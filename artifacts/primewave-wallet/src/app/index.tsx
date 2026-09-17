@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import { Alert, AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/src/theme';
@@ -395,6 +395,7 @@ function BiometricSetup({ availability, onEnable, onSkip }: { availability: Biom
 
 function Locked({ biometricEnabled, onUnlock, onBiometric, onReset }: { biometricEnabled: boolean; onUnlock: (pin: string) => void; onBiometric: () => void; onReset: () => void }) {
   const [pin, setPin] = useState('');
+  const [resetRequested, setResetRequested] = useState(false);
   return (
     <Screen>
       <View style={styles.lockHero}>
@@ -407,9 +408,18 @@ function Locked({ biometricEnabled, onUnlock, onBiometric, onReset }: { biometri
       <Field keyboardType="number-pad" label="Wallet PIN" onChangeText={setPin} placeholder="6 digits" secureTextEntry value={pin} />
       <AppButton label="Unlock wallet" onPress={() => { onUnlock(pin); setPin(''); }} icon="arrow-forward" />
       {__DEV__ ? (
-        <Pressable accessibilityRole="button" onPress={onReset} style={styles.resetPreviewButton}>
-          <Text style={styles.resetPreviewText}>Reset local preview</Text>
-        </Pressable>
+        resetRequested ? (
+          <View style={styles.resetPreviewPanel}>
+            <Text style={styles.resetPreviewTitle}>Erase this local preview?</Text>
+            <Text style={styles.resetPreviewBody}>The preview wallet and its PIN will be permanently removed from this device. You can then create a new wallet.</Text>
+            <AppButton label="Erase and restart" onPress={onReset} danger secondary icon="trash-outline" />
+            <Pressable accessibilityRole="button" onPress={() => setResetRequested(false)} style={styles.resetCancelButton}>
+              <Text style={styles.resetCancelText}>Cancel</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <AppButton label="Reset local preview" onPress={() => setResetRequested(true)} secondary icon="refresh-outline" />
+        )
       ) : null}
     </Screen>
   );
@@ -625,7 +635,7 @@ export default function FoundationScreen() {
     setPinForBiometric(pin); setPin(''); setConfirmPin(''); await refreshSettings(); setView('biometric');
   })} />;
   else if (view === 'biometric') content = <BiometricSetup availability={biometricAvailability} onEnable={() => void run(async () => { await access.enableBiometricUnlock(true, pinForBiometric); setPinForBiometric(''); await refreshSettings(); setView('wallet'); })} onSkip={() => { setPinForBiometric(''); setView('wallet'); }} />;
-  else if (view === 'locked') content = <Locked biometricEnabled={settings.biometricEnabled} onUnlock={(value) => void run(async () => { const result = await access.unlockWithPin(value); if (!result.authenticated) { setError('Authentication failed. Try again or use your PIN fallback.'); return; } await refreshSettings(); setView('wallet'); })} onBiometric={() => void run(async () => { const result = await access.unlockWithBiometrics(); if (!result.authenticated) { setError(result.reason === 'cancelled' ? 'Biometric authentication was cancelled. Use your PIN.' : 'Biometric authentication was not available. Use your PIN.'); return; } setView('wallet'); })} onReset={() => Alert.alert('Reset local preview?', 'This permanently erases the preview wallet and its PIN on this device. You will create a new wallet and choose a new PIN.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Erase and restart', style: 'destructive', onPress: () => void run(async () => { await access.resetLocalWallet(); setSettings({ biometricEnabled: false, autoLockPolicy: 0, pinConfigured: false }); setPin(''); setConfirmPin(''); setView('welcome'); }) }])} />;
+  else if (view === 'locked') content = <Locked biometricEnabled={settings.biometricEnabled} onUnlock={(value) => void run(async () => { const result = await access.unlockWithPin(value); if (!result.authenticated) { setError('Authentication failed. Try again or use your PIN fallback.'); return; } await refreshSettings(); setView('wallet'); })} onBiometric={() => void run(async () => { const result = await access.unlockWithBiometrics(); if (!result.authenticated) { setError(result.reason === 'cancelled' ? 'Biometric authentication was cancelled. Use your PIN.' : 'Biometric authentication was not available. Use your PIN.'); return; } setView('wallet'); })} onReset={() => void run(async () => { await access.resetLocalWallet(); setSettings({ biometricEnabled: false, autoLockPolicy: 0, pinConfigured: false }); setPin(''); setConfirmPin(''); setView('welcome'); })} />;
   else if (view === 'wallet' && currentWallet) content = <WalletHome wallet={currentWallet} onSecurity={() => { setError(''); setView('security'); }} onLock={() => void run(async () => { await access.lockWallet(); setView('locked'); })} />;
   else if (view === 'security') content = <Security settings={settings} biometricAvailability={biometricAvailability} securityPin={securityPin} setSecurityPin={setSecurityPin} newPin={newPin} setNewPin={setNewPin} onChangePin={() => void run(async () => { if (newPin.length !== 6 || !/^\d{6}$/.test(newPin)) { setError('Choose exactly 6 digits for your new PIN.'); return; } const result = await access.changePin(securityPin, newPin); if (!result.authenticated) { setError('Current PIN was not accepted.'); return; } setSecurityPin(''); setNewPin(''); await refreshSettings(); setError('PIN updated.'); })} onToggleBiometric={() => void run(async () => { const result = await access.enableBiometricUnlock(!settings.biometricEnabled, securityPin); if (!result.authenticated) { setError('Current PIN was not accepted.'); return; } setSecurityPin(''); await refreshSettings(); })} onAutoLock={(policy) => void run(async () => { await access.setAutoLockPolicy(policy); await refreshSettings(); if (policy === 0) setView('locked'); })} onReveal={() => void run(async () => { if (!securityPin) { setError('Enter your current PIN first.'); return; } setRevealedPhrase(await access.revealRecoveryPhrase(securityPin)); setSecurityPin(''); setView('recovery'); })} onLock={() => void run(async () => { await access.lockWallet(); setView('locked'); })} onBack={() => { setError(''); setView('wallet'); }} />;
   else if (view === 'recovery' && revealedPhrase) content = <Recovery phrase={revealedPhrase} onClose={() => { setRevealedPhrase(''); setView('security'); }} />;
@@ -673,8 +683,11 @@ const styles = StyleSheet.create({
   buttonSecondary: { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border },
   buttonDanger: { backgroundColor: 'transparent', borderColor: theme.colors.destructive },
   buttonDisabled: { opacity: theme.states.disabledOpacity },
-  resetPreviewButton: { alignItems: 'center', justifyContent: 'center', minHeight: 44, marginTop: theme.spacing.xs },
-  resetPreviewText: { color: theme.colors.mutedForeground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13, textDecorationLine: 'underline' },
+  resetPreviewPanel: { borderRadius: theme.radius.md, padding: theme.spacing.md, gap: theme.spacing.sm, backgroundColor: 'rgba(255, 101, 132, 0.08)', borderWidth: 1, borderColor: 'rgba(255, 101, 132, 0.35)' },
+  resetPreviewTitle: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 15, lineHeight: 20 },
+  resetPreviewBody: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 13, lineHeight: 19 },
+  resetCancelButton: { alignItems: 'center', justifyContent: 'center', minHeight: 40 },
+  resetCancelText: { color: theme.colors.mutedForeground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13, textDecorationLine: 'underline' },
   buttonPressed: { opacity: theme.states.pressedOpacity, transform: [{ scale: 0.99 }] },
   buttonText: { color: theme.colors.primaryForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 13, letterSpacing: 0.3 },
   buttonTextSecondary: { color: theme.colors.foreground },
