@@ -1,0 +1,1323 @@
+PRIMEWAVE WALLET — PHASE 3.3
+TOKEN DISCOVERY & USER-ADDED ASSET ENGINE
+==========================================
+
+You are continuing development of PrimeWave Wallet.
+
+IMPORTANT:
+This is Phase 3.3 ONLY.
+
+Implement the token discovery architecture and user-added token engine.
+
+DO NOT implement:
+- token transfers
+- approve
+- allowance
+- transferFrom
+- permit
+- token sending UI
+- token receiving UI
+- swaps
+- DEX integration
+- trading
+- NFTs
+- portfolio valuation
+- fiat pricing
+- transaction history
+- Activity UI
+- DApps
+- WalletConnect
+- backend token indexing
+- external token verification services
+- price APIs
+- token risk scoring
+- automatic token trust decisions
+- signing
+- broadcasting
+- background transaction execution
+
+Do not redesign the existing asset/token architecture.
+
+==================================================
+CORE PRINCIPLE
+==================================================
+
+Discovery, identity, compatibility, metadata, verification, and trust are different concepts.
+
+DO NOT collapse them.
+
+A token can be:
+
+DISCOVERED
+without being
+VERIFIED.
+
+A token can be:
+
+ERC-20 COMPATIBLE
+without being
+TRUSTED.
+
+A token can have:
+
+VALID METADATA
+without being
+LEGITIMATE.
+
+A token can have the same:
+
+NAME / SYMBOL
+
+as another token while having a completely different contract address.
+
+The contract address + network remains the authoritative asset identity.
+
+==================================================
+CURRENT ARCHITECTURE
+==================================================
+
+Existing:
+
+Phase 3.1:
+- Asset abstraction
+- Native assets
+- network-scoped asset identity
+- exact amount handling
+- native balances
+
+Phase 3.2:
+- generic ERC-20 token engine
+- contract validation
+- name
+- symbol
+- decimals
+- balanceOf
+- metadata states
+- unverified/unknown semantics
+- exact bigint token balances
+
+Existing blockchain infrastructure:
+- Network Registry
+- RPC Provider
+- Account State Service
+- Gas/Fee Engine
+- Transaction Construction
+- Local Signing
+- Broadcast/Confirmation
+
+Reuse existing services.
+
+Do not duplicate RPC functionality.
+
+==================================================
+PHASE 3.3 OBJECTIVE
+==================================================
+
+Create a safe discovery and user-added token architecture.
+
+The system should support:
+
+1. Known token candidates
+2. User-added tokens
+3. Discovered token candidates
+4. Token visibility state
+5. Deduplication
+6. Network/account scoping
+7. Safe metadata resolution
+8. Discovery provenance
+9. Explicit verification state
+10. Future trusted-token integration
+
+But DO NOT build a full external token verification provider.
+
+==================================================
+1. TOKEN SOURCE / PROVENANCE
+==================================================
+
+Create a strongly typed token provenance model.
+
+Possible values:
+
+- user_added
+- discovered
+- registry
+- external_source
+
+Only sources appropriate to this phase should be functional.
+
+At minimum implement:
+
+user_added
+discovered
+
+The architecture may reserve:
+
+registry
+external_source
+
+for future use.
+
+Every token candidate should carry provenance.
+
+This allows future UI to explain:
+
+"Added by you"
+
+versus:
+
+"Discovered on-chain"
+
+without implying trust.
+
+==================================================
+2. TOKEN DISCOVERY STATUS
+==================================================
+
+Create a discovery state model.
+
+Possible states:
+
+- not_discovered
+- discovered
+- manually_added
+- hidden
+- unavailable
+
+Use terminology consistent with the existing project.
+
+Do not automatically use:
+
+verified
+
+as a discovery state.
+
+Verification is a separate concern.
+
+==================================================
+3. TOKEN VERIFICATION STATUS
+==================================================
+
+Reuse/extend the Phase 3.2 verification model.
+
+At minimum:
+
+- unknown
+- unverified
+- verified
+
+For Phase 3.3:
+
+DO NOT implement a real verification provider.
+
+DO NOT automatically set arbitrary discovered tokens to verified.
+
+DO NOT infer verification from:
+
+- contract code
+- name
+- symbol
+- decimals
+- balance
+- transfer history
+- token popularity
+
+All arbitrary discovered/user-added tokens should remain:
+
+unknown/unverified
+
+unless a trusted source already exists in the project.
+
+==================================================
+4. USER-ADDED TOKEN
+==================================================
+
+Create a user-added token request/model.
+
+The minimum required input should be:
+
+- network ID
+- contract address
+
+The system should then:
+
+1. Validate network
+2. Validate address
+3. Validate contract code
+4. Read ERC-20 metadata
+5. Resolve token identity
+6. Create a token candidate
+7. Mark provenance as user_added
+8. Mark verification as unknown/unverified
+9. Return the token result
+
+Do NOT automatically claim the token is legitimate.
+
+==================================================
+5. USER-ADDED TOKEN PERSISTENCE
+==================================================
+
+This phase MAY introduce persistence for user-added token preferences.
+
+However:
+
+ONLY non-sensitive public metadata may be persisted.
+
+Allowed examples:
+
+- network ID
+- contract address
+- asset identity
+- visibility
+- provenance
+- locally observed metadata
+- timestamps
+
+Forbidden:
+
+- private keys
+- mnemonic
+- seed
+- PIN
+- vault contents
+- authentication secrets
+- signing data
+
+Do NOT use SecureStore for token metadata.
+
+If persistence is implemented, use an appropriate non-sensitive local storage abstraction already accepted by the project.
+
+If the project does not yet have an approved persistence abstraction:
+
+create a small isolated public-metadata persistence interface.
+
+Do not directly scatter AsyncStorage/localStorage calls throughout the token engine.
+
+==================================================
+6. WEB / BROWSER STORAGE
+==================================================
+
+Follow the existing project security policy.
+
+Do NOT introduce insecure fallback behavior merely to make persistence work on web.
+
+If secure/public persistence is unsupported in a specific environment:
+
+fail safely or operate session-only according to the established architecture.
+
+Do not persist token metadata in inappropriate secret storage.
+
+==================================================
+7. TOKEN IDENTITY
+==================================================
+
+The canonical token identity remains:
+
+assetType
++
+networkId
++
+contractAddress
+
+Do NOT use:
+
+symbol
+name
+decimals
+
+as identity.
+
+Normalize contract addresses consistently.
+
+Example:
+
+Ethereum + 0xABC...
+
+is different from:
+
+Base + 0xABC...
+
+==================================================
+8. DEDUPLICATION
+==================================================
+
+Prevent duplicate token records.
+
+These must resolve to the same identity:
+
+Ethereum + contract A
+
+Ethereum + same contract A
+
+regardless of:
+
+- checksum casing
+- provenance
+- repeated discovery
+
+However:
+
+Ethereum + contract A
+
+must remain distinct from:
+
+Base + contract A
+
+If a token is:
+
+user_added
+
+and later:
+
+discovered
+
+do NOT create two token identities.
+
+Instead maintain one token identity with multiple provenance observations if useful.
+
+==================================================
+9. DISCOVERY OBSERVATION
+==================================================
+
+Create a model representing a discovery observation.
+
+Conceptually:
+
+TokenDiscoveryObservation
+
+containing:
+
+- token identity
+- network ID
+- account ID if account-specific
+- discovery source
+- discovered timestamp
+- reason
+- metadata snapshot if available
+
+Do not claim the observation proves ownership.
+
+Do not claim it proves legitimacy.
+
+==================================================
+10. WHAT COUNTS AS DISCOVERY?
+==================================================
+
+For Phase 3.3, implement only safe discovery mechanisms that are practical with the current architecture.
+
+The preferred mechanism is:
+
+transaction/event-based discovery
+
+using public blockchain information.
+
+Do NOT scan the entire blockchain.
+
+Do NOT scan every contract.
+
+Do NOT scan every block from genesis.
+
+Do NOT create a blockchain indexer.
+
+Do NOT add an external indexing service.
+
+If event-based discovery is not safely supportable with the current RPC architecture, implement the discovery interface and a controlled known-contract/user-added path, and explicitly document event scanning as deferred.
+
+Do NOT invent an incomplete discovery system merely to satisfy the feature.
+
+==================================================
+11. ERC-20 TRANSFER EVENT
+==================================================
+
+If implementing on-chain discovery through logs, use the standard ERC-20:
+
+Transfer(address,address,uint256)
+
+event.
+
+The event signature is:
+
+Transfer(address,address,uint256)
+
+Use the standard event topic.
+
+Do NOT manually invent topic encoding.
+
+Prefer viem's existing ABI/log utilities.
+
+==================================================
+12. ACCOUNT-SCOPED DISCOVERY
+==================================================
+
+Discovery should be tied to a wallet account where appropriate.
+
+For example:
+
+Wallet Account A
+
+may discover token X.
+
+Wallet Account B
+
+may not have interacted with token X.
+
+Do not assume all accounts share the same discovered-token set.
+
+However, token identity itself remains:
+
+network + contract.
+
+Separate:
+
+asset identity
+
+from:
+
+account discovery state.
+
+==================================================
+13. MULTI-NETWORK DISCOVERY
+==================================================
+
+Discovery must remain network-scoped.
+
+The same contract address on:
+
+Ethereum
+
+and:
+
+Base
+
+must create separate asset identities.
+
+Never merge them because:
+
+symbol/name match.
+
+==================================================
+14. DISCOVERY LIMITS
+==================================================
+
+Discovery must be bounded.
+
+Do not allow a single request to:
+
+- scan unlimited blocks
+- retrieve unlimited logs
+- create unlimited token records
+- consume unbounded memory
+
+Introduce reasonable:
+
+- block range limits
+- result limits
+- metadata lookup limits
+
+Document the limits.
+
+If a request exceeds the allowed range:
+
+return a clear normalized error or require pagination/chunking.
+
+Do NOT silently scan more than the requested/allowed scope.
+
+==================================================
+15. LOG DISCOVERY SAFETY
+==================================================
+
+If using eth_getLogs:
+
+filter narrowly by:
+
+- network
+- account address
+- Transfer event topic
+
+Use appropriate indexed address topics.
+
+Do not request the entire chain's Transfer events.
+
+Do not use:
+
+eth_getLogs
+
+without bounded block ranges.
+
+Do not automatically scan from block 0.
+
+==================================================
+16. FALSE POSITIVES
+==================================================
+
+A contract emitting a Transfer-shaped event does NOT automatically prove it is a legitimate ERC-20.
+
+After discovering a candidate:
+
+run the Phase 3.2 contract/metadata validation.
+
+A candidate may be:
+
+- discovered
+- ERC-20-compatible
+- metadata partial
+- unverified
+
+These states may coexist.
+
+==================================================
+17. ZERO BALANCE DISCOVERY
+==================================================
+
+Do not automatically hide a discovered token solely because its current balance is zero.
+
+A user may have:
+
+- previously held it
+- sent it away
+- received an event
+- intentionally added it
+
+However, do not automatically flood the asset list with every historical zero-balance token.
+
+Separate:
+
+discovered candidate
+
+from:
+
+visible portfolio asset.
+
+Visibility policy belongs to the portfolio layer.
+
+==================================================
+18. VISIBILITY STATE
+==================================================
+
+Create a public token visibility model.
+
+Possible values:
+
+- visible
+- hidden
+
+This is NOT a security/trust decision.
+
+Hidden means:
+
+"Do not show this token in the user's primary asset view."
+
+It does NOT mean:
+
+"Token is malicious."
+
+It does NOT delete the asset identity.
+
+==================================================
+19. USER INTENT
+==================================================
+
+User-added tokens represent explicit user intent.
+
+Record provenance:
+
+user_added
+
+but do not automatically upgrade verification status.
+
+For example:
+
+User adds a contract claiming to be "USDT".
+
+The engine may resolve:
+
+name = USDT
+symbol = USDT
+decimals = 6
+
+But verification remains:
+
+unknown/unverified
+
+unless trusted verification evidence exists.
+
+==================================================
+20. METADATA REFRESH
+==================================================
+
+If metadata was already resolved during user-add/discovery:
+
+reuse it within that operation.
+
+Do not create continuous refresh.
+
+Do not create background token metadata polling.
+
+A future cache strategy can be designed separately.
+
+==================================================
+21. METADATA CHANGES
+==================================================
+
+Do not assume token metadata is immutable.
+
+If a later metadata read differs:
+
+represent the new observation safely.
+
+Do not silently change token identity.
+
+Identity remains:
+
+network + contract address.
+
+Do not create a second token because the name changed.
+
+==================================================
+22. PERSISTED METADATA
+==================================================
+
+If persisting metadata:
+
+treat it as a cache/observation, not authoritative truth.
+
+Blockchain reads remain the source for current contract behavior.
+
+Do not allow stale local metadata to override fresh validated contract reads without an explicit cache policy.
+
+==================================================
+23. TOKEN REGISTRY INTEGRATION
+==================================================
+
+Integrate with the existing Phase 3.2 token registry.
+
+The registry should resolve:
+
+network + contract
+
+to one canonical token identity.
+
+Repeated discovery must not create duplicate entries.
+
+==================================================
+24. NO GLOBAL TOKEN LIST
+==================================================
+
+Do NOT build a giant list of:
+
+USDT
+USDC
+DAI
+WBTC
+LINK
+etc.
+
+A future verified-token registry may exist separately.
+
+Phase 3.3 must remain generic.
+
+==================================================
+25. NO EXTERNAL TOKEN API
+==================================================
+
+Do not integrate:
+
+CoinGecko
+CoinMarketCap
+Trust Wallet assets
+Uniswap token lists
+DEX Screener
+third-party token lists
+third-party verification APIs
+
+in this phase.
+
+Do not make external claims of verification.
+
+==================================================
+26. NO PRICE DATA
+==================================================
+
+Do not retrieve:
+
+- token prices
+- market cap
+- volume
+- liquidity
+- P&L
+
+Discovery is about identifying assets, not valuing them.
+
+==================================================
+27. NO TOKEN RISK ENGINE
+==================================================
+
+Do not create a fake "scam score."
+
+Do not label tokens:
+
+- scam
+- malicious
+- fraud
+
+based solely on discovery.
+
+The safest generic state is:
+
+unknown/unverified.
+
+A future risk engine can combine multiple trusted signals.
+
+==================================================
+28. SAFE METADATA
+==================================================
+
+Continue the Phase 3.2 metadata security rules.
+
+Token metadata is untrusted.
+
+Apply bounded limits to:
+
+- name
+- symbol
+- metadata strings
+
+Do not allow metadata to become:
+
+- executable code
+- automatic URLs
+- HTML
+- navigation targets
+- file paths
+- external resource fetches
+
+==================================================
+29. ACCOUNT / ADDRESS VALIDATION
+==================================================
+
+Validate wallet account addresses before discovery.
+
+Only public addresses may be used.
+
+No:
+
+- private keys
+- mnemonic
+- vault
+- signing
+
+==================================================
+30. NETWORK VALIDATION
+==================================================
+
+Every discovery operation must validate:
+
+- network ID
+- enabled state
+- configured state
+- chain ID
+- remote chain ID
+
+Do not discover tokens against a network that has not been configured.
+
+PrimeWave placeholder must remain rejected until official configuration is supplied.
+
+==================================================
+31. NETWORK RACE PROTECTION
+==================================================
+
+Capture the network context before discovery.
+
+If using an active-network convenience method:
+
+verify active network has not changed before returning results.
+
+For explicitly network-scoped discovery:
+
+keep the request tied to that network.
+
+Do not silently switch.
+
+==================================================
+32. DISCOVERY RESULT MODEL
+==================================================
+
+Create a safe result model containing:
+
+- token identity
+- network
+- contract
+- provenance
+- discovery state
+- verification state
+- metadata state
+- token metadata where available
+- discovery timestamp
+- account context if applicable
+- visibility
+
+Do NOT include:
+
+- private key
+- mnemonic
+- seed
+- PIN
+- vault data
+- signing capability
+
+==================================================
+33. ERROR HANDLING
+==================================================
+
+Use the existing sanitized error architecture.
+
+Possible normalized errors:
+
+- DISCOVERY_NETWORK_UNAVAILABLE
+- DISCOVERY_NETWORK_CHANGED
+- DISCOVERY_CHAIN_MISMATCH
+- DISCOVERY_INVALID_ACCOUNT
+- DISCOVERY_INVALID_TOKEN
+- DISCOVERY_NOT_A_CONTRACT
+- DISCOVERY_RANGE_TOO_LARGE
+- DISCOVERY_RESULT_LIMIT
+- DISCOVERY_LOG_QUERY_FAILED
+- DISCOVERY_METADATA_FAILED
+- DISCOVERY_PERSISTENCE_FAILED
+- DISCOVERY_UNSUPPORTED
+
+Do not expose:
+
+- raw RPC payloads
+- raw RPC URLs
+- credentials
+- internal stacks
+- secrets
+
+==================================================
+34. PERSISTENCE ARCHITECTURE
+==================================================
+
+If implementing persistence:
+
+create a small repository interface such as:
+
+TokenPreferenceRepository
+
+or equivalent.
+
+It should store only public metadata/preferences.
+
+Example:
+
+{
+  assetIdentity,
+  visibility,
+  provenance,
+  metadataSnapshot,
+  createdAt,
+  updatedAt
+}
+
+Do not put persistence logic into low-level RPC services.
+
+==================================================
+35. DELETE / HIDE SEMANTICS
+==================================================
+
+Do not implement account deletion or wallet deletion here.
+
+For token preferences, if supporting removal:
+
+distinguish:
+
+hide token
+
+from:
+
+delete local token preference.
+
+Do not claim deleting a local token record deletes anything on-chain.
+
+No blockchain state is changed.
+
+==================================================
+36. TESTING
+==================================================
+
+Create comprehensive offline tests using fake RPC transports and deterministic storage mocks.
+
+At minimum test:
+
+1. valid user-added token
+2. invalid network
+3. unconfigured network
+4. disabled network
+5. PrimeWave placeholder rejection
+6. invalid contract address
+7. EOA rejection
+8. valid ERC-20 metadata resolution
+9. metadata failure
+10. partial metadata
+11. user-added provenance
+12. discovered provenance
+13. unknown verification state
+14. duplicate token identity
+15. checksum normalization deduplication
+16. same contract different networks remain distinct
+17. same token discovered by multiple sources
+18. account-specific discovery
+19. multiple accounts
+20. multiple networks
+21. visibility state
+22. metadata snapshot behavior
+23. persisted public metadata only
+24. no secret persistence
+25. no SecureStore use
+26. no signing
+27. no broadcasting
+28. no backend
+29. no price APIs
+30. no external token lists
+31. bounded discovery range
+32. bounded discovery results
+33. Transfer event discovery if implemented
+34. unrelated event ignored
+35. malformed log handling
+36. duplicate discovery deduplication
+37. network-change rejection
+38. chain mismatch
+39. RPC error normalization
+40. metadata security limits
+41. repeated discovery determinism
+42. concurrent discovery safety
+
+==================================================
+37. TRANSFER EVENT TESTS
+==================================================
+
+If event-based discovery is implemented, test:
+
+- Transfer event TO wallet
+- Transfer event FROM wallet
+- Transfer event involving another wallet
+- multiple token contracts
+- duplicate events
+- zero-value transfers
+- malformed event data
+- bounded block ranges
+- correct indexed address filtering
+
+Do not treat every arbitrary log as a token.
+
+==================================================
+38. RPC METHOD AUDIT
+==================================================
+
+Record all RPC methods.
+
+Allowed read methods may include:
+
+- eth_chainId
+- eth_getCode
+- eth_call
+- eth_getLogs
+- other existing read-only methods strictly required
+
+Must NOT call:
+
+eth_sendRawTransaction
+
+Must NOT invoke token state-changing methods:
+
+transfer
+approve
+allowance
+transferFrom
+permit
+permit2
+
+==================================================
+39. NO FULL-CHAIN SCAN TEST
+==================================================
+
+Explicitly test that discovery rejects or bounds:
+
+- enormous block ranges
+- unlimited scans
+- block 0 → latest automatic scanning
+
+Do not allow a single method call to scan an entire blockchain.
+
+==================================================
+40. SECURITY LEAK TESTS
+==================================================
+
+Verify no:
+
+- private key
+- mnemonic
+- seed
+- PIN
+- vault contents
+
+appear in:
+
+- discovery results
+- token records
+- persistence
+- errors
+- logs
+
+==================================================
+41. NO TRANSACTION TEST
+==================================================
+
+The fake RPC transport must fail if:
+
+eth_sendRawTransaction
+
+is invoked.
+
+The complete Phase 3.3 suite must pass without broadcasting.
+
+==================================================
+42. NO STATE-CHANGING TOKEN TEST
+==================================================
+
+The fake RPC transport must fail if any state-changing token operation is attempted.
+
+Verify no calls are made for:
+
+transfer
+approve
+allowance
+transferFrom
+permit
+permit2
+
+==================================================
+43. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+src/core/assets/README.md
+
+Create/update discovery documentation if appropriate.
+
+Document:
+
+- discovery model
+- provenance
+- user-added tokens
+- discovered candidates
+- verification separation
+- visibility
+- identity/deduplication
+- network/account scoping
+- discovery limits
+- Transfer event approach if implemented
+- persistence policy
+- metadata trust limitations
+- no external verification provider
+- no token transactions
+- no portfolio valuation
+
+Clearly state:
+
+"Phase 3.3 introduces token discovery and user-added token infrastructure. Discovery does not imply verification or trust."
+
+==================================================
+44. FILE ORGANIZATION
+==================================================
+
+Prefer:
+
+src/core/assets/
+  token/
+    ...
+    discovery/
+      models.ts
+      service.ts
+      repository.ts
+      errors.ts
+      index.ts
+      tests/
+
+Adapt to existing conventions.
+
+Do not duplicate existing token logic.
+
+==================================================
+45. DEPENDENCY POLICY
+==================================================
+
+Prefer existing:
+
+- viem
+- existing RPC provider
+- existing token engine
+- existing asset registry
+- existing validation
+- existing persistence abstractions if any
+
+Do not add an external token list.
+
+Do not add an external verification service.
+
+Do not add an external indexing service.
+
+Do not add a new ABI library.
+
+==================================================
+46. PERFORMANCE
+==================================================
+
+Discovery must be deliberately bounded.
+
+Do not:
+
+- scan the entire blockchain
+- query unlimited logs
+- resolve unlimited token metadata in one operation
+- create unbounded in-memory arrays
+
+Use explicit limits.
+
+If pagination is needed:
+
+design a deterministic pagination model.
+
+Do not silently expand the requested scope.
+
+==================================================
+47. REQUIRED VALIDATION
+==================================================
+
+Run:
+
+- Phase 3.3 tests
+- complete existing test suite
+- TypeScript
+- Expo dependency check
+- Expo Doctor
+- Expo public config
+- git diff --check
+- Expo/Metro workflow validation if available
+
+Do not delete previous tests.
+
+Do not weaken previous security tests.
+
+==================================================
+48. FINAL REPORT
+==================================================
+
+When complete, report:
+
+1. Files created
+2. Files modified
+3. Discovery architecture
+4. Token provenance model
+5. Discovery states
+6. Verification states
+7. User-added token flow
+8. Persistence architecture
+9. Deduplication strategy
+10. Account scoping
+11. Network scoping
+12. Transfer event discovery status
+13. Discovery limits
+14. Metadata handling
+15. Visibility behavior
+16. RPC methods used
+17. Confirmation no token state-changing methods are used
+18. Confirmation no signing
+19. Confirmation no broadcasting
+20. Confirmation no backend
+21. Confirmation no external token lists
+22. Confirmation no price APIs
+23. Security limitations
+24. Test count
+25. Test failures
+26. TypeScript result
+27. Expo Doctor result
+28. Expo config result
+29. Metro result
+30. Warnings
+31. Deferred functionality
+
+==================================================
+ABSOLUTE STOP CONDITION
+==================================================
+
+STOP after Phase 3.3.
+
+DO NOT implement:
+
+- token transfers
+- approvals
+- allowances
+- permits
+- token sending UI
+- token receiving UI
+- swaps
+- DEX
+- NFTs
+- portfolio valuation
+- fiat prices
+- token prices
+- token risk scoring
+- external token verification
+- external token lists
+- full blockchain indexing
+- transaction history
+- Activity UI
+- DApps
+- WalletConnect
+- notifications
+
+Those belong to later phases.
+
+==================================================
+FINAL PRINCIPLE
+==================================================
+
+WaveX must maintain this distinction:
+
+TOKEN IDENTITY
+    ↓
+CONTRACT COMPATIBILITY
+    ↓
+METADATA
+    ↓
+DISCOVERY
+    ↓
+PROVENANCE
+    ↓
+VERIFICATION
+    ↓
+TRUST
+
+These are different layers.
+
+Discovery means:
+
+"We observed evidence that this contract may be relevant to this account."
+
+It does NOT mean:
+
+"This token is legitimate."
+
+User-added means:
+
+"The user explicitly added this contract."
+
+It does NOT mean:
+
+"WaveX verified this token."
+
+Never collapse these meanings.

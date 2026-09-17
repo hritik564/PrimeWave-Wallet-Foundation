@@ -27,6 +27,7 @@ const RPC_METHODS = new Set<EvmRpcMethod>([
   'eth_getTransactionCount',
   'eth_getCode',
   'eth_call',
+  'eth_getLogs',
   'eth_getTransactionByHash',
   'eth_getTransactionReceipt',
   'eth_estimateGas',
@@ -158,6 +159,50 @@ function validateParams(method: EvmRpcMethod, params: unknown): void {
         requireBlockTag(second);
       }
       break;
+    case 'eth_getLogs': {
+      requireLength(1);
+      if (!isPlainRecord(first)) {
+        throw new RpcProviderError('CONFIGURATION_ERROR', { method });
+      }
+      for (const [key, value] of Object.entries(first)) {
+        if (key === 'fromBlock' || key === 'toBlock') {
+          requireBlockTag(value);
+        } else if (key === 'address') {
+          if (
+            (typeof value !== 'string' &&
+              !(
+                Array.isArray(value) &&
+                value.length > 0 &&
+                value.every((item) => typeof item === 'string' && item.length > 0)
+              )) ||
+            (typeof value === 'string' && value.length === 0)
+          ) {
+            throw new RpcProviderError('CONFIGURATION_ERROR', { method });
+          }
+        } else if (key === 'topics') {
+          if (
+            !Array.isArray(value) ||
+            value.some(
+              (topic) =>
+                topic !== null &&
+                typeof topic !== 'string' &&
+                !(
+                  Array.isArray(topic) &&
+                  topic.length > 0 &&
+                  topic.every(
+                    (item) => typeof item === 'string' && item.length > 0,
+                  )
+                ),
+            )
+          ) {
+            throw new RpcProviderError('CONFIGURATION_ERROR', { method });
+          }
+        } else {
+          throw new RpcProviderError('CONFIGURATION_ERROR', { method });
+        }
+      }
+      break;
+    }
     case 'eth_getTransactionByHash':
     case 'eth_getTransactionReceipt':
     case 'eth_getBlockByHash':
@@ -224,6 +269,14 @@ function validateResult(method: EvmRpcMethod, result: unknown): void {
     case 'eth_getCode':
     case 'eth_call':
       if (!isHexData(result)) {
+        throw new RpcProviderError('INVALID_RESPONSE', { method });
+      }
+      return;
+    case 'eth_getLogs':
+      if (
+        !Array.isArray(result) ||
+        result.some((log) => !isPlainRecord(log))
+      ) {
         throw new RpcProviderError('INVALID_RESPONSE', { method });
       }
       return;
