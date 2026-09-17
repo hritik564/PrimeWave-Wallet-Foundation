@@ -56,6 +56,10 @@ export interface EvmRpcMethodMap {
     readonly params: readonly [];
     readonly result: HexQuantity;
   };
+  eth_maxPriorityFeePerGas: {
+    readonly params: readonly [];
+    readonly result: HexQuantity;
+  };
   eth_getBlockByNumber: {
     readonly params: readonly [
       blockTag: RpcBlockTag,

@@ -31,6 +31,7 @@ const RPC_METHODS = new Set<EvmRpcMethod>([
   'eth_getTransactionReceipt',
   'eth_estimateGas',
   'eth_gasPrice',
+  'eth_maxPriorityFeePerGas',
   'eth_getBlockByNumber',
   'eth_getBlockByHash',
   'eth_sendRawTransaction',
@@ -135,6 +136,7 @@ function validateParams(method: EvmRpcMethod, params: unknown): void {
     case 'eth_chainId':
     case 'eth_blockNumber':
     case 'eth_gasPrice':
+    case 'eth_maxPriorityFeePerGas':
       requireLength(0);
       break;
     case 'eth_getBalance':
@@ -214,6 +216,7 @@ function validateResult(method: EvmRpcMethod, result: unknown): void {
     case 'eth_getTransactionCount':
     case 'eth_estimateGas':
     case 'eth_gasPrice':
+    case 'eth_maxPriorityFeePerGas':
       if (!isHexQuantity(result)) {
         throw new RpcProviderError('INVALID_RESPONSE', { method });
       }

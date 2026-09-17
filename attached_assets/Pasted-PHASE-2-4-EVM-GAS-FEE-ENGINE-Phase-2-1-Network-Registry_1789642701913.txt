@@ -1,0 +1,437 @@
+PHASE 2.4 — EVM GAS & FEE ENGINE
+
+Phase 2.1 Network Registry is approved.
+Phase 2.2 RPC Provider Engine is approved.
+Phase 2.3 EVM Account & Chain State is approved.
+
+Now implement ONLY Phase 2.4: the EVM Gas & Fee Engine.
+
+IMPORTANT:
+
+Do NOT implement:
+
+- transaction signing
+- private-key access
+- recovery phrase access
+- transaction broadcasting
+- transaction history
+- token balances
+- ERC-20 functionality
+- swaps
+- DApps
+- WalletConnect
+- blockchain indexing
+- backend integration
+- price feeds
+- portfolio aggregation
+- UI redesign
+
+This phase is ONLY about safely retrieving and calculating EVM gas/fee information for future transaction previews.
+
+PRIMEWAVE SECURITY INVARIANT
+
+PrimeWave Wallet is strictly non-custodial.
+
+The Gas & Fee Engine must never receive, store, log, transmit, or depend on:
+
+- private keys
+- recovery phrases
+- PINs
+- biometric secrets
+- encryption keys
+- signing secrets
+
+Gas estimation is a public/read-only blockchain operation.
+
+1. GAS ENGINE ARCHITECTURE
+
+Create a strongly typed, UI-independent Gas & Fee Engine.
+
+It must use the existing:
+
+- NetworkRegistry
+- EvmRpcProvider
+- Account & Chain State architecture where appropriate
+
+Do not create a second RPC abstraction or network registry.
+
+The engine should provide a clean API for future transaction-preview functionality.
+
+2. GAS ESTIMATION
+
+Support read-only gas estimation using:
+
+eth_estimateGas
+
+The engine should accept a future-compatible transaction simulation/request model containing only public transaction parameters such as:
+
+- from address
+- to address
+- value
+- calldata/data where applicable
+
+Do NOT accept or require:
+
+- private keys
+- recovery phrases
+- signing credentials
+
+Validate addresses before requesting estimation.
+
+Do not sign or broadcast anything.
+
+3. GAS LIMIT
+
+Return the estimated gas limit as a lossless integer representation.
+
+Use bigint internally.
+
+Never convert gas quantities through JavaScript Number.
+
+Do not silently round or truncate.
+
+4. GAS PRICE
+
+Support legacy gas pricing using:
+
+eth_gasPrice
+
+Return the value losslessly as bigint.
+
+Do not assume gas price is always available or appropriate for every EVM network.
+
+5. EIP-1559 FEE DATA
+
+Add support for EIP-1559 fee information.
+
+Where supported, retrieve the appropriate public fee information needed to construct a future EIP-1559 transaction.
+
+Support:
+
+- base fee where available
+- max fee per gas
+- max priority fee per gas where available
+
+Use appropriate EVM RPC methods and/or block information already available through the RPC provider.
+
+Do not assume every network uses EIP-1559.
+
+The engine must distinguish between:
+
+- legacy gas pricing
+- EIP-1559 fee model
+- unavailable/unsupported fee information
+
+6. FEE MODEL
+
+Create a strongly typed fee model.
+
+It should clearly distinguish:
+
+- gas limit
+- gas price or EIP-1559 fee parameters
+- estimated network fee
+- fee currency
+- fee calculation model
+
+The estimated network fee must be calculated using bigint arithmetic.
+
+For a legacy model:
+
+estimated fee = gas limit × gas price
+
+For an EIP-1559 model, calculate an appropriate maximum-fee estimate using lossless integer arithmetic.
+
+Do not use floating-point arithmetic.
+
+7. DISPLAY FORMATTING
+
+Create a separate formatting layer for human-readable values.
+
+Internal calculations must remain bigint-based.
+
+Display formatting may produce decimal strings.
+
+Examples:
+
+- raw gas limit
+- raw fee in wei
+- formatted fee in ETH/BNB/MATIC/etc.
+- fee currency symbol
+
+Never represent monetary blockchain quantities internally as floating-point numbers.
+
+Do not create fiat/USD valuation in this phase.
+
+8. FEE SAFETY
+
+The engine must detect impossible or unsafe fee conditions.
+
+Examples:
+
+- gas limit is zero
+- gas price is zero when a nonzero price is required
+- multiplication overflow is impossible with bigint but still validate logically invalid values
+- malformed RPC quantities
+- negative values
+- invalid hex quantities
+- unsupported fee model
+- missing required fee data
+- chain mismatch
+
+Return normalized safe errors.
+
+Do not silently substitute arbitrary gas values.
+
+9. GAS ESTIMATION ERROR HANDLING
+
+Use the existing normalized RPC error architecture.
+
+Normalize cases such as:
+
+- insufficient funds during estimation
+- execution reverted
+- RPC timeout
+- RPC unavailable
+- malformed result
+- unsupported RPC method
+- chain mismatch
+- invalid transaction request
+
+Do not expose raw provider internals or stack traces to the UI.
+
+Do not interpret an estimation failure as proof that a transaction is impossible unless the underlying RPC response explicitly establishes that condition.
+
+10. FROM ADDRESS
+
+If a `from` address is provided:
+
+- validate it
+- checksum-normalize it
+- ensure it is treated only as public data
+
+Do not retrieve the address from private wallet material inside the Gas Engine.
+
+The caller must provide the public address.
+
+11. TO ADDRESS
+
+Validate the destination address.
+
+Support contract destinations because future transactions may call smart contracts.
+
+Do not attempt to determine whether the destination is trustworthy.
+
+Do not introduce token approval or contract-risk logic yet.
+
+12. VALUE
+
+Represent native value losslessly.
+
+Accept hexadecimal EVM quantities or bigint internally according to the project's established conventions.
+
+Do not use JavaScript Number.
+
+Reject negative values.
+
+13. CALLDATA
+
+Allow future-compatible hexadecimal calldata/data.
+
+Validate the encoding where appropriate.
+
+Do not decode arbitrary smart-contract calldata in this phase.
+
+Do not build ERC-20 transaction builders yet.
+
+14. FEE STRATEGY
+
+Create an abstraction that allows the transaction layer later to request:
+
+- current fee information
+- gas estimate
+- maximum estimated network fee
+- fee model
+
+Do not create transaction signing or transaction execution functionality.
+
+15. NETWORK CONSISTENCY
+
+Every gas operation must be tied to one configured network.
+
+Before using fee information:
+
+- verify the active network
+- verify chain ID
+- reject unconfigured PrimeWave Mainnet
+- reject network changes during an asynchronous operation where they could cause mixed-network results
+
+Never combine:
+
+- gas data from one network
+- gas limits from another network
+- account state from another network
+
+16. NO AUTOMATIC GAS BUMPING
+
+Do NOT implement:
+
+- automatic gas multipliers
+- hidden gas padding
+- automatic fee increases
+- automatic retry with higher fees
+- transaction replacement
+
+A future transaction-preview layer may deliberately add user-visible safety margins, but that is not part of this phase.
+
+17. NO FIAT PRICES
+
+Do not add:
+
+- USD price
+- INR price
+- token price
+- exchange-rate APIs
+
+This phase deals exclusively with native blockchain fee quantities.
+
+18. NO PERSISTENCE
+
+Do not persist gas estimates.
+
+Do not use:
+
+- SecureStore
+- AsyncStorage
+- localStorage
+- database
+- backend storage
+
+Gas information is ephemeral public blockchain state.
+
+19. NO BACKGROUND POLLING
+
+Do not add WebSockets or continuous fee monitoring.
+
+Expose explicit read methods only.
+
+20. TESTING
+
+Add comprehensive offline tests using the existing fake/mock RPC transport.
+
+Do NOT depend on live public RPC endpoints.
+
+Test at minimum:
+
+- valid gas estimation
+- invalid from address
+- invalid to address
+- native value validation
+- calldata validation
+- gas limit bigint handling
+- legacy gas price
+- EIP-1559 fee model
+- missing EIP-1559 data
+- fee calculation using bigint
+- very large fee values
+- zero gas limit
+- invalid gas price
+- malformed RPC quantities
+- estimation RPC error
+- timeout
+- chain mismatch
+- network change/stale result
+- unconfigured PrimeWave network
+- unsupported fee model
+- display formatting
+- no floating-point calculations
+- no persistence
+
+21. REGRESSION TESTING
+
+All existing tests must continue passing.
+
+Do not break:
+
+- wallet generation
+- recovery phrase handling
+- secure vault
+- PIN authentication
+- biometric authentication
+- network registry
+- RPC provider
+- account-state service
+
+Do not modify existing security-sensitive code unless absolutely necessary.
+
+If an existing component must change, explain exactly why.
+
+22. DOCUMENTATION
+
+Update architecture/development documentation with:
+
+- Gas & Fee Engine responsibility
+- gas estimation
+- legacy gas pricing
+- EIP-1559 support
+- bigint safety
+- fee calculation
+- error handling
+- network consistency
+- read-only boundary
+
+Explicitly state that:
+
+- gas estimation does not sign
+- gas estimation does not broadcast
+- no private keys enter the engine
+- transaction construction is a later phase
+
+23. DEPENDENCY DISCIPLINE
+
+Do not add unnecessary dependencies.
+
+Prefer the existing RPC and TypeScript architecture.
+
+Any dependency added must be compatible with Expo SDK 57 / React Native and must not introduce Node-only runtime requirements.
+
+24. VALIDATION
+
+After implementation run:
+
+- pnpm run typecheck
+- pnpm test
+- CI=1 pnpm exec expo install --check
+- pnpm dlx expo-doctor@latest
+- Expo configuration validation
+- git diff --check
+- Expo workflow validation where available
+
+Report exact results.
+
+FINAL REPORT
+
+Do NOT continue automatically into Phase 2.5.
+
+Return a concise completion report containing:
+
+1. What was implemented
+2. Gas estimation architecture
+3. Legacy fee support
+4. EIP-1559 support
+5. Fee calculation strategy
+6. BigInt/lossless-number strategy
+7. Error handling
+8. Network consistency protection
+9. Security boundary
+10. Tests added
+11. Exact test results
+12. TypeScript result
+13. Expo validation result
+14. Any warnings
+15. Any assumptions
+16. Anything intentionally NOT implemented
+17. Any changes made to existing wallet/security code
+18. Confirmation that no private keys, recovery phrases, PINs, biometric secrets, signing secrets, transaction signing, transaction broadcasting, tokens, swaps, DApps, indexing, backend custody, or fiat pricing were introduced.
+
+STOP after Phase 2.4.
