@@ -1,0 +1,974 @@
+PRIMEWAVE WALLET — PHASE 2.6
+SECURE LOCAL TRANSACTION SIGNING ENGINE
+=======================================
+
+You are continuing development of PrimeWave Wallet.
+
+IMPORTANT:
+This is Phase 2.6 ONLY.
+
+Do not implement:
+- transaction broadcasting
+- eth_sendRawTransaction
+- transaction history
+- tokens
+- swaps
+- DApps
+- WalletConnect
+- backend signing APIs
+- cloud signing
+- automatic signing
+- automatic transaction approval
+- UI redesign
+
+Phase 2.6 introduces LOCAL transaction signing only.
+
+The signed transaction must remain on the user's device.
+
+After signing, return only the minimum public result required by the established architecture.
+
+==================================================
+CRITICAL NON-CUSTODIAL SECURITY INVARIANT
+==================================================
+
+PrimeWave Wallet is strictly non-custodial.
+
+Private keys and recovery phrases MUST:
+
+- never leave the device
+- never be sent to PrimeWave backend
+- never be sent to RPC providers
+- never be logged
+- never be persisted outside the established secure vault
+- never be exposed to React/UI components
+- never be returned from public signing APIs
+- never be included in transaction previews
+- never be included in analytics
+- never appear in errors
+- never appear in telemetry
+- never be copied to clipboard
+- never be accessible to DApp code
+
+Signing must happen entirely locally.
+
+The only output of signing that may leave the signing boundary is the resulting signed transaction representation required by a future broadcasting layer.
+
+==================================================
+CURRENT ARCHITECTURE
+==================================================
+
+Existing architecture:
+
+PRIMEWAVE UI
+  Home / Assets / Swap / Activity / Settings
+       ↓
+WALLET ENGINE
+  Accounts / Signing / Transactions / Sessions
+       ↓
+BLOCKCHAIN ENGINE
+  EVM / RPC / Gas / Tokens / Networks
+       ↓
+SECURE DEVICE LAYER
+  Keychain / Keystore / Biometrics / Encryption
+
+Backend separately handles:
+- authentication/profile
+- wallet metadata
+- token metadata
+- price data
+- blockchain indexing
+- transaction history
+- notifications
+- analytics
+
+Backend MUST NEVER handle:
+- private keys
+- recovery phrases
+- signing secrets
+- wallet PIN
+- encryption keys
+- raw transaction signing
+
+==================================================
+PREVIOUS PHASES
+==================================================
+
+Phase 0:
+- security architecture
+- security contracts
+
+Phase 1:
+- EVM wallet generation
+- standard BIP39
+- EVM derivation
+- SecureStore-backed vault
+- authentication/locking
+- biometric architecture
+
+Phase 2.1:
+- EVM network registry
+
+Phase 2.2:
+- EVM RPC provider
+
+Phase 2.3:
+- account state service
+
+Phase 2.4:
+- gas/fee engine
+
+Phase 2.5:
+- unsigned transaction construction
+
+Phase 2.5 produces:
+
+UnsignedTransaction
+TransactionPreview
+
+It intentionally does NOT sign or broadcast.
+
+==================================================
+PHASE 2.6 OBJECTIVE
+==================================================
+
+Implement a secure local signing engine.
+
+The intended lifecycle is:
+
+Unsigned Transaction
+        ↓
+Explicit Authorization
+        ↓
+Wallet Authentication
+        ↓
+Secure Key Access
+        ↓
+Local EVM Signing
+        ↓
+Signed Raw Transaction
+        ↓
+Sensitive Material Immediately Discarded
+        ↓
+Return Signed Transaction to controlled transaction layer
+        ↓
+STOP
+
+Broadcasting is Phase 2.7.
+
+==================================================
+1. USE EXISTING SECURITY CONTRACTS
+==================================================
+
+Use the signing/security contracts established during Phase 0B.
+
+Do NOT replace them with an unrelated architecture.
+
+If existing contracts need extension:
+
+- preserve backward compatibility
+- keep the security boundary explicit
+- document the reason for each change
+- do not expose private keys through the new interfaces
+
+The UI must never receive a private key.
+
+The UI must never call a low-level private-key signing primitive directly.
+
+==================================================
+2. AUTHORIZATION IS REQUIRED
+==================================================
+
+Signing must require an explicit authorization object.
+
+The signer must reject signing if authorization is absent or invalid.
+
+Authorization should bind the signing request to the specific transaction.
+
+At minimum, authorization must be associated with:
+
+- wallet/account identity
+- sender address
+- network identity
+- chain ID
+- transaction identity / transaction digest
+- authorization timestamp/context
+- authentication state
+
+The purpose is to prevent:
+
+"Authenticate once → sign arbitrary transaction later."
+
+The authorization must be specific to the transaction being signed.
+
+==================================================
+3. AUTHENTICATION
+==================================================
+
+Use the existing WalletAuthenticator architecture.
+
+Signing must require the wallet to be authenticated/unlocked.
+
+Authentication may be:
+
+- PIN
+- biometric authentication
+- other existing approved local authentication mechanism
+
+Do NOT create a second authentication system.
+
+Do NOT store another PIN.
+
+Do NOT bypass existing authentication.
+
+Do NOT treat merely having an unlocked UI as authorization to sign arbitrary transactions.
+
+==================================================
+4. TRANSACTION BINDING
+==================================================
+
+Before signing, independently validate that the transaction being signed matches the authorization.
+
+Verify:
+
+- account ID
+- FROM address
+- network ID
+- chain ID
+- transaction type
+- nonce
+- gas limit
+- value
+- recipient
+- calldata
+- fee model
+- fee fields
+
+If any transaction-critical field differs:
+
+REJECT SIGNING.
+
+Do not silently rebuild.
+
+Do not silently modify.
+
+Do not "fix" the transaction.
+
+Return a normalized security/signing error.
+
+This is a critical anti-tampering boundary.
+
+==================================================
+5. SIGNING INPUT
+==================================================
+
+The signing engine should consume the validated unsigned transaction produced by Phase 2.5.
+
+Do not allow arbitrary unvalidated transaction objects to reach the low-level signer.
+
+If necessary, create a typed:
+
+ValidatedUnsignedTransaction
+
+or equivalent internal model.
+
+The low-level signer should operate only on this validated representation.
+
+==================================================
+6. EVM SIGNING
+==================================================
+
+Use a well-maintained, standards-compliant EVM signing implementation.
+
+Do NOT implement cryptographic primitives manually.
+
+Use the existing approved dependency stack where possible.
+
+The implementation must support:
+
+- Legacy EVM transactions
+- EIP-1559 transactions
+
+The correct chain ID MUST be included.
+
+Signing must follow standard Ethereum transaction serialization/signing rules.
+
+Do not invent a custom PrimeWave transaction format.
+
+PrimeWave Chain is EVM-compatible.
+
+==================================================
+7. PRIVATE KEY LIFETIME
+==================================================
+
+This is extremely important.
+
+Private key material should exist in memory only for the minimum period required to derive/access the signing account and produce the signature.
+
+Do NOT:
+
+- put private keys in React state
+- put private keys in Redux
+- put private keys in context providers
+- put private keys in global variables
+- put private keys in caches
+- put private keys in AsyncStorage
+- put private keys in localStorage
+- put private keys in logs
+- put private keys in error objects
+- put private keys in analytics
+- put private keys in navigation parameters
+- put private keys in URL parameters
+- put private keys in test snapshots
+
+Use the existing secure vault interface.
+
+The signing layer must not persist extracted private key material.
+
+==================================================
+8. SECRET DISPOSAL
+==================================================
+
+After signing:
+
+- release references to secret material
+- do not retain the secret in service state
+- do not cache it
+- do not return it
+- do not store it
+
+Use best-effort memory cleanup where the language/runtime permits.
+
+IMPORTANT:
+
+Do NOT falsely claim that JavaScript/TypeScript can guarantee cryptographic memory zeroization.
+
+Document the limitation clearly.
+
+If a secure native implementation is required for stronger memory guarantees, document this as a future hardening item rather than pretending it is solved.
+
+==================================================
+9. NO SECRET EXPORT API
+==================================================
+
+Do NOT add public methods such as:
+
+getPrivateKey()
+exportPrivateKey()
+getSeed()
+getMnemonic()
+getSecret()
+retrieveRawKey()
+
+The signer should not expose secret material to callers.
+
+The secure vault remains the owner of sensitive wallet material.
+
+==================================================
+10. SIGNER INTERFACE
+==================================================
+
+Create a narrow signing interface.
+
+Conceptually:
+
+signTransaction(
+  validatedUnsignedTransaction,
+  authorization
+)
+
+returns something equivalent to:
+
+SignedTransaction
+
+containing only information needed by the future broadcast layer.
+
+For example:
+
+- rawTransaction
+- transaction hash if deterministically available
+- network ID
+- chain ID
+- transaction type
+
+Do NOT return:
+
+- private key
+- mnemonic
+- seed
+- decrypted vault contents
+- authentication credentials
+
+The exact existing architecture should determine the final names.
+
+==================================================
+11. SIGNED RAW TRANSACTION
+==================================================
+
+The output must be a properly serialized signed EVM transaction.
+
+It should be suitable for a future RPC broadcast call.
+
+However:
+
+DO NOT actually broadcast it.
+
+Do NOT call:
+
+eth_sendRawTransaction
+
+The signed raw transaction must remain within the local transaction/security layer until Phase 2.7.
+
+==================================================
+12. TRANSACTION HASH
+==================================================
+
+If the chosen signing library provides deterministic transaction hashing:
+
+calculate the transaction hash locally.
+
+The hash is public information.
+
+Do not query an RPC provider just to obtain the hash.
+
+Do not broadcast to calculate the hash.
+
+The hash must correspond exactly to the signed transaction.
+
+If a hash cannot safely be produced with the current implementation, document it rather than inventing one.
+
+==================================================
+13. NETWORK PROTECTION
+==================================================
+
+Before signing:
+
+verify:
+
+- selected network
+- network ID
+- chain ID
+- transaction chain ID
+- authorization chain ID
+
+All must match.
+
+If the active network changes before signing completes:
+
+REJECT.
+
+Never sign a transaction against stale network context.
+
+Do not automatically switch networks.
+
+Do not automatically retry against another network.
+
+==================================================
+14. ACCOUNT PROTECTION
+==================================================
+
+Verify that:
+
+- requested account exists locally
+- authorization account matches transaction sender
+- normalized sender address matches derived public account address
+
+Never sign for a different account than the user authorized.
+
+Do not automatically choose account 0.
+
+Do not fall back to another account.
+
+==================================================
+15. SIGNING SHOULD BE EXPLICIT
+==================================================
+
+The signing API must NOT be triggered by:
+
+- app startup
+- background task
+- app resume
+- network refresh
+- balance refresh
+- token discovery
+- DApp request
+- timer
+- notification
+- automatic retry
+
+Signing must require an explicit authorized call.
+
+==================================================
+16. PREVENT REPLAY / WRONG-CHAIN SIGNING
+==================================================
+
+The chain ID must be cryptographically bound into the transaction according to the transaction type.
+
+Test that:
+
+- signing on chain A produces a transaction bound to chain A
+- the same unsigned transaction cannot be treated as authorized for chain B
+- authorization for one chain cannot sign another chain's transaction
+
+Do not implement custom replay protection.
+
+Use standard EVM chain ID semantics.
+
+==================================================
+17. FEE INTEGRITY
+==================================================
+
+The signer must not modify:
+
+- gas limit
+- gas price
+- max fee
+- max priority fee
+- nonce
+- value
+
+The signer is NOT a fee optimizer.
+
+The signer consumes the already validated transaction.
+
+If a field is invalid:
+
+reject.
+
+Do not silently correct it.
+
+==================================================
+18. VALUE / DATA INTEGRITY
+==================================================
+
+The signer must preserve exactly:
+
+- recipient
+- value
+- calldata
+- nonce
+- gas
+- fee parameters
+- chain ID
+
+Do not normalize in a way that changes transaction meaning.
+
+Any canonical normalization must happen before the authorization binding or be included in the transaction digest.
+
+==================================================
+19. SECURITY ERRORS
+==================================================
+
+Use the existing sanitized error architecture.
+
+Possible normalized errors:
+
+- SIGNING_NOT_AUTHENTICATED
+- SIGNING_NOT_AUTHORIZED
+- SIGNING_TRANSACTION_MISMATCH
+- SIGNING_ACCOUNT_MISMATCH
+- SIGNING_NETWORK_MISMATCH
+- SIGNING_CHAIN_MISMATCH
+- SIGNING_INVALID_TRANSACTION
+- SIGNING_UNSUPPORTED_TRANSACTION
+- SIGNING_VAULT_UNAVAILABLE
+- SIGNING_KEY_ACCESS_FAILED
+- SIGNING_FAILED
+- SIGNING_CANCELLED
+
+Do not expose:
+
+- private key
+- mnemonic
+- seed
+- decrypted vault contents
+- raw cryptographic exceptions containing secrets
+- secure storage values
+- authentication secrets
+
+==================================================
+20. USER CANCELLATION
+==================================================
+
+Authentication can be cancelled.
+
+If the user cancels:
+
+- signing must stop
+- no transaction should be signed
+- no secret should be retained
+- return a normalized cancellation error/state
+
+Do not treat cancellation as a signing failure that might trigger automatic retry.
+
+==================================================
+21. BIOMETRIC BEHAVIOR
+==================================================
+
+Use the existing biometric architecture.
+
+Do not create a separate biometric implementation.
+
+If biometric authentication is unavailable:
+
+allow the existing PIN fallback according to the established authentication policy.
+
+If authentication times out:
+
+return a normalized error.
+
+Never leave the signer stuck in a "signing" state.
+
+Physical Face ID testing is still deferred because Expo Go cannot provide the required native Face ID behavior.
+
+Do not claim native biometric signing is physically verified yet.
+
+==================================================
+22. CONCURRENCY
+==================================================
+
+Protect against concurrent signing attempts.
+
+Examples:
+
+Request A starts signing.
+Request B attempts to sign simultaneously.
+
+Do not allow uncontrolled shared secret state.
+
+Prefer one isolated signing operation at a time per wallet/account.
+
+Reject or safely serialize concurrent signing attempts according to the existing architecture.
+
+Do NOT queue arbitrary background signing requests.
+
+==================================================
+23. SIGNING SESSION LIFETIME
+==================================================
+
+Do not keep decrypted key material available after signing.
+
+Authentication state may remain according to the existing wallet-locking policy, but key material must not.
+
+Do not create a long-lived:
+
+currentPrivateKey
+
+signingKey
+
+decryptedWallet
+
+global secret cache
+
+==================================================
+24. NO BACKEND COMMUNICATION
+==================================================
+
+Phase 2.6 signing must work offline after the required wallet/auth state is available.
+
+The signer must not call:
+
+- PrimeWave backend
+- analytics APIs
+- cloud key services
+- remote signing services
+
+RPC is not required to sign.
+
+A signing test must be able to run using a fake/offline environment.
+
+==================================================
+25. TEST VECTORS
+==================================================
+
+Use deterministic known test vectors.
+
+At minimum verify the existing wallet derivation against known accounts.
+
+The existing known vectors include:
+
+Account 0:
+0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+
+Account 1:
+0x70997970C51812dc3A010C7d01b50e0d17dc79C8
+
+Account 2:
+0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC
+
+Use deterministic test credentials only.
+
+NEVER use a real user's wallet or recovery phrase in tests.
+
+==================================================
+26. TEST REQUIREMENTS
+==================================================
+
+Create comprehensive offline signing tests.
+
+At minimum test:
+
+1. valid Legacy transaction signs
+2. valid EIP-1559 transaction signs
+3. resulting signed transaction is deterministic
+4. resulting transaction contains correct chain ID
+5. transaction hash is correct if implemented
+6. sender recovered from signature matches expected sender
+7. invalid authorization rejected
+8. missing authorization rejected
+9. wrong account authorization rejected
+10. wrong sender rejected
+11. wrong chain ID rejected
+12. wrong network rejected
+13. transaction field tampering rejected
+14. nonce tampering rejected
+15. gas limit tampering rejected
+16. gas price tampering rejected
+17. max fee tampering rejected
+18. max priority fee tampering rejected
+19. value tampering rejected
+20. recipient tampering rejected
+21. calldata tampering rejected
+22. transaction type tampering rejected
+23. authentication required
+24. authentication cancellation
+25. authentication timeout
+26. vault unavailable
+27. signing failure normalized
+28. concurrent signing protection
+29. repeated deterministic signing
+30. no persistence
+31. no backend calls
+32. no RPC calls required for signing
+33. no eth_sendRawTransaction
+34. no secret in returned result
+35. no secret in errors
+36. no secret in logs
+37. no secret in transaction preview
+38. account mismatch rejection
+39. network-change rejection
+40. chain mismatch rejection
+
+==================================================
+27. CRITICAL SECRET-LEAK TESTS
+==================================================
+
+Explicitly test that:
+
+- private key does not appear in SignedTransaction
+- mnemonic does not appear in SignedTransaction
+- private key does not appear in errors
+- mnemonic does not appear in errors
+- private key does not appear in logs
+- mnemonic does not appear in logs
+- private key is not persisted
+- mnemonic is not persisted
+- private key is not exposed through transaction models
+- private key is not returned by public wallet APIs
+
+Do not merely test for property names.
+
+Test actual output content where practical.
+
+==================================================
+28. BROADCAST BLOCK TEST
+==================================================
+
+Create a fake RPC transport that fails the test if:
+
+eth_sendRawTransaction
+
+is called.
+
+The entire Phase 2.6 suite must pass without invoking it.
+
+Also verify that the signing module has no code path that automatically broadcasts.
+
+==================================================
+29. SECRET-ACCESS BOUNDARY TEST
+==================================================
+
+Where practical, use mocks/spies around the secure vault.
+
+Verify:
+
+- key material is requested only after authorization/authentication
+- it is not requested during transaction construction
+- it is not requested for validation
+- it is not requested before explicit signing
+- it is not requested after signing is complete
+
+Do not weaken production interfaces merely to make tests easier.
+
+==================================================
+30. DO NOT CLAIM PERFECT MEMORY ZEROIZATION
+==================================================
+
+JavaScript/TypeScript runtimes and mobile runtimes may not provide perfect guarantees that secret bytes are immediately overwritten in every memory location.
+
+Document this honestly.
+
+The implementation should still:
+
+- minimize secret lifetime
+- avoid unnecessary copies
+- avoid persistence
+- avoid logging
+- release references
+- avoid global state
+- use secure platform storage for persistence
+
+If native cryptographic isolation would materially improve security, document it as a future hardening item.
+
+==================================================
+31. DEPENDENCY REVIEW
+==================================================
+
+Before adding any cryptographic dependency:
+
+- inspect whether existing dependencies already support the required signing
+- avoid duplicate crypto libraries
+- use established, maintained libraries
+- do not implement secp256k1 manually
+- do not implement RLP manually unless already required and well-tested
+- do not implement transaction signing primitives manually
+
+Document any new dependency and why it is required.
+
+==================================================
+32. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+src/core/transactions/README.md if appropriate
+
+Document:
+
+- signing boundary
+- authorization binding
+- authentication requirement
+- local-only signing
+- supported Legacy/EIP-1559 signing
+- secret lifetime
+- secret disposal limitations
+- no backend signing
+- no RPC signing
+- no broadcasting
+- future broadcast boundary
+- physical-device testing requirements
+
+Clearly state:
+
+"Phase 2.6 performs local transaction signing only. Broadcasting is intentionally deferred to Phase 2.7."
+
+==================================================
+33. REQUIRED VERIFICATION
+==================================================
+
+Run:
+
+- Phase 2.6 signing tests
+- complete existing test suite
+- TypeScript
+- Expo install check
+- Expo Doctor
+- Expo configuration validation
+- git diff --check
+- Metro/workflow validation if available
+
+Do not weaken existing tests.
+
+Do not delete previous security tests.
+
+Do not replace tests with snapshots that hide sensitive values.
+
+==================================================
+34. SECURITY AUDIT REPORT
+==================================================
+
+At completion, provide a detailed report containing:
+
+1. Files created
+2. Files modified
+3. Existing contracts reused
+4. New contracts/interfaces
+5. Cryptographic dependency used
+6. Why it was selected
+7. Legacy signing implementation
+8. EIP-1559 signing implementation
+9. Authorization mechanism
+10. Authentication mechanism
+11. Transaction binding mechanism
+12. Network/chain validation
+13. Secret lifetime handling
+14. Secret disposal approach
+15. Concurrency handling
+16. RPC calls made during signing
+17. Confirmation that no backend calls occur
+18. Confirmation that eth_sendRawTransaction is never called
+19. Test count
+20. Test failures
+21. TypeScript result
+22. Expo Doctor result
+23. Expo configuration result
+24. Metro result
+25. Security limitations
+26. Physical-device testing still required
+27. Deferred functionality
+
+==================================================
+ABSOLUTE STOP CONDITION
+==================================================
+
+STOP after Phase 2.6.
+
+DO NOT implement Phase 2.7.
+
+Do not add:
+
+- broadcasting
+- eth_sendRawTransaction
+- transaction history
+- receipt monitoring
+- confirmation polling
+- retry broadcasting
+- replacement transactions
+- speed-up
+- cancellation transactions
+
+Those are Phase 2.7 and later.
+
+The only new capability in this phase is:
+
+SECURE LOCAL EVM TRANSACTION SIGNING.
+
+==================================================
+
+FINAL PRINCIPLE:
+
+The wallet must behave as:
+
+CONSTRUCT
+  ↓
+AUTHORIZE
+  ↓
+AUTHENTICATE
+  ↓
+SIGN LOCALLY
+  ↓
+DISCARD SENSITIVE MATERIAL
+  ↓
+RETURN SIGNED TRANSACTION
+  ↓
+STOP
+
+Never:
+
+CONSTRUCT
+  ↓
+AUTO SIGN
+  ↓
+AUTO BROADCAST
