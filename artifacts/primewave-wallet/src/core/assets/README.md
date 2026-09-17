@@ -1,7 +1,8 @@
 # Asset core
 
-Phase 3.1 implements the asset abstraction and native EVM asset engine only.
-ERC-20/token functionality is intentionally deferred.
+Phases 3.1 and 3.2 implement the network-scoped asset abstraction, native EVM
+balance engine, and generic read-only ERC-20 token engine. NFTs and
+state-changing token operations remain deferred.
 
 Assets are network-scoped. The stable native identity is:
 
@@ -30,10 +31,26 @@ exact `bigint`. Leading zeros are rejected except for the single zero integer
 part.
 
 Multi-network support is achieved by supplying explicitly network-bound
-account-state services to the balance service. The same address on different
-networks produces separate balance identities. No balance cache, continuous
-polling, portfolio aggregation, fiat pricing, or background refresh exists in
-this phase.
+account-state services to the balance service and explicitly network-bound
+account-state/provider pairs to the ERC-20 service. The same address or
+contract on different networks produces separate identities. No balance cache,
+continuous polling, portfolio aggregation, fiat pricing, or background refresh
+exists in this phase.
 
-Future fungible-token and NFT types exist only as architectural type labels;
-they do not resolve or perform operations in Phase 3.1.
+## ERC-20 read engine
+
+`ERC20TokenService` resolves tokens by the network ID and
+checksum-normalized contract address. It validates contract code through
+`eth_getCode`, then uses only viem-encoded `name`, `symbol`, `decimals`, and
+`balanceOf(address)` calls through the existing RPC provider. It never calls
+transfers, approvals, allowances, `transferFrom`, permits, signing, or
+broadcasting.
+
+Metadata remains untrusted and reports complete, partial, unavailable, or
+invalid states. Names and symbols are bounded and control-character checked.
+Decimals are explicit contract metadata with the shared 0–36 policy; invalid
+or unavailable decimals are never replaced with 18. Balances remain exact
+`bigint` values and use the token's decimals for display formatting.
+
+Token discovery, external lists, verification providers, NFTs, portfolio and
+fiat pricing, history, DApps, and backend APIs are outside this boundary.

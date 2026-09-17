@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 3.1 — asset architecture and native EVM asset engine (completed)**
+**Phase 3.2 — generic read-only ERC-20 token engine (completed)**
 
 ## Completed work
 
@@ -123,16 +123,33 @@
   RPC-failure, and no-service error normalization.
 - Added tests proving no token contract calls, signing, broadcasting, backend
   calls, persistence, or secret material.
+- Added a generic, UI-independent ERC-20 read engine under the existing asset
+  boundary without token lists, discovery, or external verification.
+- Added network-scoped token identities using checksum-normalized contract
+  addresses; symbols and names are never identity keys.
+- Added contract-code validation through `eth_getCode`, rejecting EOAs before
+  metadata or balance reads.
+- Added viem ABI encoding/decoding for only `name`, `symbol`, `decimals`, and
+  `balanceOf`; no token state-changing methods are present in the ABI.
+- Added bounded, untrusted metadata handling with explicit complete, partial,
+  unavailable, and invalid states and the established 0–36 decimal policy.
+- Added exact bigint ERC-20 balances and token-decimal display formatting with
+  explicit account, network, chain, and contract identity.
+- Added network-change and chain-mismatch protection by reusing the existing
+  account-state and RPC/provider boundaries.
+- Added offline fake-RPC coverage for multiple accounts/networks, malformed
+  metadata, reverted reads, EOAs, exact balances, safe errors, and forbidden
+  methods.
 
 ## Pending work
 
 - Production PrimeWave Chain launch configuration must be supplied and reviewed
   before the primary network can be activated.
 - Recovery UX and authentication UI require separate scope and security review.
-- ERC-20/token functionality, token discovery and metadata, NFTs, portfolio
-  valuation, fiat pricing, transaction history, swaps, DApps, indexing,
-  backend asset APIs, and notifications remain outside this controlled
-  increment.
+- Token discovery, external token lists, verification providers, NFTs,
+  portfolio valuation, fiat pricing, transaction history, transfers, approvals,
+  permits, swaps, DApps, backend asset APIs, and notifications remain outside
+  this controlled increment.
 - Balance preflight validation is intentionally not implemented because it is
   optional and must not be mistaken for a guarantee before signing/broadcast.
 - Physical-device verification of local signing and native biometric behavior
@@ -164,8 +181,8 @@
 
 ## Phase boundary
 
-Phase 3.1 is complete. Stop here. Later phases may separately define ERC-20
-tokens, NFTs, portfolio valuation, fiat pricing, transaction history, UI
-activity, swaps, DApps, WalletConnect, notifications, backend indexing,
-replacement, speed-up, cancellation, automatic fee bumping, and other
-ecosystem capabilities.
+Phase 3.2 is complete. Stop here. Later phases may separately define token
+discovery, external verification, token state-changing operations, NFTs,
+portfolio valuation, fiat pricing, transaction history, UI activity, swaps,
+DApps, WalletConnect, notifications, backend indexing, replacement, speed-up,
+cancellation, automatic fee bumping, and other ecosystem capabilities.

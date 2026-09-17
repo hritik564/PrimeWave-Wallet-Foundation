@@ -30,7 +30,11 @@ export function createAssetIdentity(
 }
 
 export function getAssetIdentityKey(identity: AssetIdentity): string {
-  return `${identity.assetType}:${identity.networkId}:${identity.assetId}`;
+  return JSON.stringify([
+    identity.assetType,
+    identity.networkId,
+    identity.assetId,
+  ]);
 }
 
 function statusForNetwork(

@@ -7,3 +7,4 @@
 - [Local preview reset](preview-reset.md) — erase the wallet before secondary PIN cleanup and return to onboarding only after explicit confirmation.
 - [Broadcast and confirmation boundary](broadcast-confirmation.md) — Phase 2.7 sends exact already-signed bytes, observes receipts, and treats ambiguous outcomes as unknown.
 - [Native asset network binding](native-asset-network-binding.md) — multi-network balance reads use explicitly bound account-state services; never switch one active registry implicitly.
+- [ERC-20 read boundary](erc20-read-boundary.md) — token identity is network plus contract address; metadata is untrusted and reads stay strictly read-only.

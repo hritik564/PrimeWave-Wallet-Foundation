@@ -13,7 +13,20 @@ export type AssetErrorCode =
   | 'BALANCE_CONFIGURATION_ERROR'
   | 'INVALID_AMOUNT'
   | 'DECIMAL_OVERFLOW'
-  | 'MALFORMED_AMOUNT';
+  | 'MALFORMED_AMOUNT'
+  | 'TOKEN_INVALID_ADDRESS'
+  | 'TOKEN_NOT_A_CONTRACT'
+  | 'TOKEN_METADATA_UNAVAILABLE'
+  | 'TOKEN_METADATA_INVALID'
+  | 'TOKEN_INVALID_DECIMALS'
+  | 'TOKEN_BALANCE_UNAVAILABLE'
+  | 'TOKEN_CONTRACT_CALL_FAILED'
+  | 'TOKEN_NETWORK_CHANGED'
+  | 'TOKEN_CHAIN_MISMATCH'
+  | 'TOKEN_NETWORK_UNAVAILABLE'
+  | 'TOKEN_UNSUPPORTED'
+  | 'TOKEN_RPC_ERROR'
+  | 'TOKEN_DUPLICATE_IDENTITY';
 
 const SAFE_MESSAGES: Record<AssetErrorCode, string> = {
   ASSET_NOT_FOUND: 'The requested asset was not found.',
@@ -31,6 +44,19 @@ const SAFE_MESSAGES: Record<AssetErrorCode, string> = {
   INVALID_AMOUNT: 'The asset amount is invalid.',
   DECIMAL_OVERFLOW: 'The asset amount is too large.',
   MALFORMED_AMOUNT: 'The asset amount format is invalid.',
+  TOKEN_INVALID_ADDRESS: 'The token contract address is invalid.',
+  TOKEN_NOT_A_CONTRACT: 'The token address is not a contract.',
+  TOKEN_METADATA_UNAVAILABLE: 'Token metadata is unavailable.',
+  TOKEN_METADATA_INVALID: 'Token metadata is invalid.',
+  TOKEN_INVALID_DECIMALS: 'The token decimals are invalid.',
+  TOKEN_BALANCE_UNAVAILABLE: 'The token balance is unavailable.',
+  TOKEN_CONTRACT_CALL_FAILED: 'The token read call failed.',
+  TOKEN_NETWORK_CHANGED: 'The token network changed during the read.',
+  TOKEN_CHAIN_MISMATCH: 'The token response belongs to a different chain.',
+  TOKEN_NETWORK_UNAVAILABLE: 'The token network is unavailable.',
+  TOKEN_UNSUPPORTED: 'The token operation is not supported.',
+  TOKEN_RPC_ERROR: 'The token provider returned an error.',
+  TOKEN_DUPLICATE_IDENTITY: 'The token identity is duplicated.',
 };
 
 export class AssetError extends Error {

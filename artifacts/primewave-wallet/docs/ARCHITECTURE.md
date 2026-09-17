@@ -345,11 +345,13 @@ original provider/network context even if the user changes the active network.
 **Phase 2.7 broadcasts already-signed transactions and observes blockchain
 confirmation. It does not construct or sign transactions.**
 
-## Asset abstraction and native balance engine
+## Asset abstraction, native balance, and ERC-20 read engine
 
-Phase 3.1 adds `src/core/assets` as a UI-independent, network-scoped asset
-layer. It establishes architectural asset types for `native`,
-`fungible_token`, and `nft`, but only `native` is functional in this phase.
+Phases 3.1 and 3.2 provide `src/core/assets` as a UI-independent,
+network-scoped asset layer. It establishes architectural asset types for
+`native`, `fungible_token`, and `nft`; native EVM assets and a generic,
+read-only ERC-20 engine are functional. NFTs and token state-changing
+operations remain outside this boundary.
 
 Native identity is never based on a symbol or name. Its stable identity is:
 
@@ -377,8 +379,47 @@ assumption. The returned balance contains network/chain context, account
 identity, checksum-normalized address, raw amount, exact display string, and
 retrieval timestamp.
 
-**Phase 3.1 implements the asset abstraction and native EVM asset engine only.
-ERC-20/token functionality is intentionally deferred.**
+### ERC-20 token read engine
+
+The Phase 3.2 token identity is deliberately contract-based and network-scoped:
+
+```text
+assetType = fungible_token
+networkId = <network registry ID>
+contractAddress = <checksum-normalized EVM address>
+```
+
+`symbol`, `name`, and other metadata are never identity keys. The token registry
+normalizes addresses, keeps equal contract addresses on different networks
+distinct, and rejects duplicate registered identities. Arbitrary contract
+metadata is not treated as verified; the default verification state is
+`unknown`.
+
+`ERC20TokenService` accepts explicitly network-bound account-state and RPC
+services. It first verifies the configured network and contract code through
+the existing `EvmAccountStateService`. No-code observations are normalized to
+`TOKEN_NOT_A_CONTRACT`. The only contract calls encoded by the service are:
+`name()`, `symbol()`, `decimals()`, and `balanceOf(address)`, using the
+existing `viem` ABI primitives and `EvmRpcProvider`.
+
+Metadata reads are operation-scoped and concurrent, with no persistent cache or
+background refresh. Returned metadata distinguishes `complete`, `partial`,
+`unavailable`, and `invalid` states. Names and symbols are untrusted strings
+with bounded lengths and control-character rejection; legacy `bytes32` text is
+decoded when valid. Decimals remain explicit metadata and must be an integer
+from 0 through 36. Missing or invalid decimals are never replaced by 18.
+
+Token balances remain raw `bigint` values and use the shared exact decimal
+formatter with the token's validated decimals. Each balance includes account
+ID, checksum-normalized public address, network ID, chain ID, token contract,
+metadata status, and retrieval context. The service never merges accounts or
+networks, persists observations, signs, broadcasts, or accesses wallet secrets.
+Network changes and remote chain mismatches fail closed.
+
+**Phase 3.2 implements generic read-only ERC-20 identity, metadata, and balance
+retrieval only. Transfers, approvals, allowances, `transferFrom`, permits,
+discovery, verification providers, NFTs, portfolio/fiat data, history, DApps,
+and backend APIs are intentionally deferred.**
 
 ## Design system
 
@@ -424,8 +465,12 @@ website layout.
     broadcasting, chain/network protection, in-memory duplicate prevention,
     bounded receipt polling, revert handling, unknown-result handling, and
     read-only transaction lookup. No automatic retry or transaction mutation.
- 12. **Phase 3.1 — asset abstraction and native balance engine:** network-scoped
-     native asset identities, exact bigint amount utilities, and read-only
-     native balance retrieval. ERC-20 and other asset classes remain deferred.
- 13. **Future ecosystem capabilities:** discovery, swaps, DApp connectivity,
-     and PrimeWave integrations remain deferred.
+  12. **Phase 3.1 — asset abstraction and native balance engine:** network-scoped
+      native asset identities, exact bigint amount utilities, and read-only
+      native balance retrieval. Complete.
+  13. **Phase 3.2 — generic ERC-20 token read engine:** network-scoped token
+      identities, contract-code validation, bounded metadata, exact token
+      balances, safe errors, and offline fake-RPC tests. Complete.
+  14. **Future ecosystem capabilities:** token discovery and verification,
+      state-changing token operations, NFTs, portfolio, swaps, DApp
+      connectivity, and PrimeWave integrations remain deferred.

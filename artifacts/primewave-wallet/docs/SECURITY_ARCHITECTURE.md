@@ -425,11 +425,13 @@ identity, public sender/type metadata, lifecycle state, and safe receipt
 fields. They contain no private key, mnemonic, seed, vault contents, signing
 capability, PIN, biometric secret, or authentication credential.
 
-## 14. Phase 3.1 asset and native balance boundary
+## 14. Phase 3.1 and 3.2 asset and token-read boundary
 
 Phase 3.1 adds a read-only asset layer. It defines architectural asset types
-for native assets, fungible tokens, and NFTs, but only native EVM assets are
-functional. The native asset identity is network-scoped:
+for native assets, fungible tokens, and NFTs. Phase 3.2 adds generic,
+read-only ERC-20 identity, metadata, and balance reads. NFTs and
+state-changing token operations remain outside this boundary. The native asset
+identity is network-scoped:
 
 ```text
 assetType = native
@@ -459,11 +461,37 @@ the selected network.
 Amount formatting and parsing use exact decimal string operations. Floating
 point, `Number(balance)`, exponent notation, malformed decimals, negative
 amounts, excessive decimal places, and unsafe numeric conversion are
-rejected. No token contract methods such as `balanceOf`, `decimals`, `symbol`,
-`name`, `transfer`, or `approve` are called.
+rejected.
 
-**Phase 3.1 implements the asset abstraction and native EVM asset engine only.
-ERC-20/token functionality is intentionally deferred.**
+The Phase 3.2 token identity is:
+
+```text
+assetType = fungible_token
+networkId = <network registry ID>
+contractAddress = <checksum-normalized EVM address>
+```
+
+Token names and symbols are untrusted display metadata, not identity or
+verification claims. The read engine validates configured network state and
+contract code before metadata reads, and returns a normalized not-a-contract
+error for EOAs. It uses only the existing provider's `eth_chainId`,
+`eth_getCode`, and `eth_call` methods. Contract calldata is generated from a
+small viem ABI containing only `name`, `symbol`, `decimals`, and
+`balanceOf(address)`. No transfer, approval, allowance, `transferFrom`,
+permit, signing, or broadcast method is available through this boundary.
+
+Metadata is operation-scoped, not persisted or refreshed in the background.
+Untrusted strings have bounded lengths and control-character validation.
+Metadata results explicitly report complete, partial, unavailable, or invalid
+states. Decimals are contract-returned metadata and must be within the
+established 0–36 policy; invalid or missing values are never defaulted to 18.
+Token balances remain exact `bigint` values and include the account,
+network/chain, and contract identity. Network changes and chain mismatches
+fail closed. No token list, discovery service, verification provider,
+portfolio/fiat service, indexer, backend, or secret-bearing component is used.
+
+**Phase 3.2 implements generic read-only ERC-20 identity, metadata, and balance
+retrieval only.**
 
 ## 15. Error handling
 

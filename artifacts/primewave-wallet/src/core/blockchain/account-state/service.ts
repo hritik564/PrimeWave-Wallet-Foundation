@@ -127,6 +127,14 @@ export class EvmAccountStateService {
     return this.network;
   }
 
+  /**
+   * Allows other read-only blockchain layers to reuse the same captured
+   * network-consistency guard without exposing the provider or registry.
+   */
+  assertNetworkContext(): void {
+    this.assertNetworkUnchanged();
+  }
+
   async getNativeBalance(address: unknown): Promise<NativeBalanceState> {
     const normalizedAddress = normalizePublicEvmAddress(address);
     return this.runLogged('native-balance', normalizedAddress, async () => {
