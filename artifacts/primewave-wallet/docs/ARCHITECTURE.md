@@ -496,6 +496,28 @@ Network and chain changes fail closed. No portfolio balance persistence,
 SecureStore access, wallet-secret access, signing, broadcasting, backend
 indexing, background polling, or automatic network switching is introduced.
 
+### Development-only Replit web preview test mode
+
+The Replit web preview has a separate `src/core/development` preview test mode.
+It is available only when both `__DEV__` and a browser document are present.
+This mode exists for UI and navigation testing when native SecureStore is not
+available; it is not a web wallet and is not a replacement for native security
+testing.
+
+Preview Test Mode does not instantiate or call `LocalWalletEngine`,
+`SecureVault`, `AuthenticationManager`, SecureStore, biometric APIs, RPC
+providers, transaction construction, signing, or broadcasting. It uses one
+fixed public development address for display and a development-only six-digit
+PIN fingerprint for lock/unlock UI state. It never creates or persists a
+mnemonic, seed, private key, recovery phrase, real PIN verifier, or signing
+capability.
+
+The isolated preview repository may use a namespaced browser-local state key
+containing only the preview phase and non-secret test PIN fingerprint. Invalid,
+missing, blocked, or cleared preview state returns to onboarding, and reset is
+idempotent. Native builds do not use this repository. Production builds cannot
+activate Preview Test Mode because the `__DEV__` boundary is required.
+
 ## Design system
 
 PrimeWave Wallet uses a centralized dark foundation with blue, cyan, and violet

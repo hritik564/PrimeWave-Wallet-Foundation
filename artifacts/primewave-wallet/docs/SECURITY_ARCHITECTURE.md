@@ -560,6 +560,29 @@ portfolio valuation, price feeds, history, DApps, WalletConnect, signing,
 broadcasting, background execution, backend indexing, external lists,
 verification providers, and risk systems remain deferred.**
 
+### Development-only Replit web preview mode
+
+The Replit web preview cannot use native SecureStore, so it fails closed for
+the real wallet. To support UI testing without weakening that boundary,
+`src/core/development/preview-test-mode.ts` provides a separate simulated
+state machine selected only by `__DEV__` plus a browser document.
+
+This mode is not a wallet. It does not import or call the real wallet engine,
+SecureVault, SecureStore adapter, authentication manager, biometric provider,
+RPC provider, transaction constructor, signer, broadcaster, or backend. It
+uses only a fixed public development address and a non-secret fingerprint of
+the developer's six-digit test PIN. No mnemonic, seed, private key, recovery
+phrase, production PIN verifier, authentication record, or signing capability
+is created or persisted.
+
+The preview state is isolated under a development-only browser-local key and
+contains only its phase and test PIN fingerprint. It supports onboarding,
+PIN setup, lock, unlock, reset, and refresh persistence for UI testing.
+Clearing or missing state returns to onboarding, and reset is idempotent.
+Native iOS and Android flows remain unchanged and continue to require
+platform-secure storage and real device authentication. Preview Test Mode is
+not accessible in production builds.
+
 ## 15. Error handling
 
 Errors shown to users must not expose private keys, recovery phrases,

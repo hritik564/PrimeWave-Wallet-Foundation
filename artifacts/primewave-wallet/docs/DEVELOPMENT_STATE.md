@@ -4,6 +4,10 @@
 
 **Phase 3.4 — portfolio aggregation and token-logo architecture (completed)**
 
+The native wallet/security path remains the production-controlled path. A
+separate development-only Replit web preview test mode is also available for
+UI testing; it is not a real wallet and does not alter the native boundary.
+
 ## Completed work
 
 - Created a lightweight Expo and TypeScript mobile application.
@@ -174,6 +178,17 @@
 - Added 12 offline portfolio tests covering aggregation, isolation,
   deduplication, provenance, visibility, zero balances, metadata gaps, icons,
   fallbacks, chain/network races, limits, safe errors, and forbidden methods.
+- Added isolated `src/core/development/preview-test-mode.ts` for Replit web
+  preview UI testing.
+- Added simulated onboarding, six-digit test PIN, lock, unlock, reset, and
+  refresh-persistent state using only a fixed public development identity and
+  non-secret test-state data.
+- Kept Preview Test Mode separate from `LocalWalletEngine`, SecureVault,
+  SecureStore, native authentication, biometric APIs, RPC, signing,
+  broadcasting, and backend services.
+- Added preview security tests for development-only availability, invalid PINs,
+  lock/unlock/reset idempotency, refresh persistence, and absence of mnemonic,
+  private-key, recovery-phrase, and raw PIN data.
 
 ## Pending work
 
@@ -184,6 +199,8 @@
   pricing, transaction history, transfers, approvals, permits, swaps, DApps,
   backend asset APIs, notifications, and full wallet UI remain outside this
   controlled increment.
+- Preview Test Mode is intentionally limited to web UI state testing and is not
+  native wallet or security validation.
 - Balance preflight validation is intentionally not implemented because it is
   optional and must not be mistaken for a guarantee before signing/broadcast.
 - Physical-device verification of local signing and native biometric behavior

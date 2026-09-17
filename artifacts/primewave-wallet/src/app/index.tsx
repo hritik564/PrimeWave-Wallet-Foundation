@@ -6,6 +6,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/src/theme';
 import {
+  isPreviewTestModeAvailable,
+  PreviewTestMode,
+} from '@/src/core/development';
+import {
   AuthenticationError,
   getWalletAccessManager,
   screenPrivacyController,
@@ -200,31 +204,51 @@ function SectionTitle({ eyebrow, title, body }: { eyebrow: string; title: string
   );
 }
 
-function Welcome({ onCreate, onImport }: { onCreate: () => void; onImport: () => void }) {
+function Welcome({
+  onCreate,
+  onImport,
+  previewMode = false,
+}: {
+  onCreate: () => void;
+  onImport: () => void;
+  previewMode?: boolean;
+}) {
   return (
     <Screen sensitive={false}>
       <View style={styles.hero}>
-        <Text style={styles.eyebrow}>LOCAL • NON-CUSTODIAL • OFFLINE</Text>
+        <Text style={styles.eyebrow}>{previewMode ? 'DEVELOPMENT • PREVIEW TEST MODE' : 'LOCAL • NON-CUSTODIAL • OFFLINE'}</Text>
         <Text style={styles.heroTitle}>
           Your keys stay{'\n'}
           <Text style={styles.heroAccent}>with you.</Text>
         </Text>
         <Text style={styles.body}>
-          PrimeWave Wallet gives you a private, device-local foundation for managing your own recovery material.
+          {previewMode
+            ? 'This web preview uses a simulated public test identity for UI testing. It is not a real wallet and cannot sign transactions.'
+            : 'PrimeWave Wallet gives you a private, device-local foundation for managing your own recovery material.'}
         </Text>
       </View>
+      {previewMode ? (
+        <View style={styles.previewModePanel}>
+          <Text style={styles.previewModeTitle}>Preview Test Mode</Text>
+          <Text style={styles.previewModeBody}>
+            Development-only state. No mnemonic, private key, recovery phrase, SecureStore, or signing capability is used.
+          </Text>
+        </View>
+      ) : null}
       <View style={styles.panel}>
         <View style={styles.panelIcon}>
           <Ionicons name="shield-checkmark-outline" size={24} color={theme.colors.accent} />
         </View>
-        <Text style={styles.panelTitle}>Start with a secure local vault</Text>
+        <Text style={styles.panelTitle}>{previewMode ? 'Start a simulated wallet session' : 'Start with a secure local vault'}</Text>
         <Text style={styles.panelBody}>
-          There is no account to create and no recovery service. Your recovery phrase is the only way to restore access.
+          {previewMode
+            ? 'Use a custom six-digit test PIN to exercise onboarding, lock, unlock, and reset UI flows.'
+            : 'There is no account to create and no recovery service. Your recovery phrase is the only way to restore access.'}
         </Text>
-        <AppButton icon="add" label="Create new wallet" onPress={onCreate} />
-        <AppButton icon="download-outline" label="Import existing wallet" onPress={onImport} secondary />
+        <AppButton icon="add" label={previewMode ? 'Create test wallet' : 'Create new wallet'} onPress={onCreate} />
+        {!previewMode ? <AppButton icon="download-outline" label="Import existing wallet" onPress={onImport} secondary /> : null}
       </View>
-      <Text style={styles.footerNote}>PrimeWave cannot recover a lost recovery phrase.</Text>
+      <Text style={styles.footerNote}>{previewMode ? 'Public test identity only • excluded from production builds' : 'PrimeWave cannot recover a lost recovery phrase.'}</Text>
     </Screen>
   );
 }
@@ -425,14 +449,24 @@ function Locked({ biometricEnabled, onUnlock, onBiometric, onReset }: { biometri
   );
 }
 
-function WalletHome({ wallet, onSecurity, onLock }: { wallet: Wallet; onSecurity: () => void; onLock: () => void }) {
+function WalletHome({
+  wallet,
+  onSecurity,
+  onLock,
+  previewMode = false,
+}: {
+  wallet: Wallet;
+  onSecurity: () => void;
+  onLock: () => void;
+  previewMode?: boolean;
+}) {
   const account = wallet.accounts[0];
   return (
     <Screen>
       <View style={styles.hero}>
-        <Text style={styles.eyebrow}>WALLET AVAILABLE • DEVICE LOCAL</Text>
+        <Text style={styles.eyebrow}>{previewMode ? 'PREVIEW TEST MODE • SIMULATED' : 'WALLET AVAILABLE • DEVICE LOCAL'}</Text>
         <Text style={styles.title}>Welcome back.</Text>
-        <Text style={styles.body}>Your vault is unlocked. No network connection is required for this local foundation.</Text>
+        <Text style={styles.body}>{previewMode ? 'This is a development-only simulated wallet. It has no recovery material and cannot sign.' : 'Your vault is unlocked. No network connection is required for this local foundation.'}</Text>
       </View>
       <View style={styles.addressCard}>
         <View style={styles.cardRow}>
@@ -443,12 +477,12 @@ function WalletHome({ wallet, onSecurity, onLock }: { wallet: Wallet; onSecurity
         <Text style={styles.addressPath}>{account?.derivationPath}</Text>
       </View>
       <View style={styles.panel}>
-        <Text style={styles.panelTitle}>Security controls</Text>
-        <Text style={styles.panelBody}>Manage authentication, background locking, and recovery status.</Text>
-        <AppButton label="Open security" onPress={onSecurity} icon="shield-checkmark-outline" secondary />
+          <Text style={styles.panelTitle}>{previewMode ? 'Preview controls' : 'Security controls'}</Text>
+          <Text style={styles.panelBody}>{previewMode ? 'Use the lock control to test the development PIN flow. Native security settings are not available in preview mode.' : 'Manage authentication, background locking, and recovery status.'}</Text>
+          {!previewMode ? <AppButton label="Open security" onPress={onSecurity} icon="shield-checkmark-outline" secondary /> : null}
         <AppButton label="Lock wallet now" onPress={onLock} icon="lock-closed-outline" />
       </View>
-      <Text style={styles.footerNote}>Phase 1B-2 is offline only. Network, transaction, and signing features are not enabled.</Text>
+      <Text style={styles.footerNote}>{previewMode ? 'Development-only public identity • no real wallet secrets' : 'Phase 1B-2 is offline only. Network, transaction, and signing features are not enabled.'}</Text>
     </Screen>
   );
 }
@@ -547,6 +581,8 @@ function Unavailable() {
 
 export default function FoundationScreen() {
   const access = useMemo<WalletAccessManager>(() => getWalletAccessManager(), []);
+  const previewTestMode = useMemo(() => new PreviewTestMode(), []);
+  const previewMode = isPreviewTestModeAvailable();
   const [view, setView] = useState<ViewName>('loading');
   const [draft, setDraft] = useState<WalletSetupResult | null>(null);
   const [importedWallet, setImportedWallet] = useState<Wallet | null>(null);
@@ -565,6 +601,15 @@ export default function FoundationScreen() {
   const appState = useRef(AppState.currentState);
 
   const refreshSettings = async () => {
+    if (previewMode) {
+      setSettings({
+        biometricEnabled: false,
+        autoLockPolicy: 0,
+        pinConfigured: previewTestMode.getState().pinConfigured,
+      });
+      setBiometricAvailability({ available: false, type: null });
+      return;
+    }
     try {
       setSettings(await access.getAuthenticationSettings());
       setBiometricAvailability(await access.getBiometricAvailability());
@@ -575,22 +620,42 @@ export default function FoundationScreen() {
 
   useEffect(() => {
     let mounted = true;
-    void access.initialize().then(async (status) => {
-      if (!mounted) return;
-      if (status === 'onboarding') setView('welcome');
-      else if (status === 'authentication-setup') setView('pin');
-      else if (status === 'locked') { setView('locked'); await refreshSettings(); }
-      else setView('unavailable');
-    });
+    if (previewMode) {
+      const previewState = previewTestMode.getState();
+      if (!previewState.hasPreviewWallet) setView('welcome');
+      else if (previewState.phase === 'pin-setup') setView('pin');
+      else if (previewState.phase === 'locked') setView('locked');
+      else setView('wallet');
+      setSettings({
+        biometricEnabled: false,
+        autoLockPolicy: 0,
+        pinConfigured: previewState.pinConfigured,
+      });
+    } else {
+      void access.initialize().then(async (status) => {
+        if (!mounted) return;
+        if (status === 'onboarding') setView('welcome');
+        else if (status === 'authentication-setup') setView('pin');
+        else if (status === 'locked') { setView('locked'); await refreshSettings(); }
+        else setView('unavailable');
+      });
+    }
     const subscription = AppState.addEventListener('change', (nextState) => {
       const wasBackground = appState.current !== 'active';
       appState.current = nextState;
       if (nextState === 'background' || nextState === 'inactive') {
         setBackgrounded(true);
         void screenPrivacyController.maskSensitiveContent();
-        void access.handleAppStateChange(nextState).then(() => {
-          if (access.getStatus() === 'locked') setView('locked');
-        });
+        if (previewMode) {
+          if (previewTestMode.getState().phase === 'unlocked') {
+            previewTestMode.lockPreviewWallet();
+            setView('locked');
+          }
+        } else {
+          void access.handleAppStateChange(nextState).then(() => {
+            if (access.getStatus() === 'locked') setView('locked');
+          });
+        }
       } else if (nextState === 'active') {
         setBackgrounded(false);
         void screenPrivacyController.restoreSensitiveContent();
@@ -598,7 +663,7 @@ export default function FoundationScreen() {
       }
     });
     return () => { mounted = false; subscription.remove(); };
-  }, [access]);
+  }, [access, previewMode, previewTestMode]);
 
   useEffect(() => {
     if (view !== 'welcome' && view !== 'loading') void screenPrivacyController.enterSensitiveScreen('wallet-security-settings');
@@ -611,12 +676,23 @@ export default function FoundationScreen() {
     try { await operation(); } catch (operationError) { setError(safeMessage(operationError)); }
   };
 
-  const currentWallet = access.getStatus() === 'unlocked' ? (() => { try { return access.getWallet(); } catch { return null; } })() : null;
+  const currentWallet = previewMode
+    ? previewTestMode.getWallet()
+    : access.getStatus() === 'unlocked'
+      ? (() => { try { return access.getWallet(); } catch { return null; } })()
+      : null;
 
   let content: React.ReactNode;
   if (view === 'loading') content = <Loading />;
   else if (view === 'unavailable') content = <Unavailable />;
-  else if (view === 'welcome') content = <Welcome onCreate={() => setView('warning')} onImport={() => { setError(''); setView('import'); }} />;
+  else if (view === 'welcome') content = <Welcome previewMode={previewMode} onCreate={() => void run(async () => {
+    if (previewMode) {
+      previewTestMode.createPreviewWallet();
+      setView('pin');
+      return;
+    }
+    setView('warning');
+  })} onImport={() => { setError(''); setView('import'); }} />;
   else if (view === 'warning') content = <Warning onContinue={() => void run(async () => { setDraft(await access.prepareNewWallet()); setView('phrase'); })} />;
   else if (view === 'phrase' && draft) content = <PhraseDisplay draft={draft} onContinue={() => setView('phrase-confirm')} />;
   else if (view === 'phrase-confirm' && draft) content = <PhraseConfirm draft={draft} values={confirmWords} onChange={(index, value) => setConfirmWords((current) => current.map((entry, i) => i === index ? value : entry))} onConfirm={() => void run(async () => {
@@ -628,15 +704,57 @@ export default function FoundationScreen() {
   })} />;
   else if (view === 'import') content = <ImportScreen value={importPhrase} onChange={setImportPhrase} onContinue={() => void run(async () => { const wallet = await access.prepareImportWallet(importPhrase); setImportedWallet(wallet); setImportPhrase(''); setView('import-confirm'); })} />;
   else if (view === 'import-confirm' && importedWallet) content = <ImportConfirm wallet={importedWallet} onConfirm={() => void run(async () => { await access.persistPreparedWallet(); setImportedWallet(null); setView('pin'); })} />;
-  else if (view === 'pin') content = <PinSetup existing={!draft && !importedWallet} pin={pin} confirmPin={confirmPin} setPin={setPin} setConfirmPin={setConfirmPin} onContinue={() => void run(async () => {
+  else if (view === 'pin') content = <PinSetup existing={!draft && !importedWallet && !previewMode} pin={pin} confirmPin={confirmPin} setPin={setPin} setConfirmPin={setConfirmPin} onContinue={() => void run(async () => {
     if (pin.length !== 6 || !/^\d{6}$/.test(pin)) { setError('Choose exactly 6 digits for your PIN.'); return; }
     if (pin !== confirmPin) { setError('PIN entries do not match.'); return; }
+    if (previewMode) {
+      previewTestMode.setPreviewPin(pin);
+      setPin('');
+      setConfirmPin('');
+      setSettings({ biometricEnabled: false, autoLockPolicy: 0, pinConfigured: true });
+      setView('wallet');
+      return;
+    }
     await access.configurePin(pin);
     setPinForBiometric(pin); setPin(''); setConfirmPin(''); await refreshSettings(); setView('biometric');
   })} />;
   else if (view === 'biometric') content = <BiometricSetup availability={biometricAvailability} onEnable={() => void run(async () => { await access.enableBiometricUnlock(true, pinForBiometric); setPinForBiometric(''); await refreshSettings(); setView('wallet'); })} onSkip={() => { setPinForBiometric(''); setView('wallet'); }} />;
-  else if (view === 'locked') content = <Locked biometricEnabled={settings.biometricEnabled} onUnlock={(value) => void run(async () => { const result = await access.unlockWithPin(value); if (!result.authenticated) { setError('Authentication failed. Try again or use your PIN fallback.'); return; } await refreshSettings(); setView('wallet'); })} onBiometric={() => void run(async () => { const result = await access.unlockWithBiometrics(); if (!result.authenticated) { setError(result.reason === 'cancelled' ? 'Biometric authentication was cancelled. Use your PIN.' : 'Biometric authentication was not available. Use your PIN.'); return; } setView('wallet'); })} onReset={() => void run(async () => { await access.resetLocalWallet(); setSettings({ biometricEnabled: false, autoLockPolicy: 0, pinConfigured: false }); setPin(''); setConfirmPin(''); setView('welcome'); })} />;
-  else if (view === 'wallet' && currentWallet) content = <WalletHome wallet={currentWallet} onSecurity={() => { setError(''); setView('security'); }} onLock={() => void run(async () => { await access.lockWallet(); setView('locked'); })} />;
+  else if (view === 'locked') content = <Locked biometricEnabled={previewMode ? false : settings.biometricEnabled} onUnlock={(value) => void run(async () => {
+    if (previewMode) {
+      if (!previewTestMode.verifyPreviewPin(value)) {
+        setError('Preview PIN was not accepted.');
+        return;
+      }
+      setView('wallet');
+      return;
+    }
+    const result = await access.unlockWithPin(value);
+    if (!result.authenticated) { setError('Authentication failed. Try again or use your PIN fallback.'); return; }
+    await refreshSettings();
+    setView('wallet');
+  })} onBiometric={() => void run(async () => {
+    const result = await access.unlockWithBiometrics();
+    if (!result.authenticated) { setError(result.reason === 'cancelled' ? 'Biometric authentication was cancelled. Use your PIN.' : 'Biometric authentication was not available. Use your PIN.'); return; }
+    setView('wallet');
+  })} onReset={() => void run(async () => {
+    if (previewMode) {
+      previewTestMode.resetPreviewWallet();
+    } else {
+      await access.resetLocalWallet();
+    }
+    setSettings({ biometricEnabled: false, autoLockPolicy: 0, pinConfigured: false });
+    setPin('');
+    setConfirmPin('');
+    setView('welcome');
+  })} />;
+  else if (view === 'wallet' && currentWallet) content = <WalletHome previewMode={previewMode} wallet={currentWallet} onSecurity={() => { setError(''); setView('security'); }} onLock={() => void run(async () => {
+    if (previewMode) {
+      previewTestMode.lockPreviewWallet();
+    } else {
+      await access.lockWallet();
+    }
+    setView('locked');
+  })} />;
   else if (view === 'security') content = <Security settings={settings} biometricAvailability={biometricAvailability} securityPin={securityPin} setSecurityPin={setSecurityPin} newPin={newPin} setNewPin={setNewPin} onChangePin={() => void run(async () => { if (newPin.length !== 6 || !/^\d{6}$/.test(newPin)) { setError('Choose exactly 6 digits for your new PIN.'); return; } const result = await access.changePin(securityPin, newPin); if (!result.authenticated) { setError('Current PIN was not accepted.'); return; } setSecurityPin(''); setNewPin(''); await refreshSettings(); setError('PIN updated.'); })} onToggleBiometric={() => void run(async () => { const result = await access.enableBiometricUnlock(!settings.biometricEnabled, securityPin); if (!result.authenticated) { setError('Current PIN was not accepted.'); return; } setSecurityPin(''); await refreshSettings(); })} onAutoLock={(policy) => void run(async () => { await access.setAutoLockPolicy(policy); await refreshSettings(); if (policy === 0) setView('locked'); })} onReveal={() => void run(async () => { if (!securityPin) { setError('Enter your current PIN first.'); return; } setRevealedPhrase(await access.revealRecoveryPhrase(securityPin)); setSecurityPin(''); setView('recovery'); })} onLock={() => void run(async () => { await access.lockWallet(); setView('locked'); })} onBack={() => { setError(''); setView('wallet'); }} />;
   else if (view === 'recovery' && revealedPhrase) content = <Recovery phrase={revealedPhrase} onClose={() => { setRevealedPhrase(''); setView('security'); }} />;
   else content = <Loading />;
@@ -679,6 +797,9 @@ const styles = StyleSheet.create({
   panelIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(80, 217, 255, 0.1)', borderWidth: 1, borderColor: 'rgba(80, 217, 255, 0.24)' },
   panelTitle: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 17, lineHeight: 23 },
   panelBody: { color: theme.colors.mutedForeground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: theme.typography.bodyMedium.fontSize, lineHeight: 21 },
+  previewModePanel: { borderRadius: theme.radius.md, padding: theme.spacing.md, gap: theme.spacing.sm, backgroundColor: 'rgba(244, 200, 107, 0.08)', borderWidth: 1, borderColor: 'rgba(244, 200, 107, 0.35)' },
+  previewModeTitle: { color: theme.states.warning, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 15, lineHeight: 20 },
+  previewModeBody: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 13, lineHeight: 19 },
   button: { minHeight: 54, borderRadius: theme.radius.md, paddingHorizontal: theme.spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm, backgroundColor: theme.colors.accent, borderWidth: 1, borderColor: theme.colors.accent },
   buttonSecondary: { backgroundColor: theme.colors.secondary, borderColor: theme.colors.border },
   buttonDanger: { backgroundColor: 'transparent', borderColor: theme.colors.destructive },
