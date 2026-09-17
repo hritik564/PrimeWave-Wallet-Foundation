@@ -37,6 +37,7 @@ export interface SecureVault {
   retrieveEncryptedWalletState(): Promise<EncryptedWalletState | null>;
   deleteWalletState(): Promise<void>;
   hasVault(): Promise<boolean>;
+  isVaultValid(): Promise<boolean>;
 }
 
 export type BiometricType = 'face' | 'fingerprint' | 'iris' | 'unknown';
