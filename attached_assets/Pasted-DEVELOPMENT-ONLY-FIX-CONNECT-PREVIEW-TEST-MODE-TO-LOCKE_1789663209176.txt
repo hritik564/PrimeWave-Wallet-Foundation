@@ -1,0 +1,333 @@
+DEVELOPMENT-ONLY FIX — CONNECT PREVIEW TEST MODE TO LOCKED WALLET UNLOCK FLOW
+
+IMPORTANT:
+Do NOT modify native SecureStore behavior.
+Do NOT modify production wallet authentication.
+Do NOT modify real wallet cryptography.
+Do NOT modify signing.
+Do NOT weaken any security boundary.
+
+We have already implemented the development-only Replit Web Preview Test Mode.
+
+The following works:
+
+- Preview Test Mode onboarding
+- Create test wallet
+- Developer-defined 6-digit test PIN
+- Lock
+- Reset
+- Preview persistence
+
+However, there is a bug in the LOCKED WALLET → UNLOCK flow.
+
+Observed behavior in Replit Web Preview:
+
+1. Preview Test Mode creates a test wallet successfully.
+2. Developer locks the wallet.
+3. Developer enters the correct 6-digit Preview Test PIN.
+4. Instead of unlocking the Preview Test Mode wallet, the UI shows:
+
+"Preparing local vault
+
+Checking platform-secure storage."
+
+5. After approximately 30 seconds, it returns to the Locked Wallet screen.
+
+This proves that the locked-wallet unlock action is incorrectly entering the real/native wallet vault/authentication path instead of the development-only Preview Test Mode path.
+
+==================================================
+1. ROOT CAUSE INVESTIGATION
+==================================================
+
+Trace the complete flow from:
+
+Locked Wallet
+→ PIN entry
+→ unlock handler
+→ WalletAuthenticator / wallet-access
+→ vault initialization
+→ navigation/state transition
+
+Determine exactly why Web Preview is invoking the real SecureStore-backed authentication flow after the Preview Test PIN is entered.
+
+Do not guess.
+
+Identify the exact files/functions responsible.
+
+==================================================
+2. REQUIRED BEHAVIOR
+==================================================
+
+When ALL of the following are true:
+
+- __DEV__ is true
+- running in a browser/Web Preview
+- Preview Test Mode is active
+- preview wallet exists
+- user enters the Preview Test PIN
+
+the unlock action MUST use:
+
+Preview Test Mode verification
+
+and MUST NOT invoke:
+
+- SecureStore
+- WalletAuthenticator native unlock
+- LocalWalletEngine
+- native biometric authentication
+- real vault initialization
+
+Expected flow:
+
+Locked Wallet
+→ 6-digit Preview Test PIN
+→ Preview Test Mode verifies PIN
+→ preview wallet unlocked
+→ Wallet Home / existing unlocked application state
+
+==================================================
+3. NATIVE FLOW MUST REMAIN UNCHANGED
+==================================================
+
+On iOS/Android:
+
+Locked Wallet
+→ real PIN authentication
+→ real SecureStore-backed vault
+→ existing native authentication flow
+
+Do NOT modify this behavior.
+
+The preview branch must be explicitly isolated from native behavior.
+
+==================================================
+4. PREVIEW LOCK STATE
+==================================================
+
+Ensure Preview Test Mode has a clear locked/unlocked state.
+
+For Web Preview:
+
+preview wallet state should distinguish at least:
+
+- onboarding
+- unlocked
+- locked
+
+The existing application navigation/state machine should consume this state without trying to initialize the real vault.
+
+Do not duplicate the production wallet authentication system.
+
+==================================================
+5. PREVIEW PIN VERIFICATION
+==================================================
+
+The Preview Test Mode should perform its own development-only PIN verification.
+
+Requirements:
+
+- exactly 6 digits
+- correct PIN unlocks
+- incorrect PIN remains locked
+- no SecureStore
+- no production authentication storage
+- no real wallet secrets
+
+Do not expose the PIN in logs.
+
+Do not store the raw PIN.
+
+Continue using the existing non-secret preview PIN representation/fingerprint architecture.
+
+==================================================
+6. AVOID THE 30-SECOND NATIVE TIMEOUT
+==================================================
+
+The Preview Web path must never wait for native SecureStore initialization.
+
+When Preview Test Mode is active, the locked-screen unlock handler should branch BEFORE any native vault/authentication initialization.
+
+Do not merely shorten the timeout.
+
+Do not catch the SecureStore error and pretend the preview unlocked.
+
+The correct solution is to avoid invoking the native path entirely.
+
+==================================================
+7. APP STARTUP / REFRESH
+==================================================
+
+Also inspect application startup logic.
+
+After a browser refresh:
+
+- if Preview Test Mode has a persisted locked preview state, show the Preview Locked screen
+- entering the Preview PIN should unlock through Preview Test Mode
+- it must NOT initialize SecureStore
+
+If preview state is onboarding, show onboarding.
+
+If preview state is unlocked, preserve the existing preview behavior as currently designed.
+
+==================================================
+8. RESET
+==================================================
+
+Do not break the existing working:
+
+Reset Local Preview
+→ Preview onboarding
+
+Reset must continue to work.
+
+==================================================
+9. PRODUCTION SAFETY
+==================================================
+
+The preview unlock branch must be unreachable in production.
+
+Use the existing development/browser gating.
+
+Do not add a user-controlled production switch.
+
+Do not add query parameters or URL flags.
+
+Do not expose preview test mode through production UI.
+
+==================================================
+10. SECURITY BOUNDARY
+==================================================
+
+Preview Test Mode MUST NOT gain access to:
+
+- mnemonic
+- private key
+- recovery phrase
+- SecureStore wallet vault
+- production PIN verifier
+- WalletAuthenticator secrets
+- LocalWalletEngine secret state
+- signing capability
+
+Preview Test Mode remains a UI/application-flow simulator only.
+
+==================================================
+11. TESTS
+==================================================
+
+Add focused regression tests for:
+
+1. Preview wallet creation
+2. Preview PIN setup
+3. Preview lock
+4. Correct Preview PIN unlocks
+5. Incorrect Preview PIN remains locked
+6. Preview unlock does NOT invoke SecureStore
+7. Preview unlock does NOT invoke WalletAuthenticator
+8. Preview unlock does NOT invoke LocalWalletEngine
+9. Preview unlock does NOT invoke native biometrics
+10. Preview refresh with locked state
+11. Preview refresh + correct PIN unlock
+12. Preview reset still returns to onboarding
+13. Native unlock path remains unchanged
+14. Preview branch unavailable outside development/browser environment
+
+Keep all existing tests green.
+
+==================================================
+12. MANUAL WEB PREVIEW VERIFICATION
+==================================================
+
+After the fix, manually verify in Replit Web Preview:
+
+A. Reset Local Preview
+
+B. Create test wallet
+
+C. Set a 6-digit PIN, for example:
+123456
+
+D. Confirm wallet opens
+
+E. Lock wallet
+
+F. Enter:
+123456
+
+Expected:
+→ immediate Preview Test Mode unlock
+→ no "Preparing local vault"
+→ no "Checking platform-secure storage"
+→ no 30-second delay
+→ wallet becomes unlocked
+
+G. Lock again
+
+H. Enter an incorrect PIN
+
+Expected:
+→ remains locked
+→ no native vault attempt
+
+I. Refresh while locked
+
+Expected:
+→ remains in Preview Locked state
+
+J. Enter correct Preview PIN
+
+Expected:
+→ immediate unlock
+
+K. Reset Local Preview
+
+Expected:
+→ onboarding
+
+==================================================
+13. DO NOT CHANGE UNRELATED CODE
+==================================================
+
+Do not modify:
+
+- Phase 3.4 portfolio code
+- token engine
+- token discovery
+- network engine
+- RPC engine
+- transaction construction
+- transaction signing
+- broadcasting
+- SecureVault architecture
+- production authentication
+- native biometric implementation
+
+Only modify the minimum code necessary to correctly route the Web Preview unlock through Preview Test Mode.
+
+==================================================
+14. VERIFICATION
+==================================================
+
+Run:
+
+- full test suite
+- TypeScript
+- git diff --check
+- Expo/Metro workflow
+- web bundle
+
+Report:
+
+- exact root cause
+- files/functions changed
+- exact routing fix
+- confirmation that SecureStore is never called by Preview unlock
+- confirmation that native authentication is unchanged
+- tests passed
+- TypeScript result
+- Expo/Metro result
+- manual Web Preview result
+- remaining limitations
+
+STOP AFTER THIS FIX.

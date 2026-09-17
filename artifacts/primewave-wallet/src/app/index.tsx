@@ -417,7 +417,7 @@ function BiometricSetup({ availability, onEnable, onSkip }: { availability: Biom
   );
 }
 
-function Locked({ biometricEnabled, onUnlock, onBiometric, onReset }: { biometricEnabled: boolean; onUnlock: (pin: string) => void; onBiometric: () => void; onReset: () => void }) {
+function Locked({ biometricEnabled, previewMode = false, onUnlock, onBiometric, onReset }: { biometricEnabled: boolean; previewMode?: boolean; onUnlock: (pin: string) => void; onBiometric: () => void; onReset: () => void }) {
   const [pin, setPin] = useState('');
   const [resetRequested, setResetRequested] = useState(false);
   return (
@@ -426,7 +426,7 @@ function Locked({ biometricEnabled, onUnlock, onBiometric, onReset }: { biometri
         <View style={styles.lockIcon}><Ionicons name="lock-closed-outline" size={34} color={theme.colors.accent} /></View>
         <Text style={styles.eyebrow}>PRIMEWAVE WALLET</Text>
         <Text style={styles.title}>Wallet locked</Text>
-        <Text style={styles.body}>Authenticate to access your local wallet. Sensitive material stays hidden while locked.</Text>
+        <Text style={styles.body}>{previewMode ? 'Enter your development-only Preview Test PIN to continue. No native vault or biometric APIs are used.' : 'Authenticate to access your local wallet. Sensitive material stays hidden while locked.'}</Text>
       </View>
       {biometricEnabled ? <AppButton label="Unlock with biometrics" onPress={onBiometric} icon="finger-print-outline" /> : null}
       <Field keyboardType="number-pad" label="Wallet PIN" onChangeText={setPin} placeholder="6 digits" secureTextEntry value={pin} />
@@ -659,7 +659,11 @@ export default function FoundationScreen() {
       } else if (nextState === 'active') {
         setBackgrounded(false);
         void screenPrivacyController.restoreSensitiveContent();
-        if (wasBackground && access.getStatus() === 'locked') setView('locked');
+        if (previewMode) {
+          if (wasBackground && previewTestMode.getState().phase === 'locked') setView('locked');
+        } else if (wasBackground && access.getStatus() === 'locked') {
+          setView('locked');
+        }
       }
     });
     return () => { mounted = false; subscription.remove(); };
@@ -719,7 +723,7 @@ export default function FoundationScreen() {
     setPinForBiometric(pin); setPin(''); setConfirmPin(''); await refreshSettings(); setView('biometric');
   })} />;
   else if (view === 'biometric') content = <BiometricSetup availability={biometricAvailability} onEnable={() => void run(async () => { await access.enableBiometricUnlock(true, pinForBiometric); setPinForBiometric(''); await refreshSettings(); setView('wallet'); })} onSkip={() => { setPinForBiometric(''); setView('wallet'); }} />;
-  else if (view === 'locked') content = <Locked biometricEnabled={previewMode ? false : settings.biometricEnabled} onUnlock={(value) => void run(async () => {
+  else if (view === 'locked') content = <Locked previewMode={previewMode} biometricEnabled={previewMode ? false : settings.biometricEnabled} onUnlock={(value) => void run(async () => {
     if (previewMode) {
       if (!previewTestMode.verifyPreviewPin(value)) {
         setError('Preview PIN was not accepted.');
@@ -733,6 +737,7 @@ export default function FoundationScreen() {
     await refreshSettings();
     setView('wallet');
   })} onBiometric={() => void run(async () => {
+    if (previewMode) return;
     const result = await access.unlockWithBiometrics();
     if (!result.authenticated) { setError(result.reason === 'cancelled' ? 'Biometric authentication was cancelled. Use your PIN.' : 'Biometric authentication was not available. Use your PIN.'); return; }
     setView('wallet');
