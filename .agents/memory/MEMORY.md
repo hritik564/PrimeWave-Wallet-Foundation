@@ -2,3 +2,4 @@
 - [Crypto dependency maturity](crypto-dependency-maturity.md) — use mature releases under the workspace registry guard and prefer Node's built-in test runner when framework installs are blocked.
 - [Secure wallet vault](secure-wallet-vault.md) — use Expo SecureStore with native-only fail-closed behavior; defer access authentication to Phase 1B-2.
 - [Local authentication policy](local-authentication.md) — wallet access uses a versioned six-digit scrypt verifier, PIN fallback, immediate default auto-lock, and no permanent lockout.
+- [Expo Go native compatibility](expo-go-native-compatibility.md) — keep startup imports limited to modules available in Expo Go; use React Native keyboard primitives for this wallet.
