@@ -1,4 +1,5 @@
 import type { AuthenticationResult, BiometricAvailability } from './contracts';
+import { secureLogger } from './logging';
 import {
   AuthenticationManager,
   type AuthenticationSettings,
@@ -99,7 +100,13 @@ export class WalletAccessManager {
 
   async resetLocalWallet(): Promise<void> {
     await this.engine.deleteWallet();
-    await this.authenticator.clearAuthenticationState();
+    try {
+      await this.authenticator.clearAuthenticationState();
+    } catch {
+      secureLogger.warning('Local preview authentication cleanup deferred', {
+        cleanup: 'authentication',
+      });
+    }
     this.currentWallet = null;
     this.status = 'onboarding';
   }

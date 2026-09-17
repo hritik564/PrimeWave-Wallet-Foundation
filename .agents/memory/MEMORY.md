@@ -4,3 +4,4 @@
 - [Local authentication policy](local-authentication.md) — wallet access uses a versioned six-digit scrypt verifier, PIN fallback, immediate default auto-lock, and no permanent lockout.
 - [Expo Go native compatibility](expo-go-native-compatibility.md) — keep startup imports limited to modules available in Expo Go; use React Native keyboard primitives for this wallet.
 - [Account state consistency](account-state-consistency.md) — bind public snapshots to the selected network and captured block context; reject stale results after network changes.
+- [Local preview reset](preview-reset.md) — erase the wallet before secondary PIN cleanup and return to onboarding only after explicit confirmation.
