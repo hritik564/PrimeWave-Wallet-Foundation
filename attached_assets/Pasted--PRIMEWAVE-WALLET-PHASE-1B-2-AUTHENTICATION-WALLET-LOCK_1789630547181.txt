@@ -1,0 +1,948 @@
+# PRIMEWAVE WALLET — PHASE 1B-2
+
+## AUTHENTICATION, WALLET LOCKING & RECOVERY UX
+
+Phase 1A and Phase 1B-1 have been completed and approved.
+
+Continue from the existing PrimeWave Wallet project.
+
+This is **PHASE 1B-2 ONLY**.
+
+We are now implementing the authentication and wallet-access layer around the secure local vault.
+
+The wallet remains strictly non-custodial.
+
+Do NOT implement blockchain connectivity, RPC, transactions, signing, swaps, DApps, WalletConnect, backend services, or portfolio functionality.
+
+---
+
+# 1. OBJECTIVE
+
+Implement a secure local wallet access lifecycle:
+
+FIRST LAUNCH
+
+↓
+
+Create or Import Wallet
+
+↓
+
+Secure Recovery Phrase Setup
+
+↓
+
+Recovery Backup Confirmation
+
+↓
+
+Wallet Vault Created
+
+↓
+
+Authentication Setup
+
+↓
+
+Wallet Locked
+
+↓
+
+PIN / Biometrics
+
+↓
+
+Wallet Unlocked
+
+↓
+
+Wallet Available
+
+↓
+
+App Backgrounds
+
+↓
+
+Wallet Locks
+
+↓
+
+Authentication Required Again
+
+---
+
+# 2. SECURITY MODEL
+
+The wallet remains strictly non-custodial.
+
+Never transmit or store remotely:
+
+* recovery phrase
+* mnemonic
+* private key
+* seed
+* PIN
+* password
+* biometric credentials
+* encryption keys
+
+No backend should be introduced.
+
+No network requests should be introduced.
+
+---
+
+# 3. AUTHENTICATION ARCHITECTURE
+
+Implement a dedicated authentication layer under:
+
+src/core/security/
+
+Use the Phase 0B contracts where appropriate.
+
+Conceptually:
+
+AuthenticationManager
+
+Responsibilities:
+
+* configure authentication
+* authenticate user
+* lock wallet
+* unlock wallet
+* check lock state
+* determine available authentication methods
+* handle authentication failure
+* handle biometric availability
+
+The UI must communicate with AuthenticationManager rather than directly calling SecureStore.
+
+---
+
+# 4. PIN
+
+Implement a wallet PIN.
+
+Requirements:
+
+* PIN must never be stored as plaintext.
+* PIN must never be logged.
+* PIN must never be sent to a server.
+* PIN must never appear in analytics.
+* PIN must not be stored in React state longer than necessary.
+* Failed attempts must be handled safely.
+* Authentication errors must be sanitized.
+
+Do NOT invent a password/PIN hashing algorithm.
+
+Use an established cryptographic mechanism appropriate for the chosen architecture.
+
+If a PIN-derived key is required, use a well-established password-based key derivation function and document:
+
+* algorithm
+* parameters
+* salt handling
+* versioning
+* migration strategy
+
+Do NOT write custom cryptography.
+
+---
+
+# 5. PIN SETUP UX
+
+Create:
+
+SET UP WALLET PIN
+
+Enter PIN
+
+Confirm PIN
+
+Then:
+
+PIN successfully configured.
+
+Minimum PIN length should be selected based on security/usability considerations and documented.
+
+Do not use an easily guessable fixed development PIN.
+
+Do not provide a hidden developer PIN.
+
+Do not provide a bypass PIN.
+
+---
+
+# 6. PIN AUTHENTICATION
+
+Create:
+
+UNLOCK PRIMEWAVE WALLET
+
+Enter PIN
+
+Authentication succeeds
+
+↓
+
+Wallet unlocks.
+
+Authentication fails
+
+↓
+
+Remain locked.
+
+Do not reveal whether any internal secret exists based on detailed error messages.
+
+Do not expose cryptographic details.
+
+---
+
+# 7. BIOMETRIC AUTHENTICATION
+
+Implement platform-appropriate biometric authentication using established Expo/React Native APIs.
+
+Support:
+
+* Face ID where available
+* Touch ID where available
+* Android biometric authentication where supported
+
+Do not store biometric data.
+
+PrimeWave Wallet should use the operating system's biometric authentication mechanism.
+
+The application must never receive raw biometric information.
+
+---
+
+# 8. BIOMETRIC FALLBACK
+
+If biometrics are:
+
+* unavailable
+* not enrolled
+* temporarily unavailable
+* rejected
+* cancelled
+
+the user must be able to authenticate using the configured wallet PIN.
+
+Do not lock users permanently because biometric authentication is unavailable.
+
+---
+
+# 9. BIOMETRIC ENABLE/DISABLE
+
+Provide a security setting:
+
+Biometric Unlock
+
+ON / OFF
+
+When enabling:
+
+Authenticate using the current wallet authentication method.
+
+When disabling:
+
+Require wallet authentication.
+
+Do not allow an unauthenticated user to change this setting.
+
+---
+
+# 10. WALLET LOCK STATE
+
+Implement explicit wallet states:
+
+LOCKED
+UNLOCKING
+UNLOCKED
+AUTHENTICATION_FAILED
+AUTHENTICATION_UNAVAILABLE
+
+Keep the state machine simple and deterministic.
+
+Sensitive wallet operations must not be available while LOCKED.
+
+---
+
+# 11. APPLICATION BACKGROUNDING
+
+When the application moves into the background, implement configurable wallet locking.
+
+The architecture should support:
+
+* immediate lock
+* short timeout
+* configurable timeout
+
+For initial production behavior, use a secure default.
+
+When the wallet is locked:
+
+* sensitive screens must no longer remain visible
+* sensitive wallet state should not remain exposed in the UI
+* returning to the application should require authentication when the configured lock policy says so
+
+Do not claim that JavaScript memory is guaranteed to be wiped.
+
+---
+
+# 12. BACKGROUND SCREEN PRIVACY
+
+Implement a privacy overlay when the application enters the background if technically appropriate.
+
+The application switcher should not expose:
+
+* recovery phrases
+* private keys
+* transaction confirmation details
+* sensitive wallet information
+
+Use platform-appropriate screen protection where supported.
+
+Document platform limitations.
+
+---
+
+# 13. RECOVERY PHRASE ONBOARDING
+
+Now implement the actual wallet creation onboarding.
+
+Flow:
+
+WELCOME
+
+↓
+
+CREATE NEW WALLET
+
+↓
+
+SECURITY WARNING
+
+↓
+
+RECOVERY PHRASE DISPLAY
+
+↓
+
+USER CONFIRMS THEY UNDERSTAND
+
+↓
+
+RECOVERY PHRASE SHOWN
+
+↓
+
+USER BACKS IT UP
+
+↓
+
+CONFIRM RECOVERY PHRASE
+
+↓
+
+WALLET CREATED
+
+↓
+
+SET PIN
+
+↓
+
+OPTIONALLY ENABLE BIOMETRICS
+
+↓
+
+WALLET UNLOCKED
+
+IMPORTANT:
+
+The recovery phrase is CRITICAL SECRET DATA.
+
+---
+
+# 14. RECOVERY PHRASE DISPLAY
+
+When displaying the recovery phrase:
+
+* use a dedicated secure screen
+* prevent accidental exposure where technically possible
+* do not log the phrase
+* do not send it anywhere
+* do not include it in analytics
+* do not put it into URLs
+* do not store it in normal application storage
+* do not automatically copy it
+* do not automatically share it
+
+Provide a clear warning:
+
+> Anyone who has your recovery phrase can control your wallet. PrimeWave cannot recover your wallet if you lose your recovery phrase.
+
+---
+
+# 15. RECOVERY PHRASE CONFIRMATION
+
+Do NOT simply provide a "Done" button.
+
+Require the user to demonstrate that they backed up the recovery phrase.
+
+For example:
+
+Ask the user to select specific words by position.
+
+Example:
+
+Word #4
+Word #9
+Word #12
+
+The exact implementation is up to you.
+
+Do not expose the entire recovery phrase again unnecessarily.
+
+Only after successful confirmation should wallet setup continue.
+
+---
+
+# 16. RECOVERY / IMPORT FLOW
+
+Implement:
+
+IMPORT EXISTING WALLET
+
+↓
+
+Enter recovery phrase
+
+↓
+
+Validate BIP-39 phrase
+
+↓
+
+Derive account
+
+↓
+
+Display public address
+
+↓
+
+Confirm import
+
+↓
+
+Persist wallet securely
+
+↓
+
+Set PIN
+
+↓
+
+Optional biometric setup
+
+↓
+
+Wallet unlocked
+
+The recovery phrase must never be sent to a server.
+
+Do not implement private-key import in this phase unless it already exists as a secure architectural requirement.
+
+Focus on BIP-39 recovery.
+
+---
+
+# 17. IMPORT SECURITY
+
+When a user enters a recovery phrase:
+
+* do not log it
+* do not persist it before successful import
+* do not place it in URL parameters
+* do not send it over the network
+* do not put it in analytics
+* clear references as soon as practical
+* use the existing WalletEngine
+* persist only through SecureVault
+
+If import fails, show a sanitized error.
+
+Do not tell the user unnecessary cryptographic details.
+
+---
+
+# 18. FIRST-LAUNCH LOGIC
+
+Implement:
+
+IF no persisted wallet exists:
+
+show onboarding.
+
+IF persisted wallet exists:
+
+show wallet lock screen.
+
+Do not show wallet creation onboarding repeatedly after a wallet exists.
+
+Handle corrupted or unavailable vault states safely.
+
+---
+
+# 19. WALLET LOCK SCREEN
+
+Create a polished PrimeWave lock screen consistent with the existing PrimeWave AI-tech visual system.
+
+It should contain:
+
+PRIMEWAVE WALLET
+
+Wallet locked
+
+[Biometric unlock]
+
+or
+
+Enter PIN
+
+The design must be original PrimeWave UI.
+
+Do not copy MetaMask.
+
+Do not copy another wallet's lock screen.
+
+---
+
+# 20. SECURITY SETTINGS
+
+Create a basic Security section.
+
+Include:
+
+* Change PIN
+* Biometric Unlock
+* Auto-Lock
+* Lock Wallet Now
+* Backup / Recovery status
+
+Do not expose the recovery phrase from a normal settings screen.
+
+If the user requests to view the recovery phrase later, require strong authentication and display an appropriate warning.
+
+If technically possible, require recent re-authentication before exposing the recovery phrase.
+
+---
+
+# 21. CHANGE PIN
+
+Flow:
+
+Security
+
+↓
+
+Change PIN
+
+↓
+
+Authenticate current wallet
+
+↓
+
+Enter new PIN
+
+↓
+
+Confirm new PIN
+
+↓
+
+Update authentication protection
+
+The wallet must remain usable if the PIN is changed.
+
+Do not accidentally destroy the wallet during a PIN change.
+
+Test this carefully.
+
+---
+
+# 22. RECOVERY PHRASE SECURITY
+
+Never make recovery phrase display an easily accessible one-tap operation.
+
+Require:
+
+* authentication
+* explicit warning
+* deliberate user action
+
+Do not log the recovery phrase during this process.
+
+---
+
+# 23. MULTIPLE ACCOUNTS
+
+The existing HD wallet architecture supports multiple EVM accounts.
+
+Authentication should unlock the wallet vault as a whole.
+
+Do not create separate PINs for each EVM account.
+
+Do not create separate recovery phrases for accounts belonging to the same HD wallet.
+
+---
+
+# 24. SECRET-SAFE STATE MANAGEMENT
+
+Do NOT store raw:
+
+* mnemonic
+* private key
+* seed
+* PIN
+* decrypted vault
+
+inside:
+
+* Redux
+* Zustand
+* React Context
+* persistent state
+* AsyncStorage
+* localStorage
+
+UI state should contain only what is required to render the current screen.
+
+Public wallet information such as addresses may be held in normal UI state.
+
+---
+
+# 25. CLIPBOARD
+
+Recovery phrases must not be automatically copied.
+
+If the user explicitly copies sensitive data:
+
+* show a warning
+* copy only after explicit confirmation
+* clear the clipboard when technically possible
+* never log clipboard contents
+
+Do not read the clipboard unnecessarily.
+
+---
+
+# 26. LOGGING
+
+Continue using SecureLogger.
+
+Never log:
+
+* PIN
+* recovery phrase
+* private key
+* seed
+* encryption key
+* decrypted vault
+* biometric information
+
+Safe logs may include:
+
+* authentication method
+* lock state
+* operation success/failure
+* vault availability
+
+Avoid unnecessary personal or wallet information.
+
+---
+
+# 27. AUTHENTICATION FAILURE
+
+Handle:
+
+* incorrect PIN
+* cancelled biometric authentication
+* unavailable biometric hardware
+* locked-out biometric state
+* secure-storage failure
+* corrupted vault
+
+without exposing secret material.
+
+Do not create an infinite rapid PIN-attempt loop.
+
+Implement reasonable rate limiting/backoff for repeated failed PIN attempts where appropriate.
+
+Document the behavior.
+
+Do not create a permanent lockout that could destroy access to a valid wallet.
+
+The recovery phrase remains the ultimate recovery mechanism.
+
+---
+
+# 28. TESTING
+
+Add meaningful automated tests wherever possible.
+
+Test:
+
+### Wallet creation
+
+Create wallet
+→ recovery phrase generated
+→ backup confirmation
+→ PIN configured
+→ wallet persisted
+→ wallet accessible after restart
+
+### Import
+
+Known BIP-39 phrase
+→ import
+→ expected address
+→ persist
+→ reload
+→ same address
+
+### PIN
+
+* correct PIN succeeds
+* incorrect PIN fails
+* change PIN works
+* old PIN no longer authenticates after successful change
+
+### Biometrics
+
+Mock platform biometric availability and verify:
+
+* available → authentication path works
+* unavailable → PIN fallback works
+* cancelled → remains locked
+* failed → remains locked
+
+### Locking
+
+* explicit lock
+* background lock
+* unlock
+* timeout behavior
+
+### Security
+
+Verify:
+
+* PIN never logged
+* mnemonic never logged
+* private key never exposed
+* secrets never sent over network
+* secrets never written to normal storage
+* locked state blocks protected operations
+
+---
+
+# 29. TEST VECTORS
+
+Continue using the Phase 1A known BIP-39/EVM vectors.
+
+The imported known mnemonic must produce the same expected account addresses.
+
+Do not replace standard test vectors with random assertions.
+
+---
+
+# 30. PLATFORM CONSIDERATIONS
+
+Document differences between:
+
+iOS
+
+and
+
+Android
+
+for:
+
+* secure storage
+* biometric authentication
+* background behavior
+* screen privacy
+* device security
+
+Do not falsely claim identical behavior across both platforms.
+
+---
+
+# 31. WEB BEHAVIOR
+
+This is a mobile wallet.
+
+Do not create a browser-storage fallback for wallet secrets.
+
+If secure native storage/authentication is unavailable on web:
+
+FAIL CLOSED.
+
+Do not silently downgrade security.
+
+---
+
+# 32. NO BLOCKCHAIN
+
+Do NOT add:
+
+* RPC
+* blockchain connections
+* network requests
+* transactions
+* signing
+* swaps
+* DApps
+* WalletConnect
+
+The wallet must still operate completely offline.
+
+---
+
+# 33. NO BACKEND
+
+Do not add:
+
+* authentication server
+* database
+* user accounts
+* cloud backup
+* seed recovery server
+* remote wallet storage
+
+This phase remains device-local.
+
+---
+
+# 34. DESIGN
+
+Use the existing PrimeWave AI-tech theme.
+
+The authentication and onboarding screens should feel like the same product as the PrimeWave website and existing wallet foundation.
+
+Maintain:
+
+* dark futuristic aesthetic
+* PrimeWave colors
+* gradients
+* subtle glow
+* premium cards
+* clean typography
+* restrained animation
+
+Do not sacrifice usability for visual effects.
+
+Recovery phrase and PIN screens should prioritize clarity and security over decoration.
+
+---
+
+# 35. VALIDATION
+
+Before completion:
+
+* TypeScript passes
+* all Phase 1A tests pass
+* all Phase 1B-1 tests pass
+* new authentication tests pass
+* wallet creation works
+* wallet import works
+* vault persistence works
+* PIN works
+* biometric flow works or is safely mocked/tested where unavailable
+* explicit lock works
+* background lock works
+* recovery phrase confirmation works
+* no secrets are logged
+* no secrets are transmitted
+* no secrets are stored in normal storage
+* no backend exists
+* no blockchain connection exists
+* no transaction functionality exists
+
+Test both Android and iOS behavior as far as the current Expo development environment permits.
+
+Clearly distinguish simulated tests from real device verification.
+
+---
+
+# 36. SECURITY LIMITATION
+
+Do NOT claim:
+
+"bank-grade security"
+
+"unhackable"
+
+"100% secure"
+
+"guaranteed protection"
+
+or equivalent claims.
+
+This application has not undergone an independent security audit.
+
+Document that fact.
+
+---
+
+# 37. STOP CONDITION
+
+STOP after Phase 1B-2.
+
+Do NOT begin Phase 2.
+
+Do NOT implement:
+
+* blockchain RPC
+* network manager connections
+* balances
+* transactions
+* signing
+* swaps
+* DApps
+* backend
+* token discovery
+
+Those will be separate phases.
+
+---
+
+# FINAL REPORT
+
+When complete, report:
+
+1. Authentication architecture
+2. PIN implementation
+3. Biometric implementation
+4. Lock-state architecture
+5. Auto-lock behavior
+6. Recovery phrase onboarding
+7. Recovery/import flow
+8. Secure storage integration
+9. Dependencies added and exact versions
+10. Files created/modified
+11. Automated tests and results
+12. Platform-specific limitations
+13. Security checks
+14. Any warnings/errors
+15. Confirmation that no blockchain/RPC/backend functionality was added
+16. Confirmation that no secrets are exposed through UI-facing APIs
+17. Exact next recommended step
+
+Do NOT start Phase 2 automatically.
