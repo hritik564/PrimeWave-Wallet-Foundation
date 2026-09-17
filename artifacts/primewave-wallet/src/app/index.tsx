@@ -1,9 +1,8 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import { AppState, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { KeyboardAwareScrollView } from 'react-native-keyboard-controller';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/src/theme';
 import {
@@ -166,23 +165,27 @@ function Screen({
       <LinearGradient colors={theme.gradients.background} locations={[0, 0.48, 1]} style={StyleSheet.absoluteFill} />
       <View style={styles.orbTop} />
       <View style={styles.orbBottom} />
-      <KeyboardAwareScrollView
-        bottomOffset={24}
-        contentContainerStyle={[
-          styles.content,
-          {
-            paddingTop: insets.top + theme.spacing.lg,
-            paddingBottom: insets.bottom + (Platform.OS === 'web' ? 34 : theme.spacing.lg),
-          },
-        ]}
-        keyboardShouldPersistTaps="handled"
-        showsVerticalScrollIndicator={false}
-        style={styles.scroll}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.keyboardContainer}
       >
-        <Header onBack={onBack} />
-        {sensitive ? <View style={styles.sensitiveMarker} /> : null}
-        {children}
-      </KeyboardAwareScrollView>
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            {
+              paddingTop: insets.top + theme.spacing.lg,
+              paddingBottom: insets.bottom + (Platform.OS === 'web' ? 34 : theme.spacing.lg),
+            },
+          ]}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+          style={styles.scroll}
+        >
+          <Header onBack={onBack} />
+          {sensitive ? <View style={styles.sensitiveMarker} /> : null}
+          {children}
+        </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -634,6 +637,7 @@ export default function FoundationScreen() {
 
 const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: theme.colors.background },
+  keyboardContainer: { flex: 1 },
   scroll: { flex: 1 },
   content: { flexGrow: 1, paddingHorizontal: theme.spacing.lg, gap: theme.spacing.lg },
   orbTop: { position: 'absolute', top: -120, right: -100, width: 280, height: 280, borderRadius: 140, backgroundColor: 'rgba(80, 217, 255, 0.08)' },
