@@ -1,0 +1,467 @@
+DEVELOPMENT-ONLY PREVIEW TEST MODE — FIX REPLIT WEB PREVIEW ACCESS
+
+IMPORTANT:
+This is a development/testing infrastructure change only.
+
+The Replit Web Preview is currently unusable for testing the application because it is stuck on the Wallet Locked screen.
+
+The existing Reset Local Preview button cannot operate in the Replit web environment because native SecureStore is unavailable.
+
+DO NOT weaken or modify the production/native wallet security architecture.
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Create a clearly isolated DEVELOPMENT-ONLY "Preview Test Mode" that allows the developer to repeatedly test the WaveX wallet application inside the Replit Web Preview.
+
+The purpose is to make the web preview usable for:
+
+- wallet onboarding UI
+- wallet locked/unlocked UI
+- 6-digit PIN flow
+- account screens
+- network screens
+- asset/portfolio UI as it is developed
+- transaction UI as it is developed
+- settings UI
+- general navigation and application flows
+
+This is NOT a replacement for native security testing.
+
+==================================================
+2. CRITICAL SECURITY RULE
+==================================================
+
+There must be two clearly separated environments:
+
+NATIVE / REAL WALLET
+→ existing SecureStore-backed wallet architecture
+→ real device security
+→ real wallet secrets
+→ real authentication
+→ real signing
+
+REPLIT WEB PREVIEW DEVELOPMENT MODE
+→ development-only simulated wallet state
+→ no production secrets
+→ no SecureStore replacement
+→ no real wallet private keys
+→ no real recovery phrase
+→ no real signing
+
+DO NOT modify the native SecureStore implementation to make Web Preview work.
+
+DO NOT introduce browser storage as the production wallet vault.
+
+DO NOT make the production application depend on Preview Test Mode.
+
+==================================================
+3. PREVIEW TEST MODE ACTIVATION
+==================================================
+
+Preview Test Mode must only be available when the application is running in a development environment.
+
+Use the existing __DEV__ boundary and the application's existing environment/configuration architecture.
+
+It must NOT be possible to activate Preview Test Mode in a production build through:
+
+- a URL parameter
+- local storage manipulation
+- a query parameter
+- a hidden production route
+- a runtime flag exposed to users
+- an API call
+- any user-controlled production input
+
+Production builds must compile/run without this functionality being accessible.
+
+==================================================
+4. DO NOT USE REAL WALLET SECRETS
+==================================================
+
+The Web Preview Test Mode MUST NOT generate or persist a real BIP39 mnemonic or real private key.
+
+Do not call the real wallet secret generation/derivation path merely to create preview test state.
+
+Do not store:
+
+- mnemonic
+- private key
+- seed
+- encryption key
+- PIN secret
+
+in browser storage.
+
+The preview wallet can use a deterministic PUBLIC test account representation for UI testing.
+
+For example, the test environment may use a fixed, clearly documented development-only public address such as:
+
+0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+
+ONLY as a public test identity.
+
+Do not assume or expose any corresponding private key or mnemonic.
+
+==================================================
+5. PREVIEW PIN
+==================================================
+
+The Preview Test Mode must support a developer-defined 6-digit test PIN.
+
+The developer should be able to:
+
+1. Reset Preview
+2. Enter onboarding
+3. Create/configure a test wallet
+4. Set a 6-digit PIN
+5. Lock wallet
+6. Unlock wallet using that PIN
+
+The preview PIN is NOT a real wallet security credential.
+
+It must never be passed to:
+
+- backend
+- RPC
+- signing engine
+- SecureStore
+- real wallet vault
+- analytics
+
+If persistence is needed for the preview state, use only a clearly isolated development-only preview state mechanism.
+
+Never reuse the production wallet vault.
+
+==================================================
+6. PREVIEW RESET
+==================================================
+
+The existing "Reset Local Preview" button should be repaired/reworked so that in Web Preview it actually resets the simulated development state.
+
+After reset, the application should return to the initial onboarding state.
+
+Expected flow:
+
+Reset Local Preview
+→ clean onboarding
+→ Create Test Wallet
+→ Recovery Confirmation UI if applicable
+→ Set 6-digit Test PIN
+→ Wallet Home
+→ Lock
+→ Unlock
+
+The reset operation must be idempotent.
+
+If no preview state exists, reset should still succeed.
+
+==================================================
+7. DO NOT CHANGE NATIVE RESET
+==================================================
+
+The existing native reset implementation must remain intact.
+
+On native development builds:
+
+- SecureStore remains the wallet persistence mechanism.
+- Vault deletion remains SecureStore-based.
+- Authentication cleanup remains native.
+- No browser fallback should be introduced.
+
+The preview reset path and native reset path must remain clearly separated.
+
+==================================================
+8. PREVIEW STATE ARCHITECTURE
+==================================================
+
+Create a small isolated module, for example:
+
+src/core/development/
+or
+src/core/dev-preview/
+
+Use naming that makes its development-only purpose unmistakable.
+
+Create a minimal interface such as:
+
+PreviewTestMode
+PreviewWalletState
+PreviewTestStateRepository
+
+The exact names may follow the existing architecture.
+
+The module should support only what is needed for application preview testing:
+
+- hasPreviewWallet
+- createPreviewWallet
+- setPreviewPin
+- verifyPreviewPin
+- lockPreviewWallet
+- unlockPreviewWallet
+- resetPreviewWallet
+
+Do not expose real wallet secrets.
+
+Do not create a second production wallet engine.
+
+==================================================
+9. PREVIEW PERSISTENCE
+==================================================
+
+If persistence is required so that a browser refresh does not immediately lose the test state, use a development-only browser mechanism inside the isolated Preview Test Mode module.
+
+This is the ONLY context where browser persistence may be used.
+
+It must be impossible for this repository to be imported or used by production wallet security code.
+
+Do NOT call it:
+
+SecureVault
+WalletVault
+WalletStorage
+KeyStore
+SecureStorage
+
+Use an unmistakably development-only name.
+
+Do not store sensitive secrets.
+
+The preview PIN may be represented only as a development-test state value if necessary, but never use the production PIN storage format or production authentication storage.
+
+==================================================
+10. REAL WALLET ENGINE BOUNDARY
+==================================================
+
+Do not modify:
+
+- LocalWalletEngine secret handling
+- SecureVault
+- SecureStore integration
+- KeyManager
+- SecretManager
+- LocalSigner
+- WalletAuthenticator native behavior
+- transaction signing
+- transaction authorization
+- broadcasting
+
+The preview layer must sit ABOVE the real wallet security boundary and must not replace it.
+
+==================================================
+11. SIGNING SAFETY
+==================================================
+
+Preview Test Mode must NOT provide a real signing capability.
+
+Do not create:
+
+- fake private-key signing
+- deterministic private key
+- development mnemonic
+- browser transaction signer
+- signing bypass
+
+If future UI needs to display a signed/broadcast transaction state during UI development, create a separate clearly mocked UI fixture later.
+
+Do not implement that now.
+
+==================================================
+12. UI INTEGRATION
+==================================================
+
+Update only the minimum existing development UI needed.
+
+The existing development-only Reset Local Preview control should use Preview Test Mode when running in Web Preview.
+
+Make it obvious that this is a development test environment.
+
+For example:
+
+"Preview Test Mode"
+
+"Reset Local Preview"
+
+"Development-only test wallet"
+
+Do not expose this UI in production.
+
+Do not redesign the application's main UI.
+
+==================================================
+13. WALLET LOCKED SCREEN
+==================================================
+
+When the Replit Web Preview enters the locked state, the developer must be able to unlock it using the 6-digit Preview Test PIN.
+
+Do not route the preview unlock through native biometric APIs.
+
+If the preview UI currently attempts native biometric authentication, the preview environment should use the development PIN path instead.
+
+This must NOT change native iOS/Android biometric behavior.
+
+==================================================
+14. ACCOUNT / ADDRESS
+==================================================
+
+The preview wallet may expose a fixed public development address for UI testing.
+
+Use only public test identity data.
+
+Do not expose any corresponding private key or recovery phrase.
+
+Clearly document that the address is development/test-only.
+
+==================================================
+15. NETWORK / BLOCKCHAIN SAFETY
+==================================================
+
+Preview Test Mode must not bypass the existing NetworkRegistry or blockchain security rules.
+
+Do not automatically connect to arbitrary networks.
+
+Do not add fake mainnet credentials.
+
+Do not invent PrimeWave Mainnet RPC values.
+
+Do not alter RPC security validation.
+
+The preview mode is only for application-state/UI testing.
+
+==================================================
+16. TESTS
+==================================================
+
+Add focused tests for:
+
+- Preview Test Mode available only in development
+- Initial preview state
+- Create preview wallet
+- Set valid 6-digit PIN
+- Reject invalid PIN length
+- Reject non-numeric PIN
+- Unlock with correct PIN
+- Reject incorrect PIN
+- Lock preview wallet
+- Reset preview wallet
+- Reset when no wallet exists
+- Reset idempotency
+- State survives refresh if persistence is implemented
+- Preview state contains no mnemonic
+- Preview state contains no private key
+- Preview repository is isolated from SecureVault
+- Preview repository is not used by native wallet flow
+- Production/native path remains unchanged
+- No RPC signing
+- No transaction signing
+- No backend dependency
+
+Keep existing tests green.
+
+==================================================
+17. SECURITY TEST
+==================================================
+
+Explicitly test that Preview Test Mode cannot access:
+
+- mnemonic
+- private key
+- SecureStore wallet secrets
+- real signing capability
+
+Do not weaken existing security tests.
+
+==================================================
+18. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+
+Document clearly:
+
+- Web Preview has a development-only simulated wallet state
+- Native wallet uses SecureStore
+- Preview state is not a real wallet
+- Preview PIN is not a real security credential
+- Preview cannot sign real transactions
+- Preview Test Mode is excluded from production
+- Native device testing remains mandatory for real wallet security
+
+==================================================
+19. VERIFICATION
+==================================================
+
+Run:
+
+- full test suite
+- TypeScript
+- git diff --check
+- Expo/Metro workflow
+- web bundle
+
+Verify manually in Replit Web Preview:
+
+1. Reset Local Preview
+2. App reaches onboarding
+3. Create/configure preview wallet
+4. Set a custom 6-digit PIN
+5. Enter wallet
+6. Lock wallet
+7. Unlock with the same 6-digit PIN
+8. Reset again
+9. Confirm onboarding returns
+
+==================================================
+20. IMPORTANT SCOPE LIMIT
+==================================================
+
+This is ONLY a development-preview usability fix.
+
+Do NOT implement:
+
+- token transfers
+- approvals
+- swaps
+- signing
+- real wallet generation in browser
+- browser private keys
+- browser seed phrases
+- backend wallet storage
+- production browser wallet
+- new blockchain features
+- new portfolio features
+- UI redesign
+
+STOP after this development-only Preview Test Mode fix.
+
+==================================================
+21. FINAL REPORT
+==================================================
+
+Report:
+
+- root cause of the current locked-preview problem
+- files added
+- files modified
+- Preview Test Mode architecture
+- preview state mechanism
+- PIN behavior
+- reset behavior
+- confirmation that no real wallet secret is used
+- confirmation that native SecureStore remains unchanged
+- confirmation that production cannot access Preview Test Mode
+- tests passed
+- TypeScript result
+- Expo/Metro result
+- Web Preview manual test result
+- git diff --check result
+- remaining limitations
+
+Do not claim the native wallet/security flow was tested unless it was actually tested on a native development build.
+
+STOP.
