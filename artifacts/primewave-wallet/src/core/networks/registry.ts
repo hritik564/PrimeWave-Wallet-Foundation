@@ -113,6 +113,9 @@ function validateRpcEndpoints(
       failInvalid(`RPC endpoint priority is duplicated: ${endpoint.priority}.`);
     }
     priorities.add(endpoint.priority);
+    if (endpoint.enabled !== undefined && typeof endpoint.enabled !== 'boolean') {
+      failInvalid(`RPC endpoint enabled state is invalid: ${endpoint.id}.`);
+    }
 
     parsePublicUrl(endpoint.url, `RPC endpoint ${endpoint.id}`, environment);
   }

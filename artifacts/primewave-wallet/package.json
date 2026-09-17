@@ -8,7 +8,7 @@
     "build": "node scripts/build.js",
     "serve": "node server/serve.js",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "node --import tsx --test src/core/wallet/tests/*.test.ts src/core/security/tests/*.test.ts src/core/networks/tests/*.test.ts"
+    "test": "node --import tsx --test src/core/wallet/tests/*.test.ts src/core/security/tests/*.test.ts src/core/networks/tests/*.test.ts src/core/blockchain/rpc/tests/*.test.ts"
   },
   "dependencies": {
     "@noble/hashes": "2.4.0",

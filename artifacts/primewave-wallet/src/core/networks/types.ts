@@ -16,6 +16,7 @@ export interface RpcEndpoint {
   readonly id: string;
   readonly url: string;
   readonly priority: number;
+  readonly enabled?: boolean;
 }
 
 export interface RpcEndpointConfiguration {

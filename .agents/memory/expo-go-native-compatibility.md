@@ -14,4 +14,6 @@ necessarily show that device-side crash.
 
 **How to apply:** Keep the root layout and initial screen on Expo Go-compatible
 imports. Treat physical iOS and Android Expo Go launch as a required validation
-step after changing native dependencies.
+step after changing native dependencies. Core runtime code should also prefer
+broadly supported language/runtime APIs over newer convenience methods when a
+simple compatible alternative exists.

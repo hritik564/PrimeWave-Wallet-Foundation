@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 2.1 — EVM network abstraction and registry (completed)**
+**Phase 2.2 — EVM RPC provider engine (completed)**
 
 ## Completed work
 
@@ -52,14 +52,21 @@
   or DApp-controlled selection is implemented.
 - Added focused offline registry tests for integrity, lookup, duplicate
   rejection, placeholder rules, environment separation, and invalid metadata.
+- Added a typed JSON-RPC 2.0 provider engine behind the blockchain boundary.
+- Added fake-transport tests for request creation, response validation, request
+  IDs, JSON-RPC errors, malformed responses, timeouts, HTTP/network failures,
+  endpoint selection, disabled endpoints, and chain-ID verification.
+- Added safe RPC error normalization and sanitized diagnostic logging without
+  exposing full URLs, credentials, or wallet-secret material.
 
 ## Pending work
 
 - Production PrimeWave Chain launch configuration must be supplied and reviewed
   before the primary network can be activated.
 - Recovery UX and authentication require separate scope and security review.
-- Network health checks, failover, asset read models, and live RPC integration
-  remain outside this controlled increment.
+- Aggressive endpoint failover, network health checks, asset read models,
+  balances, tokens, and live application read flows remain outside this
+  controlled increment.
 
 ## Important architectural decisions
 
@@ -73,8 +80,9 @@
 
 ## Known limitations
 
-- No blockchain RPC calls, health checks, failover, indexer, price service,
-  database, notification service, or DApp connection.
+- No automatic network switching, aggressive RPC failover, health-check
+  scheduler, indexer, price service, database, notification service, or DApp
+  connection.
 - The PrimeWave Chain entry has null chain and endpoint values by design.
 - Built-in public RPC metadata is not a live connectivity guarantee and does
   not contain credentials.
@@ -86,6 +94,6 @@
 
 ## Next recommended phase
 
-**Phase 2.2 — network read models**, covering endpoint health checks, explicit
-failover policy, and public native-asset/balance reads. Do not begin it
-automatically.
+**Phase 2.3 — network and asset read models**, covering endpoint health checks,
+explicit failover policy, and public native-asset/balance reads. Do not begin
+it automatically.

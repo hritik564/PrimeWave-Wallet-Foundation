@@ -146,6 +146,27 @@ does not accept automatic switching requests from DApps or other untrusted
 callers. The ordered endpoint list is a future seam for health checks and
 failover; this increment performs no RPC calls.
 
+## RPC provider engine
+
+Phase 2.2 adds the typed provider engine in `src/core/blockchain/rpc`. It is
+constructed from the explicitly selected active registry network, chooses the
+lowest numeric priority among enabled endpoints, and refuses unconfigured
+networks such as the PrimeWave Chain placeholder. It does not silently switch
+networks or fail over to another endpoint after a request failure.
+
+The provider sends JSON-RPC 2.0 requests through an injectable transport, with
+typed support for the foundation EVM method set. Every request has a bounded
+timeout, generated request ID, response ID check, result/error exclusivity
+check, and method-specific result validation. Initialization verifies
+`eth_chainId` against the registry before ordinary requests are allowed.
+
+Transport failures, timeouts, HTTP failures, malformed responses, invalid
+responses, JSON-RPC errors, unsupported methods, endpoint failures, and chain
+ID mismatches normalize to safe `RpcProviderError` codes. Logs contain only
+network ID, chain ID, endpoint ID, method, and error category. The RPC layer
+has no dependency on wallet keys, recovery phrases, PINs, biometric secrets,
+secure-vault state, or signing material.
+
 ## Design system
 
 PrimeWave Wallet uses a centralized dark foundation with blue, cyan, and violet
@@ -169,9 +190,13 @@ website layout.
    definitions, reviewed public metadata, deterministic validation, and
    explicit active-network selection. This controlled increment is complete;
    it performs no RPC calls.
-6. **Phase 2.2 — network and asset read models:** health checks, balances,
+6. **Phase 2.2 — EVM RPC provider engine:** typed JSON-RPC transport, bounded
+   requests, deterministic endpoint selection, response validation, safe error
+   normalization, and chain-ID verification. This controlled increment is
+   complete; it performs no wallet read models.
+7. **Phase 2.3 — network and asset read models:** health checks, balances,
    native assets, ERC-20 tokens, and verified-token boundaries.
-7. **Phase 3 — transactions and signing:** local signing, user confirmation,
+8. **Phase 3 — transactions and signing:** local signing, user confirmation,
    and broadcast flows.
-8. **Phase 4 — ecosystem capabilities:** discovery, swaps, DApp connectivity,
+9. **Phase 4 — ecosystem capabilities:** discovery, swaps, DApp connectivity,
    and PrimeWave integrations.
