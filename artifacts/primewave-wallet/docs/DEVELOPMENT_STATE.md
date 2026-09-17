@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 2.6 — secure local EVM transaction signing (completed)**
+**Phase 2.7 — EVM transaction broadcasting and confirmation (completed)**
 
 ## Completed work
 
@@ -96,15 +96,30 @@
 - Added cancellation, authentication, vault/key-access, concurrency,
   network-race, no-RPC, no-backend, no-persistence, and no-broadcast signing
   tests.
+- Added the Phase 2.7 UI-independent broadcast and confirmation engine.
+- Reused the existing typed `EvmRpcProvider` for raw transaction broadcast,
+  receipt polling, and read-only transaction lookup.
+- Added exact raw signed-transaction validation and local hash consistency
+  checks before `eth_sendRawTransaction`.
+- Added active-network, configured-network, remote-chain, and signed-chain
+  protection without automatic network switching.
+- Added in-memory hash-based duplicate protection for concurrent, completed,
+  and ambiguous broadcast operations.
+- Added bounded explicit receipt polling with confirmed, reverted, and unknown
+  states using bigint receipt quantities.
+- Added timeout ambiguity handling with no automatic rebroadcast or endpoint
+  failover.
+- Added structural tests proving the broadcaster has no signing, vault, or
+  private-key access.
 
 ## Pending work
 
 - Production PrimeWave Chain launch configuration must be supplied and reviewed
   before the primary network can be activated.
 - Recovery UX and authentication UI require separate scope and security review.
-- Broadcasting, transaction history, receipt monitoring, replacement,
-  speed-up, cancellation, token logic, swaps, DApps, indexing, backend
-  transaction APIs, and fiat pricing remain outside this controlled increment.
+- Transaction history, replacement, speed-up, cancellation, automatic fee
+  bumping, token logic, swaps, DApps, indexing, backend transaction APIs, and
+  fiat pricing remain outside this controlled increment.
 - Balance preflight validation is intentionally not implemented because it is
   optional and must not be mistaken for a guarantee before signing/broadcast.
 - Physical-device verification of local signing and native biometric behavior
@@ -134,8 +149,9 @@
   fails closed rather than using browser storage.
 - There has been no full external security audit.
 
-## Next recommended phase
+## Phase boundary
 
-Broadcasting requires a separate security-reviewed Phase 2.7. Do not begin it
-automatically. Phase 2.6 performs local transaction signing only. Broadcasting
-is intentionally deferred to Phase 2.7.
+Phase 2.7 is complete. Stop here. Later phases may separately define
+transaction history, UI activity, token functionality, swaps, DApps,
+WalletConnect, notifications, backend indexing, replacement, speed-up,
+cancellation, automatic fee bumping, and other ecosystem capabilities.

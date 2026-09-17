@@ -82,3 +82,49 @@ remains future hardening.
 
 **Phase 2.6 performs local transaction signing only. Broadcasting is
 intentionally deferred to Phase 2.7.**
+
+## Phase 2.7 broadcast and confirmation
+
+`src/core/transactions/broadcast` accepts only the public `SignedTransaction`
+result from Phase 2.6. It has no access to wallet engines, vaults, signing
+capabilities, PINs, biometric state, mnemonics, or private keys.
+
+The execution lifecycle is:
+
+```text
+SignedTransaction
+  ↓
+Validate raw bytes, local hash, network, and chain
+  ↓
+Verify configured active network and remote RPC chain
+  ↓
+eth_sendRawTransaction with exact raw bytes
+  ↓
+BroadcastResult: broadcasted or unknown
+  ↓
+Explicit bounded receipt polling
+  ↓
+ConfirmationResult: confirmed, reverted, or unknown
+```
+
+The broadcaster reuses the existing `EvmRpcProvider`. It does not create
+another HTTP client, modify or reserialize the signed transaction, retry
+automatically, switch networks, or implement replacement, speed-up,
+cancellation, fee bumping, or persistent transaction history.
+
+Broadcast identity is the signed transaction hash. In-memory idempotency
+reuses an in-flight or completed operation for the same hash, including an
+ambiguous timeout result. A timeout or transport failure after the send
+attempt returns `unknown` and never triggers an automatic second submission.
+
+Receipt polling has bounded, configurable interval and timeout values. A null
+receipt remains pending during polling and becomes `unknown` only when the
+polling bound is reached. A receipt with status `0x1` is `confirmed`; status
+`0x0` is `reverted`. Receipt quantities remain `bigint`.
+
+Confirmation and read-only transaction lookup remain tied to the provider and
+network captured for the signed transaction. A change to the user’s active
+network does not redirect confirmation to another chain.
+
+**Phase 2.7 broadcasts already-signed transactions and observes blockchain
+confirmation. It does not construct or sign transactions.**

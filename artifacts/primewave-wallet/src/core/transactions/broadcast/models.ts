@@ -21,7 +21,10 @@ export interface BroadcastResult {
   readonly transactionType: SignedTransaction['transactionType'];
   readonly from: string;
   readonly submittedAtMs: number | null;
-  readonly errorCode?: 'BROADCAST_TIMEOUT' | 'BROADCAST_UNKNOWN_RESULT';
+  readonly errorCode?:
+    | 'BROADCAST_TIMEOUT'
+    | 'BROADCAST_NETWORK_UNAVAILABLE'
+    | 'BROADCAST_UNKNOWN_RESULT';
 }
 
 export interface PublicTransactionReceipt {

@@ -294,6 +294,57 @@ APIs. Stronger native cryptographic isolation remains a future hardening item.
 **Phase 2.6 performs local transaction signing only. Broadcasting is
 intentionally deferred to Phase 2.7.**
 
+## Transaction broadcasting and confirmation
+
+Phase 2.7 adds `src/core/transactions/broadcast` as a UI-independent execution
+layer. It accepts only the public `SignedTransaction` model produced by
+Phase 2.6. It cannot access the wallet engine, secure vault, signing
+capability, authentication state, mnemonic, or private key.
+
+The execution lifecycle is:
+
+```text
+SignedTransaction
+  ↓
+Validate raw bytes, local hash, signed chain ID, and network metadata
+  ↓
+Verify selected configured network and remote RPC chain ID
+  ↓
+eth_sendRawTransaction with exact raw bytes
+  ↓
+BroadcastResult
+  ├─ broadcasted
+  └─ unknown on an ambiguous send timeout/transport failure
+       ↓
+Explicit bounded confirmation polling
+  ↓
+ConfirmationResult
+  ├─ confirmed
+  ├─ reverted
+  └─ unknown
+```
+
+The broadcaster reuses `EvmRpcProvider` for sending, receipt polling, and
+read-only transaction lookup. It performs no transaction construction,
+reserialization, signing, backend communication, analytics, endpoint
+failover, automatic retry, replacement, speed-up, cancellation, or fee
+bumping.
+
+The signed transaction hash is the in-memory idempotency key. Concurrent
+broadcast calls reuse the same operation, and completed or ambiguous results
+are not automatically submitted again. An RPC timeout after the send attempt
+is represented as `unknown`, because the endpoint may have accepted the
+transaction even if the response was lost.
+
+Receipt polling is explicitly invoked and bounded by configurable interval and
+timeout values. Null receipts remain pending until the bound is reached.
+Receipt status `0x1` becomes `confirmed`; status `0x0` becomes `reverted`.
+Receipt quantities are parsed as `bigint`. Confirmation and lookup use the
+original provider/network context even if the user changes the active network.
+
+**Phase 2.7 broadcasts already-signed transactions and observes blockchain
+confirmation. It does not construct or sign transactions.**
+
 ## Design system
 
 PrimeWave Wallet uses a centralized dark foundation with blue, cyan, and violet
@@ -334,8 +385,9 @@ website layout.
     existing authentication gating, local Legacy/EIP-1559 signing, local
     transaction hashes, secret-lifetime minimization, and no-broadcast
     enforcement.
-11. **Phase 2.7 — future broadcast boundary:** broadcasting, receipt handling,
-    confirmation polling, retries, replacement, speed-up, and cancellation
-    remain deferred.
+11. **Phase 2.7 — broadcast and confirmation:** exact signed-transaction
+    broadcasting, chain/network protection, in-memory duplicate prevention,
+    bounded receipt polling, revert handling, unknown-result handling, and
+    read-only transaction lookup. No automatic retry or transaction mutation.
 12. **Future ecosystem capabilities:** discovery, swaps, DApp connectivity,
     and PrimeWave integrations remain deferred.

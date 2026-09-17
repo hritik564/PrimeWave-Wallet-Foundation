@@ -5,3 +5,4 @@
 - [Expo Go native compatibility](expo-go-native-compatibility.md) — keep startup imports limited to modules available in Expo Go; use React Native keyboard primitives for this wallet.
 - [Account state consistency](account-state-consistency.md) — bind public snapshots to the selected network and captured block context; reject stale results after network changes.
 - [Local preview reset](preview-reset.md) — erase the wallet before secondary PIN cleanup and return to onboarding only after explicit confirmation.
+- [Broadcast and confirmation boundary](broadcast-confirmation.md) — Phase 2.7 sends exact already-signed bytes, observes receipts, and treats ambiguous outcomes as unknown.

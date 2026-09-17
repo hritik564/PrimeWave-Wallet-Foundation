@@ -164,7 +164,7 @@ function validateSignedTransaction(
       throw new TransactionBroadcastError('BROADCAST_INVALID_TRANSACTION');
     }
     return {
-      chainId: parsed.chainId,
+      chainId: BigInt(parsed.chainId),
       type: parsed.type,
     };
   } catch (error) {
@@ -300,7 +300,9 @@ export class TransactionBroadcastEngine {
     }
 
     this.lifecycle.set(context.transactionHash, 'broadcasting');
-    const operation = this.executeBroadcast(signed, parsed, context);
+    const operation = Promise.resolve().then(() =>
+      this.executeBroadcast(signed, parsed, context),
+    );
     this.broadcastOperations.set(context.transactionHash, operation);
     return operation;
   }
@@ -374,11 +376,13 @@ export class TransactionBroadcastEngine {
     parsed: ParsedSignedTransaction,
     context: OperationContext,
   ): Promise<BroadcastResult> {
+    let requestStarted = false;
     try {
       this.assertBroadcastContext(signed, parsed);
       await this.ensureProviderInitialized();
       this.assertBroadcastContext(signed, parsed);
 
+      requestStarted = true;
       const rpcHash = await this.provider.request('eth_sendRawTransaction', [
         signed.rawTransaction,
       ]);
@@ -407,8 +411,9 @@ export class TransactionBroadcastEngine {
     } catch (error) {
       const normalized = normalizeRpcError(error);
       if (
-        normalized.code === 'BROADCAST_TIMEOUT' ||
-        normalized.code === 'BROADCAST_NETWORK_UNAVAILABLE'
+        requestStarted &&
+        (normalized.code === 'BROADCAST_TIMEOUT' ||
+          normalized.code === 'BROADCAST_NETWORK_UNAVAILABLE')
       ) {
         this.lifecycle.set(context.transactionHash, 'unknown');
         const result: BroadcastResult = Object.freeze({
@@ -431,6 +436,9 @@ export class TransactionBroadcastEngine {
         return result;
       }
       this.lifecycle.set(context.transactionHash, 'failed');
+      if (!requestStarted) {
+        this.broadcastOperations.delete(context.transactionHash);
+      }
       this.logFailure(normalized, context.transactionHash);
       throw normalized;
     }
@@ -550,10 +558,13 @@ export class TransactionBroadcastEngine {
       typeof broadcast !== 'object' ||
       broadcast === null ||
       broadcast.kind !== 'broadcast-result' ||
+      (broadcast.state !== 'broadcasted' && broadcast.state !== 'unknown') ||
       !isHash(broadcast.transactionHash) ||
       typeof broadcast.networkId !== 'string' ||
       typeof broadcast.chainId !== 'bigint' ||
-      broadcast.chainId <= 0n
+      broadcast.chainId <= 0n ||
+      (broadcast.transactionType !== 'native-transfer' &&
+        broadcast.transactionType !== 'contract-call')
     ) {
       throw new TransactionBroadcastError('BROADCAST_INVALID_TRANSACTION');
     }
@@ -565,13 +576,19 @@ export class TransactionBroadcastEngine {
     ) {
       throw new TransactionBroadcastError('BROADCAST_CHAIN_MISMATCH');
     }
+    let from: string;
+    try {
+      from = normalizePublicEvmAddress(broadcast.from);
+    } catch {
+      throw new TransactionBroadcastError('BROADCAST_INVALID_TRANSACTION');
+    }
 
     return {
       transactionHash: broadcast.transactionHash.toLowerCase() as `0x${string}`,
       networkId: broadcast.networkId,
       chainId: broadcast.chainId,
       transactionType: broadcast.transactionType,
-      from: broadcast.from,
+      from,
     };
   }
 
@@ -587,25 +604,20 @@ export class TransactionBroadcastEngine {
     ) {
       throw new TransactionBroadcastError('BROADCAST_NETWORK_CHANGED');
     }
+    const chainId = this.network.chainId;
     if (
       !active.enabled ||
       active.configurationStatus !== 'configured' ||
-      active.chainId === null
+      chainId === null
     ) {
       throw new TransactionBroadcastError('BROADCAST_CHAIN_MISMATCH');
     }
     if (
       signed.networkId !== this.network.id ||
-      signed.chainId !== BigInt(this.network.chainId) ||
-      parsed.chainId !== BigInt(this.network.chainId)
+      signed.chainId !== BigInt(chainId) ||
+      parsed.chainId !== BigInt(chainId)
     ) {
       throw new TransactionBroadcastError('BROADCAST_CHAIN_MISMATCH');
-    }
-    if (
-      (parsed.type === 'legacy' && signed.transactionType === undefined) ||
-      (parsed.type === 'eip1559' && signed.transactionType === undefined)
-    ) {
-      throw new TransactionBroadcastError('BROADCAST_INVALID_TRANSACTION');
     }
   }
 

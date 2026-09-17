@@ -375,7 +375,57 @@ queued. Signing is only exposed through an explicit call; startup, refresh,
 background work, notifications, DApp discovery, and automatic retry do not
 trigger it.
 
-## 13. Error handling
+## 13. Phase 2.7 broadcast and confirmation boundary
+
+Phase 2.7 consumes only the public `SignedTransaction` result from Phase 2.6.
+The broadcaster has no dependency on `LocalWalletEngine`, `SecureVault`,
+signing capabilities, authentication state, mnemonic storage, or private-key
+access. It cannot sign or construct an unsigned transaction.
+
+Before sending, the engine validates:
+
+- 0x-prefixed raw signed bytes with complete byte pairs
+- local transaction hash consistency
+- parseable Legacy or EIP-1559 serialized transaction
+- signed chain ID
+- enabled, configured network identity
+- currently active network identity
+- remote RPC chain ID
+
+All network and chain identities must match. The engine never switches the
+active network. It transmits the exact `rawTransaction` string received from
+Phase 2.6 through the existing `EvmRpcProvider` and does not reserialize,
+modify, rebuild, or re-sign it.
+
+`eth_sendRawTransaction` is called only from an explicit `broadcast()` call
+after validation succeeds. Construction, signing, confirmation initialization,
+startup, network selection, refresh, and app lifecycle events do not call it.
+
+The signed transaction hash is the in-memory operation identity. Concurrent
+calls reuse the existing operation, and completed or ambiguous operations are
+not automatically submitted again. The engine does not create persistent
+queues, transaction history, or backend records.
+
+An RPC timeout or network transport failure after the send attempt is
+ambiguous: the result is returned as `unknown` with the signed transaction
+hash, and no automatic rebroadcast occurs. A provider rejection, malformed
+response, hash mismatch, chain mismatch, or network change becomes a
+normalized error. Raw RPC messages, payloads, stacks, and response data are
+not exposed.
+
+Confirmation uses the original provider/network context captured for the
+signed transaction rather than the current UI-selected network. It polls only
+when explicitly invoked, with bounded configurable interval and timeout. A
+null receipt remains pending during the polling window and becomes `unknown`
+after the bound. A valid receipt with status `0x1` is `confirmed`; status
+`0x0` is `reverted`. Receipt quantities use `bigint`.
+
+The public execution models contain only transaction hash, network and chain
+identity, public sender/type metadata, lifecycle state, and safe receipt
+fields. They contain no private key, mnemonic, seed, vault contents, signing
+capability, PIN, biometric secret, or authentication credential.
+
+## 14. Error handling
 
 Errors shown to users must not expose private keys, recovery phrases,
 cryptographic material, authentication secrets, or secure-storage contents.
@@ -386,7 +436,7 @@ display raw stack traces to the user.
 Secret material must never be included in application error objects created by
 future security implementations.
 
-## 14. Memory handling
+## 15. Memory handling
 
 Cryptographic secrets should have the shortest practical lifetime in memory.
 Future implementations should minimize copies, clear sensitive buffers where
@@ -398,7 +448,7 @@ JavaScript garbage collection does not guarantee secure memory wiping. PrimeWave
 Wallet must document this limitation honestly and use platform-native
 mechanisms where appropriate.
 
-## 14. Backup and recovery
+## 16. Backup and recovery
 
 The recovery phrase is the user's ultimate recovery mechanism. PrimeWave must
 not provide server-side recovery for a non-custodial wallet.
@@ -421,7 +471,7 @@ If the user loses the recovery phrase and access to the wallet, PrimeWave
 cannot recover the wallet for them. This limitation must be communicated
 clearly before wallet creation is implemented.
 
-## 15. Multiple accounts
+## 17. Multiple accounts
 
 The future vault must support multiple EVM accounts without exposing private
 keys to UI components:
@@ -438,14 +488,14 @@ Account addresses may be presented to the UI as sensitive public data.
 Derivation and signing material remains encapsulated inside the wallet and
 security layers.
 
-## 16. Security testing structure
+## 18. Security testing structure
 
 Phase 0B adds a reviewable test-case plan under
 `src/core/security/tests/SECURITY_TEST_CASES.md`. These are not fake passing
 tests. A real test runner and concrete implementations must be added before
 the corresponding contract tests are marked complete.
 
-## 17. Phase 1A cryptographic implementation
+## 19. Phase 1A cryptographic implementation
 
 Phase 1A uses the following exact dependencies:
 
@@ -477,7 +527,7 @@ m/44'/60'/0'/0/<accountIndex>
 PrimeWave does not have a separate seed or derivation path. The same EVM
 account can later be used on any supported EVM network.
 
-## 18. Phase 1B-1 vault and secret handling
+## 20. Phase 1B-1 vault and secret handling
 
 Wallet creation obtains 16 bytes from `expo-crypto`, converts that entropy to a
 12-word BIP-39 phrase, and immediately clears the temporary entropy buffer on a
@@ -541,7 +591,7 @@ the security boundary. Retrieval returns an opaque handle rather than raw
 secret material through the public engine model. No public API provides
 `getMnemonic`, `getPrivateKey`, `exportPrivateKey`, or equivalent access.
 
-## 19. Phase 1B-1 verification and limitations
+## 21. Phase 1B-1 verification and limitations
 
 Offline tests cover:
 
@@ -562,7 +612,7 @@ broadcasting, cloud backup, or backend recovery. JavaScript memory clearing is
 best-effort and platform storage behavior must still be tested on real iOS and
 Android devices.
 
-## 20. Dependency and backend rules
+## 22. Dependency and backend rules
 
 No custom cryptography, encryption, mnemonic generation, or elliptic-curve
 logic is allowed. Dependency changes require the same review for maintenance,
