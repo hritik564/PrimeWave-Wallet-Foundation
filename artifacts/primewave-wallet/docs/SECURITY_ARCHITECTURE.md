@@ -178,8 +178,10 @@ PrimeWave Wallet must not claim that it can completely prevent these threats.
 
 ## 6. Security interfaces
 
-Phase 0B defines contracts only. Implementations must use reviewed,
-platform-appropriate mechanisms later.
+Phase 0B defined the contracts. Phase 1B-1 implements the `SecureVault`
+boundary with a reviewed Expo platform adapter. Authentication, secret-manager,
+and signing implementations remain deferred to their separately approved
+phases.
 
 - `SecureVault` — save, retrieve, delete, and check for encrypted wallet state.
 - `WalletAuthenticator` — PIN and biometric authentication boundaries,
@@ -373,26 +375,71 @@ m/44'/60'/0'/0/<accountIndex>
 PrimeWave does not have a separate seed or derivation path. The same EVM
 account can later be used on any supported EVM network.
 
-## 17. Phase 1A secret handling
+## 17. Phase 1B-1 vault and secret handling
 
 Wallet creation obtains 16 bytes from `expo-crypto`, converts that entropy to a
 12-word BIP-39 phrase, and immediately clears the temporary entropy buffer on a
-best-effort basis. The mnemonic is retained only in the engine's in-memory
-secret state so additional accounts can be derived during the current runtime.
+best-effort basis. The mnemonic is retained in the engine's in-memory secret
+state for derivation and is persisted only through the platform-secure vault.
 
 The public `Wallet`, `WalletAccount`, and `WalletEngine` API exposes no
 mnemonic, seed, private key, raw secret buffer, signing capability, or secret
 export method. The internal derivation operation creates an EVM account only
 long enough to copy its public address and returns safe metadata.
 
-The implementation does not log, persist, transmit, or place secrets in
-errors, URLs, query parameters, AsyncStorage, localStorage, Redux, Zustand, or
-backend requests. Logs contain only safe operation metadata such as account
-index and derivation path. `LocalWalletEngine.discard()` removes in-memory
-secret references, but JavaScript garbage collection is not a guaranteed
+The implementation does not log, transmit, or place secrets in errors, URLs,
+query parameters, AsyncStorage, localStorage, Redux, Zustand, or backend
+requests. The only persistence path is `expo-secure-store` `57.0.4`, which
+stores the protected vault through iOS Keychain and Android Keystore-backed
+storage. Logs contain only safe operation metadata such as account index and
+derivation path. `LocalWalletEngine.discard()` removes in-memory secret
+references, but JavaScript garbage collection is not a guaranteed
 cryptographic wipe.
 
-## 18. Phase 1A verification and limitations
+### Platform secure-storage behavior
+
+- **iOS:** SecureStore uses Keychain. The vault uses
+  `WHEN_UNLOCKED_THIS_DEVICE_ONLY`, so it is accessible only while the device
+  is unlocked and is not migrated to another device through backup restore.
+- **Android:** SecureStore uses encrypted shared preferences backed by Android
+  Keystore. The iOS accessibility option is ignored on Android.
+- **Web:** SecureStore reports unavailable. The wallet fails closed and does not
+  fall back to browser storage.
+- **Authentication:** `requireAuthentication` is intentionally not enabled in
+  Phase 1B-1. PIN, biometric prompts, enrollment changes, lock screens, and
+  unlock flows belong to Phase 1B-2.
+
+### Versioned vault format
+
+The current vault version is `1`. The protected value has this shape:
+
+```json
+{
+  "vaultVersion": 1,
+  "wallet": {
+    "walletId": "opaque wallet identifier",
+    "createdAt": "creation timestamp",
+    "accountIndexes": [0, 1]
+  },
+  "secret": {
+    "mnemonic": "protected by the platform secure-storage boundary"
+  }
+}
+```
+
+The JSON is not treated as an application-level encryption primitive. The
+entire value is handed to SecureStore, which provides the native protected
+storage boundary. The parser rejects malformed data, invalid BIP-39 phrases,
+duplicate or unsafe account indexes, and unsupported versions with sanitized
+errors. Future migrations must be explicit and versioned; unknown versions are
+never guessed or silently downgraded.
+
+The engine creates a new opaque vault handle for saves and consumes it inside
+the security boundary. Retrieval returns an opaque handle rather than raw
+secret material through the public engine model. No public API provides
+`getMnemonic`, `getPrivateKey`, `exportPrivateKey`, or equivalent access.
+
+## 18. Phase 1B-1 verification and limitations
 
 Offline tests cover:
 
@@ -402,11 +449,16 @@ Offline tests cover:
 - Invalid account indexes.
 - Valid, invalid-checksum, and malformed EVM addresses.
 - Absence of mnemonic/private-key fields from public metadata.
+- Wallet creation, account-index persistence, and restoration in a fresh
+  engine instance.
+- Missing vault handling, malformed JSON, invalid secret material, unsupported
+  versions, unavailable storage, and deletion.
 
-Phase 1A is not production-secure wallet storage. It does not implement
-encrypted persistence, Keychain/Keystore, authentication, PINs, biometrics,
-locking, recovery UI, transaction signing, RPC, broadcasting, or a full
-security audit. Those are explicitly deferred to later phases.
+Phase 1B-1 is not a full security audit and does not implement authentication,
+PINs, biometrics, locking, recovery UI, transaction signing, RPC,
+broadcasting, cloud backup, or backend recovery. JavaScript memory clearing is
+best-effort and platform storage behavior must still be tested on real iOS and
+Android devices.
 
 ## 19. Dependency and backend rules
 

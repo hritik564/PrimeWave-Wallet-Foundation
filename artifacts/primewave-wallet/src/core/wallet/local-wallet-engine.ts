@@ -1,4 +1,3 @@
-import * as Crypto from 'expo-crypto';
 import { entropyToMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { secureLogger } from '@/src/core/security';
@@ -14,9 +13,12 @@ import {
 import {
   consumeEncryptedWalletState,
   createEncryptedWalletState,
-  type WalletVaultRecord,
 } from './internal/vault';
 import type { SecureVault } from '@/src/core/security';
+
+export interface WalletEntropyProvider {
+  getRandomBytesAsync(byteCount: number): Promise<Uint8Array>;
+}
 
 type InMemorySecretState = {
   mnemonic: string;
@@ -29,13 +31,22 @@ export class LocalWalletEngine implements WalletEngine {
   private walletId: string | null = null;
   private createdAt: string | null = null;
   private readonly vaultPromise: Promise<SecureVault>;
+  private readonly entropyPromise: Promise<WalletEntropyProvider>;
 
-  constructor(vault?: SecureVault) {
+  constructor(
+    vault?: SecureVault,
+    entropyProvider?: WalletEntropyProvider,
+  ) {
     this.vaultPromise = vault
       ? Promise.resolve(vault)
       : import('./internal/expo-secure-wallet-vault').then(
           ({ createExpoSecureWalletVault }) => createExpoSecureWalletVault(),
         );
+    this.entropyPromise = entropyProvider
+      ? Promise.resolve(entropyProvider)
+      : import('expo-crypto').then((crypto) => ({
+          getRandomBytesAsync: crypto.getRandomBytesAsync,
+        }));
   }
 
   async createWallet(): Promise<Wallet> {
@@ -43,7 +54,7 @@ export class LocalWalletEngine implements WalletEngine {
     this.discard();
 
     // 128 bits produces a standard 12-word BIP-39 phrase.
-    const entropy = await Crypto.getRandomBytesAsync(16);
+    const entropy = await (await this.entropyPromise).getRandomBytesAsync(16);
     try {
       const mnemonic = entropyToMnemonic(entropy, wordlist);
       const firstAccount = derivePublicAccountFromMnemonic(mnemonic, 0);
@@ -126,7 +137,7 @@ export class LocalWalletEngine implements WalletEngine {
       state.mnemonic,
       accountIndex,
     );
-    this.accounts = [
+    const nextAccounts = [
       ...this.accounts.filter((existing) => existing.index !== accountIndex),
       account,
     ].sort((left, right) => left.index - right.index);
@@ -146,10 +157,11 @@ export class LocalWalletEngine implements WalletEngine {
       createEncryptedWalletState({
         walletId,
         createdAt,
-        accountIndexes: this.accounts.map((existing) => existing.index),
+        accountIndexes: nextAccounts.map((existing) => existing.index),
         mnemonic: state.mnemonic,
       }),
     );
+    this.accounts = nextAccounts;
 
     secureLogger.info('Wallet account derived', {
       accountIndex,

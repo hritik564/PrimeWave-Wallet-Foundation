@@ -2,8 +2,9 @@
  * Security contracts only.
  *
  * These opaque types intentionally cannot be constructed by UI components.
- * Phase 0B defines the boundary; a later phase will provide reviewed,
- * platform-specific implementations.
+ * Phase 0B defined the boundary. Phase 1B-1 provides the reviewed,
+ * platform-specific SecureVault implementation; authentication and signing
+ * implementations remain deferred to later phases.
  */
 
 export type EncryptedWalletState = {

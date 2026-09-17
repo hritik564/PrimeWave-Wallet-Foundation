@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 1A — local EVM wallet core (completed)**
+**Phase 1B-1 — secure local wallet vault (completed)**
 
 ## Completed work
 
@@ -33,14 +33,22 @@
 - Added safe public wallet/account models and EVM address validation.
 - Added offline Node test coverage with known account 0, 1, and 2 vectors.
 - Reviewed the dependency tree and documented the selected library versions.
+- Added `expo-secure-store` `57.0.4` with the Expo config plugin.
+- Added a version 1 vault format containing protected mnemonic material and
+  minimal restoration metadata.
+- Added iOS Keychain / Android Keystore-backed persistence with
+  `WHEN_UNLOCKED_THIS_DEVICE_ONLY` accessibility.
+- Added wallet restoration across fresh engine instances, deletion, missing
+  vault, malformed vault, unsupported version, and unavailable-storage handling.
+- Added fail-closed web behavior because Expo SecureStore is native-only.
+- Added offline persistence tests without exposing secrets through public models.
 
 ## Pending work
 
 - Production PrimeWave Chain configuration must be supplied and reviewed.
-- Recovery UX, secure persistent storage, and authentication require separate
-  scope and security review.
-- The Phase 0B security contract test plan remains a plan for future
-  platform-secure implementations.
+- Recovery UX and authentication require separate scope and security review.
+- The Phase 0B authentication and signing contract test plan remains a plan for
+  future implementations.
 
 ## Important architectural decisions
 
@@ -54,17 +62,19 @@
 
 ## Known limitations
 
-- No secure persistent storage, import/recovery UI, vault, authentication, or
-  signing.
+- No authentication UX, import/recovery UI, PIN, biometrics, wallet locking,
+  or signing.
 - No blockchain RPC, indexer, price service, database, notification service, or
   DApp connection.
 - The PrimeWave Chain entry has null chain and endpoint values by design.
 - JavaScript garbage collection is not a guaranteed memory wipe for temporary
   secrets.
+- SecureStore availability is false on web, so web wallet creation/restoration
+  fails closed rather than using browser storage.
 - There has been no full external security audit.
 
 ## Next recommended phase
 
-**Phase 1B — secure wallet lifecycle**, as a separate approved phase covering
-encrypted platform storage, recovery UX, authentication, and wallet locking.
-Do not begin it automatically.
+**Phase 1B-2 — authentication lifecycle**, covering authentication UX,
+wallet locking, and platform authentication integration. Do not begin it
+automatically.

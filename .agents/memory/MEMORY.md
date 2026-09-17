@@ -1,2 +1,3 @@
 - [Expo route root](expo-route-root.md) — PrimeWave Wallet routes live under src/app, not the legacy top-level app directory.
 - [Crypto dependency maturity](crypto-dependency-maturity.md) — use mature releases under the workspace registry guard and prefer Node's built-in test runner when framework installs are blocked.
+- [Secure wallet vault](secure-wallet-vault.md) — use Expo SecureStore with native-only fail-closed behavior; defer access authentication to Phase 1B-2.

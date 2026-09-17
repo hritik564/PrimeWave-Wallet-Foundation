@@ -19,6 +19,7 @@ Expo Router app
   ├─ client configuration
    └─ domain cores
         ├─ local wallet core
+        │    └─ secure vault
        ├─ security
        ├─ blockchain
        ├─ networks
@@ -36,7 +37,7 @@ Expo Router app
   theme tokens.
 - **Configuration:** environment and network configuration with unconfigured
   production placeholders.
-- **Domain core:** the Phase 1A local wallet core plus typed interfaces for
+- **Domain core:** the Phase 1B-1 local wallet core plus typed interfaces for
   security, blockchain, network, token, transaction, portfolio, swap, and DApp
   behavior.
 - **Services:** reserved for client-side adapters; the wallet core requires no
@@ -44,21 +45,23 @@ Expo Router app
 
 ## Local wallet core
 
-Phase 1A implements an in-memory `LocalWalletEngine` behind the
-`WalletEngine` boundary in `src/core/wallet/contracts.ts`. It generates a
-12-word BIP-39 recovery phrase from 128 bits of Expo platform entropy, derives
-standard EVM accounts at `m/44'/60'/0'/0/<index>`, and exposes only wallet
-metadata and public account data.
+Phase 1B-1 extends the Phase 1A `LocalWalletEngine` behind the `WalletEngine`
+boundary in `src/core/wallet/contracts.ts`. It generates a 12-word BIP-39
+recovery phrase from 128 bits of Expo platform entropy, derives standard EVM
+accounts at `m/44'/60'/0'/0/<index>`, and exposes only wallet metadata and
+public account data.
 
 The cryptographic layer is intentionally separated from UI-facing models:
 
 ```text
 WalletEngine
   ├─ LocalWalletEngine
-  │    ├─ Expo Crypto entropy source
+   │    ├─ Expo Crypto entropy source
    │    ├─ @scure/bip39 mnemonic operations
    │    ├─ viem's @scure/bip32 HD account derivation
-  │    └─ viem EVM account and address operations
+   │    ├─ viem EVM account and address operations
+   │    └─ SecureVault
+   │         └─ expo-secure-store
   └─ public Wallet / WalletAccount models
 ```
 
@@ -72,19 +75,34 @@ seed systems.
 
 ### Wallet core and secure storage
 
-Phase 1A deliberately does not connect the wallet core to `SecureVault`,
-AsyncStorage, localStorage, a database, cloud backup, or any other persistence
-mechanism. `LocalWalletEngine.discard()` clears the in-memory references on a
+Phase 1B-1 connects the wallet core to a versioned `SecureVault`. The vault
+stores the minimum recovery material and public restoration metadata through
+`expo-secure-store`, which uses iOS Keychain and Android Keystore-backed
+storage. It never uses AsyncStorage, localStorage, plain files, SQLite,
+Redux/Zustand persistence, or cloud backup for secrets.
+
+The vault payload is versioned and validated before restoration. The
+`LocalWalletEngine.discard()` method clears in-memory references on a
 best-effort basis. JavaScript garbage collection is not a guaranteed secure
-memory wipe; platform-secure persistence belongs to a later reviewed phase.
+memory wipe.
 
 ## Trust boundaries
 
 The UI will communicate with `WalletEngine`, which coordinates the local
-cryptographic implementation. Private keys, recovery phrases, secure storage,
-and signing libraries remain behind that boundary. Phase 1A returns only
-public metadata; it does not expose a recovery phrase or private key to UI
-components.
+cryptographic implementation and vault lifecycle. Private keys, recovery
+phrases, secure storage, and signing libraries remain behind that boundary.
+Phase 1B-1 returns only public metadata; it does not expose a recovery phrase
+or private key to UI components.
+
+```text
+UI
+  ↓ safe WalletEngine methods
+WalletEngine
+  ↓ internal opaque vault handle
+SecureVault
+  ↓ protected key-value operation
+Platform secure storage
+```
 
 ## Future blockchain engine
 
@@ -128,11 +146,13 @@ website layout.
 2. **Phase 1A — local wallet core:** in-memory BIP-39 generation and
    validation, BIP-32/BIP-44-compatible EVM derivation, address validation,
    multiple-account models, and offline deterministic tests.
-3. **Phase 1B — secure lifecycle:** encrypted local storage, recovery UX,
-   authentication, and wallet locking after separate approval.
-4. **Phase 2 — network and asset read models:** configured networks, balances,
+3. **Phase 1B-1 — secure local vault:** versioned platform-secure persistence,
+   restoration, corruption handling, and offline persistence tests.
+4. **Phase 1B-2 — authentication lifecycle:** PIN/biometric UX, authentication,
+   and wallet locking after separate approval.
+5. **Phase 2 — network and asset read models:** configured networks, balances,
    native assets, ERC-20 tokens, and verified-token boundaries.
-5. **Phase 3 — transactions and signing:** local signing, user confirmation,
+6. **Phase 3 — transactions and signing:** local signing, user confirmation,
    and broadcast flows.
-6. **Phase 4 — ecosystem capabilities:** discovery, swaps, DApp connectivity,
+7. **Phase 4 — ecosystem capabilities:** discovery, swaps, DApp connectivity,
    and PrimeWave integrations.

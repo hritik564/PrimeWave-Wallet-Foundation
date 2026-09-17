@@ -47,7 +47,7 @@ export default function FoundationScreen() {
           </View>
           <View style={styles.phasePill}>
             <View style={styles.phaseDot} />
-             <Text style={styles.phaseText}>PHASE 1A</Text>
+              <Text style={styles.phaseText}>PHASE 1B-1</Text>
           </View>
         </View>
 
@@ -72,14 +72,14 @@ export default function FoundationScreen() {
             </View>
             <View style={styles.cardHeaderCopy}>
               <Text style={styles.cardEyebrow}>FOUNDATION STATUS</Text>
-              <Text style={styles.cardTitle}>Offline wallet core is ready</Text>
+              <Text style={styles.cardTitle}>Secure wallet vault is ready</Text>
             </View>
           </View>
           <View style={styles.divider} />
           <Text style={styles.cardBody}>
-             The local BIP-39 and standard EVM derivation core is implemented.
-             Network access, persistence, and transaction features remain out
-             of scope for this phase.
+              The local BIP-39 and standard EVM derivation core now persists
+              through platform-secure storage. Network access, authentication,
+              and transaction features remain out of scope for this phase.
           </Text>
           <View style={styles.invariantRow}>
             <View style={styles.invariantIcon}>
