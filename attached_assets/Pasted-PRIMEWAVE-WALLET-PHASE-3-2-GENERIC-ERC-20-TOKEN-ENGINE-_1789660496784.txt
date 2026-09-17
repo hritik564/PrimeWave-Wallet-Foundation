@@ -1,0 +1,1459 @@
+PRIMEWAVE WALLET — PHASE 3.2
+GENERIC ERC-20 TOKEN ENGINE
+============================
+
+You are continuing development of PrimeWave Wallet.
+
+IMPORTANT:
+This is Phase 3.2 ONLY.
+
+Implement the generic ERC-20 read-only token engine.
+
+DO NOT implement:
+- ERC-20 transfers
+- ERC-20 approvals
+- allowance management
+- transferFrom
+- token sending UI
+- token receiving UI
+- swaps
+- DEX integration
+- token trading
+- NFTs
+- token discovery across entire chains
+- token lists from external providers
+- token verification services
+- portfolio valuation
+- fiat pricing
+- transaction history
+- Activity UI
+- DApps
+- WalletConnect
+- backend token APIs
+- notifications
+- signing
+- broadcasting
+
+Do not redesign the existing architecture.
+
+==================================================
+NON-CUSTODIAL SECURITY INVARIANT
+==================================================
+
+PrimeWave Wallet is strictly non-custodial.
+
+This phase is READ-ONLY.
+
+The token engine MUST NEVER:
+
+- access private keys
+- access recovery phrases
+- access seed material
+- access SecureVault secrets
+- unlock the wallet
+- authenticate the user
+- sign transactions
+- broadcast transactions
+- call eth_sendRawTransaction
+- call token transfer()
+- call approve()
+- call transferFrom()
+- call permit()
+- persist secrets
+- send secrets to any backend
+
+Only public blockchain information may be used.
+
+==================================================
+CURRENT ARCHITECTURE
+==================================================
+
+Existing layers:
+
+NETWORK
+  ↓
+ASSET ENGINE
+  ↓
+NATIVE ASSET ENGINE
+  ↓
+ACCOUNT STATE / RPC
+  ↓
+TRANSACTION ENGINE
+  ↓
+SIGNING
+  ↓
+BROADCAST
+
+Phase 3.1 established:
+
+- AssetType
+- network-scoped AssetIdentity
+- AssetRegistry
+- NativeAsset
+- NativeAssetBalance
+- exact bigint amount handling
+- amount parsing/formatting
+- network-scoped balance retrieval
+
+Existing blockchain services include:
+
+- NetworkRegistry
+- EvmRpcProvider
+- EvmAccountStateService
+- Gas/Fee Engine
+- Transaction Construction
+- Local Signing
+- Transaction Broadcasting
+
+Reuse them.
+
+Do not duplicate RPC infrastructure.
+
+==================================================
+PHASE 3.2 OBJECTIVE
+==================================================
+
+Build a generic ERC-20 token engine capable of representing arbitrary ERC-20 contracts on supported EVM networks.
+
+The engine must support:
+
+1. Token identity
+2. Token contract validation
+3. Token metadata retrieval
+4. Token balance retrieval
+5. Exact token amount handling
+6. Network/account scoping
+7. Non-standard metadata handling
+8. Safe error handling
+9. Read-only operation
+
+The architecture must support future:
+
+- user-added tokens
+- discovered tokens
+- verified tokens
+- token visibility
+- token transfers
+
+without requiring a redesign.
+
+But those features are NOT fully implemented in this phase.
+
+==================================================
+1. TOKEN IDENTITY
+==================================================
+
+Create a strongly typed ERC-20 token identity.
+
+A token MUST NOT be identified only by:
+
+- symbol
+- name
+
+The primary identity must include:
+
+- asset type
+- network ID
+- contract address
+
+Conceptually:
+
+TokenAssetIdentity
+
+{
+  assetType: "fungible_token"
+  networkId
+  contractAddress
+}
+
+Normalize the contract address consistently.
+
+Use checksum normalization where appropriate.
+
+Two identical contract addresses on different networks MUST be treated as different assets.
+
+Example:
+
+USDC on Ethereum
+
+and
+
+USDC on Base
+
+are distinct network-scoped token identities.
+
+Do not merge them.
+
+==================================================
+2. TOKEN ASSET MODEL
+==================================================
+
+Create an ERC20Token model containing at minimum:
+
+- asset type
+- network ID
+- chain ID
+- contract address
+- name
+- symbol
+- decimals
+- metadata status
+- verification status
+- availability status
+
+The architecture may include:
+
+- verified
+- user_added
+- discovered
+- unverified
+
+but do not implement external verification/discovery services yet.
+
+For Phase 3.2, default arbitrary contract tokens to an appropriate unverified/unknown verification state.
+
+Do NOT call a token "verified" simply because it implements ERC-20 methods.
+
+==================================================
+3. TOKEN REGISTRY
+==================================================
+
+Extend the asset architecture with an ERC-20 token registry or equivalent.
+
+Responsibilities:
+
+- validate token identity
+- normalize contract addresses
+- resolve token by network + contract
+- prevent duplicate token identities
+- distinguish native assets from fungible tokens
+- reject unsupported asset types
+
+Do not create a hardcoded token list.
+
+Do not hardcode:
+
+- USDT
+- USDC
+- WBTC
+- DAI
+- LINK
+- etc.
+
+The engine must work with arbitrary ERC-20 contract addresses.
+
+==================================================
+4. NETWORK VALIDATION
+==================================================
+
+Every token operation MUST be network-scoped.
+
+A token request must identify:
+
+- network ID
+- contract address
+
+Before interacting with the contract:
+
+- network must exist
+- network must be enabled
+- network must be configured
+- network must be supported
+- remote chain ID must match registry chain ID
+
+Do not silently switch networks.
+
+Do not use the currently selected network unless explicitly requested by the caller.
+
+If using a convenience active-network method:
+
+- resolve the active network
+- reject if no active network exists
+- never automatically switch
+
+==================================================
+5. CONTRACT ADDRESS VALIDATION
+==================================================
+
+Validate the ERC-20 contract address.
+
+Requirements:
+
+- valid EVM address
+- canonical normalization
+- reject malformed addresses
+
+Do not accept arbitrary strings as contract addresses.
+
+Do not treat a wallet EOA address as a token merely because it is syntactically valid.
+
+==================================================
+6. CONTRACT CODE VALIDATION
+==================================================
+
+Before treating an address as an ERC-20 contract:
+
+use the existing public account-state / RPC infrastructure to determine whether code exists.
+
+Use:
+
+eth_getCode
+
+If no contract code exists:
+
+return a normalized:
+
+TOKEN_NOT_A_CONTRACT
+
+or equivalent error.
+
+Do NOT assume:
+
+"valid address = token contract"
+
+This distinction is important.
+
+Do not attempt to prove that arbitrary bytecode is a valid ERC-20 implementation solely from code existence.
+
+==================================================
+7. ERC-20 STANDARD INTERFACE
+==================================================
+
+Use the standard ERC-20 read methods:
+
+balanceOf(address)
+decimals()
+symbol()
+name()
+
+These are READ-ONLY contract calls.
+
+Use the existing RPC provider and:
+
+eth_call
+
+Do not create another RPC transport.
+
+Do not make direct fetch requests.
+
+Do not manually implement an RPC client.
+
+==================================================
+8. ABI IMPLEMENTATION
+==================================================
+
+Use a well-maintained existing ABI/encoding implementation.
+
+The repository already uses viem.
+
+Prefer existing viem primitives for:
+
+- ABI encoding
+- ABI decoding
+- contract reads
+- address handling
+
+Do NOT manually implement:
+
+- ABI encoding
+- ABI decoding
+- function selectors
+- hexadecimal word encoding
+
+unless the existing architecture genuinely requires it and there is no suitable existing primitive.
+
+Do not add another Ethereum ABI library unnecessarily.
+
+==================================================
+9. TOKEN METADATA
+==================================================
+
+Implement read-only metadata retrieval.
+
+Required metadata:
+
+- name
+- symbol
+- decimals
+
+Each should be retrieved safely.
+
+Do not assume every contract behaves perfectly.
+
+A contract may:
+
+- revert
+- return malformed data
+- return unexpected values
+- implement non-standard metadata behavior
+
+Handle failures explicitly.
+
+==================================================
+10. METADATA FAILURE POLICY
+==================================================
+
+Do NOT fabricate token metadata.
+
+Never substitute:
+
+"Unknown Token"
+
+as if it came from the blockchain without clearly representing it as a fallback display label.
+
+Never invent:
+
+- symbol
+- decimals
+- name
+
+If metadata cannot be read:
+
+return structured metadata status.
+
+For example:
+
+metadataStatus:
+- complete
+- partial
+- unavailable
+- invalid
+
+Use safe display fallbacks only at the presentation layer.
+
+The underlying token model must retain the fact that metadata is unavailable.
+
+==================================================
+11. SYMBOL HANDLING
+==================================================
+
+ERC-20 symbol responses may not always behave identically across contracts.
+
+Support standard string responses.
+
+Where practical, safely handle common legacy bytes32-style symbol responses.
+
+Do NOT accept arbitrary malformed values.
+
+Do not perform unsafe decoding.
+
+If symbol decoding fails:
+
+symbol = unavailable
+
+rather than guessing.
+
+==================================================
+12. NAME HANDLING
+==================================================
+
+Name should be treated similarly.
+
+If name() succeeds with a valid string:
+
+use it.
+
+If it reverts or returns invalid data:
+
+mark name unavailable.
+
+Do not fabricate a token name.
+
+==================================================
+13. DECIMALS HANDLING
+==================================================
+
+Decimals are extremely important.
+
+The engine must validate:
+
+- return value exists
+- return value is an integer
+- return value is within supported bounds
+
+Use a conservative supported range.
+
+Do not blindly trust arbitrary large decimals.
+
+Phase 3.1 currently validates asset decimal metadata through a bounded range.
+
+Use the established project policy consistently.
+
+If decimals are invalid:
+
+return normalized:
+
+TOKEN_INVALID_DECIMALS
+
+Do not silently replace invalid decimals with 18.
+
+THIS IS CRITICAL.
+
+Never assume ERC-20 decimals = 18.
+
+==================================================
+14. TOKEN BALANCE
+==================================================
+
+Implement:
+
+getTokenBalance(networkId, tokenContract, account)
+
+or equivalent.
+
+The balance must be retrieved through:
+
+balanceOf(account)
+
+using eth_call.
+
+The account must be:
+
+- valid EVM address
+- public address only
+
+No private key.
+
+No wallet unlock.
+
+No authentication.
+
+==================================================
+15. ACCOUNT SCOPING
+==================================================
+
+Token balance identity must include:
+
+- account ID
+- account address
+- network ID
+- token contract address
+
+Do not assume:
+
+account 0.
+
+Do not automatically choose the first account.
+
+Do not merge balances from multiple accounts.
+
+==================================================
+16. EXACT TOKEN AMOUNTS
+==================================================
+
+Token raw balances MUST remain bigint.
+
+Do not use:
+
+Number()
+parseFloat()
+floating point
+toFixed()
+
+for financial calculations.
+
+Example:
+
+raw token balance:
+
+123456789012345678901234567890n
+
+must remain exact.
+
+Use the existing Phase 3.1 amount formatting infrastructure where appropriate.
+
+==================================================
+17. TOKEN AMOUNT FORMATTING
+==================================================
+
+Token display formatting must use:
+
+token.decimals
+
+not:
+
+native asset decimals.
+
+Example:
+
+USDC-like token:
+6 decimals
+
+Some other token:
+18 decimals
+
+Both must display according to their own contract metadata.
+
+Do not hardcode decimals based on token symbol.
+
+==================================================
+18. TOKEN AMOUNT PARSING
+==================================================
+
+Reuse Phase 3.1 exact decimal parsing.
+
+For future token transaction UI:
+
+parse:
+
+"1.5"
+
+using:
+
+token.decimals
+
+to obtain exact bigint base units.
+
+Do NOT connect this to token transfers yet.
+
+==================================================
+19. TOKEN BALANCE RESULT
+==================================================
+
+Create a structured result similar to:
+
+TokenBalance
+
+containing:
+
+- asset identity
+- token contract
+- network ID
+- chain ID
+- account ID
+- account address
+- raw balance bigint
+- decimals
+- formatted balance
+- symbol if available
+- token name if available
+- retrieval timestamp
+- block context where available
+- metadata status
+- verification status
+
+No secrets.
+
+==================================================
+20. BLOCK CONTEXT
+==================================================
+
+Where practical, associate token balance observations with block context.
+
+Do not perform unnecessary duplicate block RPC calls.
+
+If the existing RPC/account-state layer already provides appropriate block context:
+
+reuse it.
+
+Include:
+
+- block number
+- block hash if available
+- retrieval timestamp
+
+Do not claim a balance is permanently current.
+
+==================================================
+21. MULTI-NETWORK
+==================================================
+
+The engine must support arbitrary configured EVM networks.
+
+Examples:
+
+Ethereum
+BNB Chain
+Polygon
+Arbitrum
+Base
+Optimism
+PrimeWave when configured
+
+Do not hardcode token support per chain.
+
+The same contract address on two networks is two different token identities.
+
+==================================================
+22. PRIMEWAVE PLACEHOLDER
+==================================================
+
+PrimeWave Mainnet remains unconfigured.
+
+Do NOT invent:
+
+- PrimeWave token contracts
+- PrimeWave RPC
+- PrimeWave chain ID
+- PrimeWave native metadata
+
+If PrimeWave network is unconfigured:
+
+reject token operations on that network.
+
+==================================================
+23. CONTRACT CALL SAFETY
+==================================================
+
+All token metadata/balance calls are read-only.
+
+The engine may use:
+
+eth_call
+
+with:
+
+- to = token contract
+- data = encoded read method
+- block context where supported
+
+Do NOT send:
+
+- value
+- gas for state-changing calls
+- signing data
+
+Do not call state-changing token methods.
+
+==================================================
+24. FORBIDDEN ERC-20 METHODS
+==================================================
+
+The Phase 3.2 engine MUST NOT invoke:
+
+transfer
+approve
+transferFrom
+increaseAllowance
+decreaseAllowance
+permit
+permit2
+
+or any other state-changing token operation.
+
+Also do not implement:
+
+allowance()
+
+yet.
+
+Allowance belongs to a later transaction/approval design.
+
+==================================================
+25. TOKEN VERIFICATION
+==================================================
+
+Do not claim a token is legitimate merely because:
+
+- contract code exists
+- name exists
+- symbol exists
+- decimals exists
+- balanceOf works
+
+ERC-20 compatibility is not the same thing as asset legitimacy.
+
+Create an explicit verification status model.
+
+Possible values:
+
+unknown
+unverified
+verified
+
+For Phase 3.2, arbitrary contracts should remain:
+
+unknown/unverified
+
+unless a trusted verification source already exists.
+
+Do not integrate a third-party verification provider yet.
+
+==================================================
+26. SPAM / MALICIOUS TOKENS
+==================================================
+
+Do not attempt to automatically label tokens as:
+
+- scam
+- malicious
+- fraud
+- spam
+
+based only on contract behavior.
+
+You may expose:
+
+unverified
+
+or:
+
+unknown
+
+status.
+
+Future token-risk systems can use additional evidence.
+
+Do not make unsupported security claims.
+
+==================================================
+27. TOKEN DISCOVERY
+==================================================
+
+DO NOT implement blockchain-wide token discovery.
+
+Do not scan:
+
+- every contract
+- every Transfer event
+- every block
+- every wallet transaction
+
+Do not add external token list APIs.
+
+Phase 3.2 only needs the ability to interact with a known token contract address.
+
+Token discovery belongs to a later phase.
+
+==================================================
+28. USER-ADDED TOKEN ARCHITECTURE
+==================================================
+
+The architecture should make it possible for a future user to provide:
+
+network + contract address
+
+and resolve the token.
+
+However:
+
+Do not build the user-facing "Add Token" UI yet.
+
+Do not persist user-added tokens yet unless already required by the existing architecture.
+
+The current phase is the engine.
+
+==================================================
+29. TOKEN METADATA CONSISTENCY
+==================================================
+
+A token's metadata is contract-provided data.
+
+Do not use symbol/name to determine:
+
+- token identity
+- trust
+- decimals
+- contract address
+
+Contract address + network is authoritative for identity.
+
+==================================================
+30. RPC EFFICIENCY
+==================================================
+
+Avoid unnecessary RPC calls.
+
+A token metadata request may require:
+
+- eth_getCode
+- eth_call for name
+- eth_call for symbol
+- eth_call for decimals
+
+A balance request requires:
+
+- eth_call balanceOf
+
+Do not repeatedly retrieve metadata when the same in-memory operation already has it.
+
+However:
+
+DO NOT create a persistent token cache in Phase 3.2.
+
+Future caching can be designed deliberately.
+
+==================================================
+31. OPTIONAL MULTICALL
+==================================================
+
+Do NOT add Multicall infrastructure unless the existing project already has a safe abstraction for it.
+
+For Phase 3.2:
+
+prefer correctness and clear architecture over premature batching.
+
+If you determine that multicall is necessary:
+
+STOP and document it as deferred rather than adding a large new subsystem.
+
+==================================================
+32. CONCURRENCY
+==================================================
+
+Protect against uncontrolled duplicate reads where practical.
+
+Examples:
+
+Two identical metadata requests occur simultaneously.
+
+Avoid unnecessary duplicate work within a single service operation where reasonable.
+
+Do not introduce global mutable token state.
+
+Do not persist token state.
+
+==================================================
+33. NETWORK RACE PROTECTION
+==================================================
+
+Capture network context before token operations.
+
+Verify:
+
+- network ID
+- chain ID
+- configured network
+
+before returning results.
+
+If an active-network convenience method is being used and the active network changes:
+
+reject with:
+
+NETWORK_CHANGED
+
+Do not silently return data from a different network.
+
+Explicitly network-scoped requests should remain tied to their requested network.
+
+==================================================
+34. ERROR HANDLING
+==================================================
+
+Use existing sanitized error architecture.
+
+Add normalized errors as necessary:
+
+- TOKEN_INVALID_ADDRESS
+- TOKEN_NOT_A_CONTRACT
+- TOKEN_METADATA_UNAVAILABLE
+- TOKEN_METADATA_INVALID
+- TOKEN_INVALID_DECIMALS
+- TOKEN_BALANCE_UNAVAILABLE
+- TOKEN_CONTRACT_CALL_FAILED
+- TOKEN_NETWORK_CHANGED
+- TOKEN_CHAIN_MISMATCH
+- TOKEN_NETWORK_UNAVAILABLE
+- TOKEN_UNSUPPORTED
+- TOKEN_RPC_ERROR
+
+Do not expose:
+
+- raw RPC payloads
+- raw RPC URLs
+- credentials
+- secrets
+- internal stack traces
+
+==================================================
+35. SAFE METADATA LIMITS
+==================================================
+
+Treat token-returned strings as untrusted external data.
+
+Do not allow arbitrary contract metadata to:
+
+- execute code
+- become HTML
+- become a navigation URL
+- become a file path
+- become an image URL automatically
+- become an analytics identifier without sanitization
+
+Metadata is display data.
+
+Apply reasonable length limits to:
+
+- token name
+- token symbol
+
+Do not allow enormous RPC return values to create memory abuse.
+
+Document chosen limits.
+
+Do not silently truncate the canonical metadata value if doing so would change identity; use a display-only truncation layer where appropriate.
+
+==================================================
+36. TOKEN CONTRACT CODE
+==================================================
+
+Do not assume:
+
+non-empty bytecode = ERC-20.
+
+The code-existence check is only a prerequisite.
+
+Actual ERC-20 compatibility is established through successful standard interface reads.
+
+Even then, do not call the token "verified."
+
+==================================================
+37. READ-ONLY SECURITY BOUNDARY
+==================================================
+
+The token engine must not import:
+
+- SecureStore
+- SecureVault
+- WalletAuthenticator
+- private-key modules
+- signing modules
+
+unless a public contract is absolutely necessary and does not expose secrets.
+
+The token engine must be usable without unlocking the wallet.
+
+==================================================
+38. NO PERSISTENCE
+==================================================
+
+Do not add:
+
+- AsyncStorage token records
+- localStorage token records
+- database token records
+- SecureStore token metadata
+- backend token state
+
+Phase 3.2 is read-only.
+
+If future persistence is required for user-added tokens, that will be designed separately.
+
+==================================================
+39. NO FIAT
+==================================================
+
+Do not implement:
+
+- token prices
+- USD values
+- INR values
+- market cap
+- P&L
+- price charts
+- exchange rates
+
+Those belong to a later pricing/portfolio layer.
+
+==================================================
+40. NO TRANSACTION INTEGRATION
+==================================================
+
+Do not connect token balance reading to:
+
+- transaction construction
+- token transfers
+- signing
+- broadcasting
+
+The engine only reads token state.
+
+==================================================
+41. TESTING
+==================================================
+
+Create comprehensive offline tests using fake RPC transports.
+
+At minimum test:
+
+1. valid ERC-20 contract resolution
+2. invalid token address
+3. EOA/non-contract rejection
+4. unknown network
+5. disabled network
+6. unconfigured network
+7. PrimeWave placeholder rejection
+8. network/chain mismatch
+9. valid name()
+10. valid symbol()
+11. valid decimals()
+12. valid balanceOf()
+13. large token balance
+14. zero token balance
+15. tiny token balance
+16. exact bigint preservation
+17. token formatting with 6 decimals
+18. token formatting with 18 decimals
+19. token formatting with another supported decimal count
+20. malformed name response
+21. malformed symbol response
+22. malformed decimals response
+23. decimals out of range
+24. decimals not integer
+25. name() revert
+26. symbol() revert
+27. decimals() revert
+28. balanceOf() revert
+29. malformed balance response
+30. token metadata unavailable
+31. partial metadata
+32. deterministic token identity
+33. same contract on different networks remains distinct
+34. same token queried by multiple accounts
+35. multiple networks
+36. network-change rejection
+37. chain mismatch
+38. RPC error normalization
+39. no persistence
+40. no secret access
+41. no signing
+42. no broadcasting
+43. no backend calls
+44. no token state-changing calls
+45. no allowance call
+46. deterministic repeated reads
+47. concurrent metadata reads
+48. concurrent balance reads
+
+==================================================
+42. ERC-20 METHOD AUDIT TEST
+==================================================
+
+The fake RPC transport must record every RPC call.
+
+Verify Phase 3.2 only invokes:
+
+- eth_chainId
+- eth_getCode
+- eth_call
+- other already-approved read-only methods if required
+
+Explicitly verify it does NOT invoke:
+
+- eth_sendRawTransaction
+
+and that eth_call calldata never targets:
+
+transfer
+approve
+transferFrom
+permit
+permit2
+allowance
+
+Do not merely test the function names.
+
+Inspect the encoded calldata/function selector where practical.
+
+==================================================
+43. SECURITY LEAK TESTS
+==================================================
+
+Verify no:
+
+- private key
+- mnemonic
+- seed
+- PIN
+- vault data
+
+appears in:
+
+- token models
+- token balances
+- metadata
+- errors
+- logs
+
+==================================================
+44. ARITHMETIC TESTS
+==================================================
+
+Test exact token arithmetic with:
+
+- 0
+- 1 smallest unit
+- 1 token
+- 1.5 tokens
+- very large balances
+- 6 decimals
+- 8 decimals
+- 18 decimals
+- maximum supported decimals
+- excessive decimal rejection
+- no floating-point conversion
+
+Use bigint throughout.
+
+==================================================
+45. CONTRACT METADATA ATTACK TESTS
+==================================================
+
+Test metadata containing unusual values such as:
+
+- extremely long strings
+- control characters
+- Unicode
+- whitespace
+- unusual symbols
+- malformed UTF-8/hex where relevant
+
+Verify the engine:
+
+- does not crash
+- does not execute metadata
+- does not interpret metadata as code
+- does not create URLs automatically
+- applies safe limits
+
+==================================================
+46. NO BROADCAST TEST
+==================================================
+
+Use a fake RPC transport that fails if:
+
+eth_sendRawTransaction
+
+is invoked.
+
+The entire Phase 3.2 suite must pass without broadcasting.
+
+==================================================
+47. NO STATE-CHANGING TOKEN TEST
+==================================================
+
+The fake RPC transport must fail if the engine attempts to call:
+
+transfer
+approve
+transferFrom
+permit
+permit2
+allowance
+
+The engine must remain strictly read-only.
+
+==================================================
+48. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+src/core/assets/README.md
+
+Document:
+
+- ERC-20 token identity
+- network-scoped contract addresses
+- token metadata
+- token balance retrieval
+- exact bigint handling
+- decimals policy
+- non-standard metadata handling
+- contract validation
+- verification status
+- unverified/unknown semantics
+- metadata security
+- read-only boundary
+- no persistence
+- no discovery
+- no token transactions
+- future token extension points
+
+Clearly state:
+
+"Phase 3.2 implements generic read-only ERC-20 token identification, metadata, and balance retrieval. State-changing token operations are intentionally deferred."
+
+==================================================
+49. FILE ORGANIZATION
+==================================================
+
+Prefer an architecture similar to:
+
+src/core/assets/
+  models.ts
+  errors.ts
+  registry.ts
+  amount.ts
+
+  native/
+    ...
+
+  token/
+    models.ts
+    abi.ts
+    service.ts
+    registry.ts
+    metadata.ts
+    balance.ts
+    errors.ts
+    index.ts
+    tests/
+
+Adapt to the existing repository conventions.
+
+Avoid unnecessary duplication.
+
+==================================================
+50. DEPENDENCY POLICY
+==================================================
+
+Prefer existing:
+
+- viem
+- existing RPC provider
+- existing account-state service
+- existing validation
+- existing amount utilities
+
+Do not add another ABI library unless absolutely necessary.
+
+Do not implement cryptographic primitives.
+
+==================================================
+51. PERFORMANCE
+==================================================
+
+Do not implement:
+
+- blockchain-wide scanning
+- token enumeration
+- event indexing
+- continuous polling
+- background refresh
+- giant token lists
+
+Keep Phase 3.2 focused on known token contracts.
+
+==================================================
+52. REQUIRED VALIDATION
+==================================================
+
+Run:
+
+- Phase 3.2 tests
+- complete existing test suite
+- TypeScript
+- Expo dependency check
+- Expo Doctor
+- Expo public config
+- git diff --check
+- Expo/Metro workflow validation if available
+
+Do not delete previous tests.
+
+Do not weaken previous security tests.
+
+==================================================
+53. FINAL REPORT
+==================================================
+
+When complete, report:
+
+1. Files created
+2. Files modified
+3. Token identity model
+4. Token registry
+5. Contract validation
+6. Metadata retrieval
+7. Balance retrieval
+8. Decimal handling
+9. Symbol/name handling
+10. Non-standard token handling
+11. Verification status
+12. Network scoping
+13. Account scoping
+14. Block context
+15. RPC methods used
+16. Confirmation no state-changing token methods are called
+17. Confirmation allowance is NOT implemented
+18. Confirmation signing is NOT used
+19. Confirmation broadcasting is NOT used
+20. Confirmation no backend is used
+21. Confirmation no persistence is used
+22. Security limits on metadata
+23. Test count
+24. Test failures
+25. TypeScript result
+26. Expo Doctor result
+27. Expo config result
+28. Metro result
+29. Warnings
+30. Deferred functionality
+
+==================================================
+ABSOLUTE STOP CONDITION
+==================================================
+
+STOP after Phase 3.2.
+
+DO NOT implement:
+
+- token transfer
+- approve
+- allowance
+- transferFrom
+- permit
+- token Send UI
+- token Receive UI
+- token discovery
+- external token lists
+- token verification provider
+- token risk scoring
+- NFTs
+- portfolio valuation
+- fiat pricing
+- swaps
+- DEX
+- DApps
+- WalletConnect
+- transaction history
+- Activity UI
+- backend indexing
+- notifications
+
+Those belong to later phases.
+
+==================================================
+FINAL PRINCIPLE
+==================================================
+
+Phase 3.2 establishes:
+
+NETWORK
+   ↓
+TOKEN CONTRACT
+   ↓
+CONTRACT VALIDATION
+   ↓
+ERC-20 METADATA
+   ↓
+TOKEN DECIMALS
+   ↓
+ACCOUNT
+   ↓
+BALANCE OF
+   ↓
+EXACT BIGINT BALANCE
+   ↓
+SAFE DISPLAY
+
+Nothing more.
+
+A token existing on-chain does NOT automatically mean it is verified or trustworthy.
+
+The token engine must distinguish:
+
+IDENTITY
+from
+COMPATIBILITY
+from
+VERIFICATION
+from
+TRUST.
+
+Do not collapse those concepts.
