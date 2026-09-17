@@ -1,0 +1,704 @@
+# PRIMEWAVE WALLET — PHASE 1A
+
+## NON-CUSTODIAL EVM WALLET CORE
+
+Phase 0A and Phase 0B have been completed and approved.
+
+Continue from the existing PrimeWave Wallet project.
+
+This is **PHASE 1A ONLY**.
+
+We are now implementing the first real cryptographic component of PrimeWave Wallet: the local EVM wallet core.
+
+This is a security-critical implementation.
+
+DO NOT proceed beyond the scope defined below.
+
+---
+
+# 1. OBJECTIVE
+
+Implement the core functionality required to:
+
+1. Generate a new EVM wallet locally.
+2. Generate a cryptographically secure recovery phrase using an established BIP-39 implementation.
+3. Derive an EVM account using established BIP-32/BIP-44-compatible functionality.
+4. Produce the corresponding EVM address.
+5. Import/reconstruct the same wallet from its recovery phrase internally for deterministic verification.
+6. Support multiple EVM accounts architecturally.
+7. Keep all secret material local to the device/application runtime.
+8. Expose only safe wallet information to the UI.
+
+This phase is about wallet creation and deterministic EVM key derivation.
+
+It is NOT about transactions or blockchain connectivity.
+
+---
+
+# 2. STRICT SCOPE
+
+Implement ONLY:
+
+* BIP-39-compatible mnemonic generation
+* BIP-39 mnemonic validation
+* BIP-39 seed derivation
+* BIP-32/BIP-44-compatible HD derivation
+* EVM account derivation
+* EVM address generation
+* wallet/account data models
+* WalletEngine implementation required for the above
+* deterministic derivation tests
+* secure secret-handling boundaries
+
+DO NOT implement:
+
+* secure persistent storage
+* encrypted vault
+* PIN
+* biometrics
+* wallet locking
+* blockchain RPC
+* network connections
+* transaction creation
+* transaction signing
+* transaction broadcasting
+* sending
+* receiving
+* swaps
+* token balances
+* token discovery
+* DApps
+* WalletConnect
+* backend
+* database
+* cloud backup
+* analytics
+* notifications
+
+Those belong to later phases.
+
+---
+
+# 3. CRYPTOGRAPHIC LIBRARY REQUIREMENT
+
+DO NOT write custom cryptography.
+
+DO NOT implement:
+
+* custom BIP-39
+* custom BIP-32
+* custom BIP-44
+* custom entropy generation
+* custom SHA implementations
+* custom elliptic-curve mathematics
+* custom secp256k1 implementation
+* custom ECDSA implementation
+* custom address derivation
+
+Use established, reputable, actively maintained libraries.
+
+Before implementing the wallet core:
+
+1. Inspect the existing package configuration.
+2. Determine the minimum required cryptographic dependencies.
+3. Select established libraries appropriate for React Native/Expo and EVM wallets.
+4. Add only the minimum dependencies required.
+5. Do not install a large wallet framework when smaller well-maintained libraries are sufficient.
+6. Record every cryptographic dependency and its purpose in documentation.
+
+Update:
+
+docs/SECURITY_ARCHITECTURE.md
+
+with:
+
+* library names
+* package versions
+* purpose
+* relevant standards supported
+* why the library was selected
+* known platform considerations
+
+If there is uncertainty about a library's suitability for React Native/Expo, STOP and report the uncertainty rather than silently choosing an unsuitable dependency.
+
+---
+
+# 4. STANDARDS
+
+Use established standards rather than inventing formats.
+
+The implementation should follow:
+
+* BIP-39 for mnemonic/recovery phrases
+* BIP-32 for hierarchical deterministic derivation
+* BIP-44 for account derivation
+* Ethereum/EVM-compatible key derivation and address generation
+
+Use the standard Ethereum EVM derivation path:
+
+m/44'/60'/0'/0/0
+
+for the first account unless the selected production library requires an equivalent representation.
+
+The architecture must support:
+
+m/44'/60'/0'/0/0
+m/44'/60'/0'/0/1
+m/44'/60'/0'/0/2
+...
+
+for additional accounts.
+
+Do not invent a PrimeWave-specific derivation path in this phase.
+
+PrimeWave is EVM-compatible, so the standard Ethereum coin type should be used unless we explicitly decide otherwise in a future architecture decision.
+
+---
+
+# 5. ENTROPY AND MNEMONIC GENERATION
+
+Use a cryptographically secure random source provided by the chosen trusted library/platform.
+
+Do not use:
+
+* Math.random()
+* timestamps
+* UUIDs as a substitute for cryptographic entropy
+* device identifiers
+* user information
+* predictable values
+
+The recovery phrase must be generated from cryptographically secure entropy.
+
+Prefer standard secure entropy sizes supported by BIP-39.
+
+Do not invent a mnemonic format.
+
+---
+
+# 6. RECOVERY PHRASE HANDLING
+
+The recovery phrase is a CRITICAL SECRET.
+
+During this phase it may exist temporarily in memory because wallet creation requires it.
+
+However:
+
+* never log it
+* never send it to a server
+* never put it into analytics
+* never put it into URLs
+* never put it into query parameters
+* never store it in AsyncStorage
+* never store it in localStorage
+* never store it in Redux/Zustand/global persistent state
+* never write it to a file
+* never include it in error messages
+* never expose it through debugging output
+
+Do not implement persistent storage yet.
+
+The mnemonic should exist only as long as required for the current wallet-core operation.
+
+---
+
+# 7. PRIVATE KEY HANDLING
+
+Private keys are CRITICAL SECRETS.
+
+The wallet core may internally derive private key material because it is required to create the wallet.
+
+However, private keys must NOT be exposed through the public WalletEngine API.
+
+DO NOT create:
+
+getPrivateKey()
+
+exportPrivateKey()
+
+getRawPrivateKey()
+
+or equivalent methods as part of the public wallet engine.
+
+The future signing implementation must be encapsulated.
+
+The UI must never directly receive a private key.
+
+The architecture should instead expose safe concepts such as:
+
+* wallet account
+* public address
+* account index
+* derivation metadata
+* signing capability through controlled authorization
+
+Do not implement transaction signing yet.
+
+---
+
+# 8. WALLET ENGINE
+
+Implement the WalletEngine contract created during Phase 0B.
+
+The public interface should support concepts equivalent to:
+
+createWallet()
+
+deriveAccount()
+
+getAccounts()
+
+validateRecoveryPhrase()
+
+recover/derive from recovery phrase internally for deterministic testing
+
+The API must NOT expose raw private keys.
+
+Avoid returning a data structure containing both:
+
+address + privateKey
+
+to UI-facing code.
+
+Separate secret-bearing internal operations from public wallet information.
+
+---
+
+# 9. WALLET DATA MODEL
+
+Create appropriate TypeScript types.
+
+Conceptually:
+
+Wallet
+
+* walletId
+* createdAt
+* accountCount
+* accounts
+
+Account
+
+* accountId
+* index
+* address
+* derivationPath
+
+Do not store the recovery phrase in the persistent wallet metadata model.
+
+Do not store private keys in the public Account type.
+
+If an internal secret-bearing type is necessary, isolate it inside the cryptographic implementation and do not export it through UI modules.
+
+---
+
+# 10. MULTIPLE ACCOUNT ARCHITECTURE
+
+The wallet must support multiple EVM accounts.
+
+Example:
+
+Wallet
+│
+├── Account 0
+│   m/44'/60'/0'/0/0
+│   0x...
+│
+├── Account 1
+│   m/44'/60'/0'/0/1
+│   0x...
+│
+└── Account 2
+m/44'/60'/0'/0/2
+0x...
+
+Do not require separate recovery phrases for accounts belonging to the same HD wallet.
+
+Do not implement the UI for account management yet beyond what is required to test the engine.
+
+---
+
+# 11. PRIMEWAVE NETWORK INDEPENDENCE
+
+The wallet core must NOT be tied specifically to PrimeWave Chain.
+
+An EVM wallet address is derived independently of the network.
+
+Therefore:
+
+The same EVM account may later be used on:
+
+* PrimeWave
+* Ethereum
+* BNB
+* Polygon
+* Arbitrum
+* Base
+* Optimism
+* other EVM networks
+
+Do not create separate key systems for each network.
+
+Do not create separate seed phrases per EVM network.
+
+One HD wallet can derive EVM accounts that operate across supported EVM networks.
+
+---
+
+# 12. ADDRESS VALIDATION
+
+Implement a safe EVM address validation utility using an established library.
+
+It should be able to distinguish:
+
+* valid EVM address
+* invalid address
+* malformed address
+
+Do not implement cryptographic address validation manually.
+
+Support the appropriate EVM address format and checksum behavior.
+
+Do not silently alter user-supplied addresses.
+
+---
+
+# 13. ZERO BLOCKCHAIN DEPENDENCY
+
+This phase must work without:
+
+* RPC
+* internet access
+* blockchain nodes
+* PrimeWave Mainnet
+* Ethereum Mainnet
+* BNB Mainnet
+
+Wallet creation and address derivation should be local operations.
+
+The wallet core should be testable offline.
+
+Do not add network calls.
+
+---
+
+# 14. DETERMINISTIC TESTING
+
+This is one of the most important requirements.
+
+Use well-known BIP-39/BIP-32 test vectors where appropriate.
+
+Tests must verify that:
+
+A known mnemonic
+
+↓
+
+known derivation path
+
+↓
+
+known expected address
+
+produces the expected result.
+
+Also test:
+
+* mnemonic validation
+* invalid mnemonic rejection
+* deterministic account derivation
+* account 0
+* account 1
+* account 2
+* invalid derivation path handling
+* invalid address handling
+* repeated derivation produces identical addresses
+
+Do not create fake tests.
+
+Do not write tests that simply assert that a value exists.
+
+Use meaningful known expected values where standards provide them.
+
+---
+
+# 15. SECRET-SAFETY TESTS
+
+Add tests or static safeguards demonstrating that:
+
+* mnemonic is not logged
+* private keys are not returned by public WalletEngine methods
+* wallet metadata does not contain mnemonic
+* public Account type does not contain privateKey
+* no network request occurs during wallet generation
+* no persistence mechanism is used for secrets in this phase
+
+If a test cannot be reliably automated, document the manual verification procedure instead.
+
+---
+
+# 16. LOGGING
+
+Use the SecureLogger architecture created in Phase 0B.
+
+NEVER log:
+
+* mnemonic
+* seed
+* private key
+* derived private key
+* cryptographic entropy
+* secret buffers
+
+For debugging wallet creation, only log safe metadata such as:
+
+* operation started
+* account index
+* derivation path
+* operation success/failure
+
+Even then, do not log unnecessary wallet information.
+
+---
+
+# 17. ERROR HANDLING
+
+Use the sanitized error architecture created in Phase 0B.
+
+Errors must not contain:
+
+* mnemonic
+* private key
+* seed
+* cryptographic secret
+* raw secret-bearing objects
+
+If a cryptographic library throws an error containing sensitive data, sanitize it before it reaches logging or UI.
+
+---
+
+# 18. UI
+
+Keep the UI extremely limited in this phase.
+
+Create a basic development-only wallet-core verification screen if necessary.
+
+It may display:
+
+* wallet creation status
+* derived public address
+* account index
+* derivation path
+
+DO NOT display:
+
+* recovery phrase by default
+* private key
+* raw seed
+* cryptographic entropy
+
+Do not build the final wallet onboarding UI yet.
+
+That comes later.
+
+If a temporary recovery phrase display is absolutely required for manual development verification, clearly mark it as DEVELOPMENT ONLY and ensure it cannot be accidentally shipped as the production wallet onboarding.
+
+Prefer automated tests over displaying secrets.
+
+---
+
+# 19. DEPENDENCY REVIEW
+
+After adding cryptographic dependencies:
+
+Review package versions and dependency tree.
+
+Look for:
+
+* abandoned packages
+* unnecessary packages
+* duplicate cryptographic libraries
+* packages that execute unexpected network requests
+* packages with unnecessary permissions
+* packages that are incompatible with React Native
+* packages requiring unsafe native assumptions
+
+Do not claim a package is secure merely because it is popular.
+
+Document the reasoning.
+
+---
+
+# 20. NO PRODUCTION STORAGE YET
+
+Do not implement encrypted persistent wallet storage in Phase 1A.
+
+That belongs to Phase 2.
+
+For now:
+
+Wallet generation
+
+↓
+
+In-memory wallet core
+
+↓
+
+Testing
+
+↓
+
+Discard
+
+This is intentional.
+
+---
+
+# 21. DOCUMENTATION
+
+Update:
+
+docs/ARCHITECTURE.md
+
+with:
+
+* wallet-core architecture
+* cryptographic library layer
+* HD wallet derivation
+* account derivation
+* EVM address generation
+* separation between wallet core and UI
+* separation between wallet core and secure storage
+
+Update:
+
+docs/SECURITY_ARCHITECTURE.md
+
+with:
+
+* selected crypto libraries
+* BIP standards
+* derivation path
+* secret handling
+* public/private data boundary
+* known limitations of in-memory handling during Phase 1A
+
+Update:
+
+docs/DEVELOPMENT_STATE.md
+
+with:
+
+* Phase 1A status
+* implemented functionality
+* tests
+* dependencies
+* known limitations
+* next phase
+
+---
+
+# 22. IMPORTANT — DO NOT CLAIM PRODUCTION SECURITY
+
+Even if all tests pass, do NOT state that the wallet is production secure.
+
+At this stage:
+
+* secure persistent storage is not implemented
+* authentication is not implemented
+* biometric protection is not implemented
+* transaction signing is not implemented
+* full security audit has not happened
+
+Clearly document this.
+
+---
+
+# 23. VALIDATION CHECKLIST
+
+Before reporting completion:
+
+### Build
+
+* TypeScript passes
+* application still starts
+* no broken Phase 0A functionality
+
+### Wallet core
+
+* secure mnemonic generation works
+* mnemonic validation works
+* EVM account derivation works
+* deterministic derivation works
+* multiple account derivation works
+* address validation works
+
+### Security
+
+* no secrets logged
+* no secrets persisted
+* no secrets transmitted
+* no private-key public API
+* no network requests
+* no backend integration
+
+### Standards
+
+* BIP-39 used correctly
+* BIP-32/BIP-44 derivation used correctly
+* standard EVM derivation path used
+* known test vectors verified
+
+### Dependencies
+
+* dependency list reviewed
+* versions documented
+* no unnecessary packages added
+
+---
+
+# 24. STOP CONDITION
+
+STOP after Phase 1A.
+
+Do NOT implement Phase 1B.
+
+Do NOT implement:
+
+* encrypted vault
+* Keychain
+* Android Keystore
+* PIN
+* biometrics
+* recovery UI
+* transaction signing
+* RPC
+* blockchain connectivity
+
+Those will be handled separately.
+
+---
+
+# FINAL REPORT
+
+When finished, report:
+
+1. Exact cryptographic libraries selected
+2. Exact versions
+3. Why each library was selected
+4. Standards implemented
+5. Derivation path used
+6. Files created/modified
+7. Wallet-core functionality implemented
+8. Tests performed
+9. Test-vector results
+10. Security checks performed
+11. Dependencies added
+12. Any warnings/errors
+13. Any unresolved security concerns
+14. Confirmation that no persistent secret storage was implemented
+15. Confirmation that no blockchain/network connection was implemented
+16. Exact next recommended step
+
+Do not proceed automatically to Phase 1B.
