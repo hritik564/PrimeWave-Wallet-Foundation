@@ -345,6 +345,41 @@ original provider/network context even if the user changes the active network.
 **Phase 2.7 broadcasts already-signed transactions and observes blockchain
 confirmation. It does not construct or sign transactions.**
 
+## Asset abstraction and native balance engine
+
+Phase 3.1 adds `src/core/assets` as a UI-independent, network-scoped asset
+layer. It establishes architectural asset types for `native`,
+`fungible_token`, and `nft`, but only `native` is functional in this phase.
+
+Native identity is never based on a symbol or name. Its stable identity is:
+
+```text
+assetType = native
+networkId = <network registry ID>
+assetId = native
+```
+
+`AssetRegistry` derives native metadata from the existing `NetworkRegistry`.
+Configured networks resolve to deterministic native assets; unknown, disabled,
+and placeholder networks remain unavailable. PrimeWave Chain remains
+unconfigured and no native metadata is invented for it.
+
+`NativeAssetBalanceService` requires an explicit network ID, account ID, and
+public address. It delegates to explicitly network-bound
+`EvmAccountStateService` instances, which reuse the existing RPC provider and
+native balance implementation. It does not switch networks, merge balances,
+cache observations, poll in the background, or create portfolio totals.
+
+Native amounts remain exact `bigint` values. `formatAssetAmount` and
+`parseAssetAmount` use decimal string arithmetic only: no floating point,
+exponent notation, unsafe numeric conversion, or implicit 18-decimal
+assumption. The returned balance contains network/chain context, account
+identity, checksum-normalized address, raw amount, exact display string, and
+retrieval timestamp.
+
+**Phase 3.1 implements the asset abstraction and native EVM asset engine only.
+ERC-20/token functionality is intentionally deferred.**
+
 ## Design system
 
 PrimeWave Wallet uses a centralized dark foundation with blue, cyan, and violet
@@ -389,5 +424,8 @@ website layout.
     broadcasting, chain/network protection, in-memory duplicate prevention,
     bounded receipt polling, revert handling, unknown-result handling, and
     read-only transaction lookup. No automatic retry or transaction mutation.
-12. **Future ecosystem capabilities:** discovery, swaps, DApp connectivity,
-    and PrimeWave integrations remain deferred.
+ 12. **Phase 3.1 — asset abstraction and native balance engine:** network-scoped
+     native asset identities, exact bigint amount utilities, and read-only
+     native balance retrieval. ERC-20 and other asset classes remain deferred.
+ 13. **Future ecosystem capabilities:** discovery, swaps, DApp connectivity,
+     and PrimeWave integrations remain deferred.

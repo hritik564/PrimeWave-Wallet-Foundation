@@ -425,7 +425,47 @@ identity, public sender/type metadata, lifecycle state, and safe receipt
 fields. They contain no private key, mnemonic, seed, vault contents, signing
 capability, PIN, biometric secret, or authentication credential.
 
-## 14. Error handling
+## 14. Phase 3.1 asset and native balance boundary
+
+Phase 3.1 adds a read-only asset layer. It defines architectural asset types
+for native assets, fungible tokens, and NFTs, but only native EVM assets are
+functional. The native asset identity is network-scoped:
+
+```text
+assetType = native
+networkId = <network registry ID>
+assetId = native
+```
+
+Symbols, names, and decimals are display/metadata fields, never primary keys.
+`AssetRegistry` derives native metadata from the existing network registry and
+rejects unknown, disabled, and unconfigured networks as usable assets.
+PrimeWave Chain remains a placeholder until official configuration is supplied;
+no chain ID, RPC endpoint, symbol, or decimals are invented by this phase.
+
+`NativeAssetBalanceService` accepts only an explicit network ID, account ID,
+and public address. It delegates to explicitly network-bound
+`EvmAccountStateService` instances and uses the existing RPC provider and
+`eth_getBalance` path. It does not access vaults, secrets, PINs, biometrics,
+authentication, signing, transaction construction, broadcasting, backend
+services, analytics, or persistence.
+
+Every balance model carries asset identity, network/chain context, account ID,
+public address, raw bigint balance, exact display amount, and retrieval time.
+Balances on the same address across different networks remain separate. The
+engine never merges them into a portfolio total and never silently changes
+the selected network.
+
+Amount formatting and parsing use exact decimal string operations. Floating
+point, `Number(balance)`, exponent notation, malformed decimals, negative
+amounts, excessive decimal places, and unsafe numeric conversion are
+rejected. No token contract methods such as `balanceOf`, `decimals`, `symbol`,
+`name`, `transfer`, or `approve` are called.
+
+**Phase 3.1 implements the asset abstraction and native EVM asset engine only.
+ERC-20/token functionality is intentionally deferred.**
+
+## 15. Error handling
 
 Errors shown to users must not expose private keys, recovery phrases,
 cryptographic material, authentication secrets, or secure-storage contents.
@@ -436,7 +476,7 @@ display raw stack traces to the user.
 Secret material must never be included in application error objects created by
 future security implementations.
 
-## 15. Memory handling
+## 16. Memory handling
 
 Cryptographic secrets should have the shortest practical lifetime in memory.
 Future implementations should minimize copies, clear sensitive buffers where
@@ -448,7 +488,7 @@ JavaScript garbage collection does not guarantee secure memory wiping. PrimeWave
 Wallet must document this limitation honestly and use platform-native
 mechanisms where appropriate.
 
-## 16. Backup and recovery
+## 17. Backup and recovery
 
 The recovery phrase is the user's ultimate recovery mechanism. PrimeWave must
 not provide server-side recovery for a non-custodial wallet.
@@ -471,7 +511,7 @@ If the user loses the recovery phrase and access to the wallet, PrimeWave
 cannot recover the wallet for them. This limitation must be communicated
 clearly before wallet creation is implemented.
 
-## 17. Multiple accounts
+## 18. Multiple accounts
 
 The future vault must support multiple EVM accounts without exposing private
 keys to UI components:
@@ -488,14 +528,14 @@ Account addresses may be presented to the UI as sensitive public data.
 Derivation and signing material remains encapsulated inside the wallet and
 security layers.
 
-## 18. Security testing structure
+## 19. Security testing structure
 
 Phase 0B adds a reviewable test-case plan under
 `src/core/security/tests/SECURITY_TEST_CASES.md`. These are not fake passing
 tests. A real test runner and concrete implementations must be added before
 the corresponding contract tests are marked complete.
 
-## 19. Phase 1A cryptographic implementation
+## 20. Phase 1A cryptographic implementation
 
 Phase 1A uses the following exact dependencies:
 
@@ -527,7 +567,7 @@ m/44'/60'/0'/0/<accountIndex>
 PrimeWave does not have a separate seed or derivation path. The same EVM
 account can later be used on any supported EVM network.
 
-## 20. Phase 1B-1 vault and secret handling
+## 21. Phase 1B-1 vault and secret handling
 
 Wallet creation obtains 16 bytes from `expo-crypto`, converts that entropy to a
 12-word BIP-39 phrase, and immediately clears the temporary entropy buffer on a
@@ -591,7 +631,7 @@ the security boundary. Retrieval returns an opaque handle rather than raw
 secret material through the public engine model. No public API provides
 `getMnemonic`, `getPrivateKey`, `exportPrivateKey`, or equivalent access.
 
-## 21. Phase 1B-1 verification and limitations
+## 22. Phase 1B-1 verification and limitations
 
 Offline tests cover:
 
@@ -612,7 +652,7 @@ broadcasting, cloud backup, or backend recovery. JavaScript memory clearing is
 best-effort and platform storage behavior must still be tested on real iOS and
 Android devices.
 
-## 22. Dependency and backend rules
+## 23. Dependency and backend rules
 
 No custom cryptography, encryption, mnemonic generation, or elliptic-curve
 logic is allowed. Dependency changes require the same review for maintenance,

@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 2.7 — EVM transaction broadcasting and confirmation (completed)**
+**Phase 3.1 — asset architecture and native EVM asset engine (completed)**
 
 ## Completed work
 
@@ -111,15 +111,28 @@
   failover.
 - Added structural tests proving the broadcaster has no signing, vault, or
   private-key access.
+- Added the network-scoped asset abstraction with architectural native,
+  fungible-token, and NFT type labels.
+- Added `AssetRegistry` deriving native assets from the existing network
+  registry without hardcoded global symbols.
+- Added exact bigint amount formatting and strict decimal parsing utilities.
+- Added the read-only `NativeAssetBalanceService` using existing
+  `EvmAccountStateService` instances and RPC balance infrastructure.
+- Added explicit multi-account and multi-network balance identity handling.
+- Added placeholder, disabled, unsupported, chain-mismatch, network-change,
+  RPC-failure, and no-service error normalization.
+- Added tests proving no token contract calls, signing, broadcasting, backend
+  calls, persistence, or secret material.
 
 ## Pending work
 
 - Production PrimeWave Chain launch configuration must be supplied and reviewed
   before the primary network can be activated.
 - Recovery UX and authentication UI require separate scope and security review.
-- Transaction history, replacement, speed-up, cancellation, automatic fee
-  bumping, token logic, swaps, DApps, indexing, backend transaction APIs, and
-  fiat pricing remain outside this controlled increment.
+- ERC-20/token functionality, token discovery and metadata, NFTs, portfolio
+  valuation, fiat pricing, transaction history, swaps, DApps, indexing,
+  backend asset APIs, and notifications remain outside this controlled
+  increment.
 - Balance preflight validation is intentionally not implemented because it is
   optional and must not be mistaken for a guarantee before signing/broadcast.
 - Physical-device verification of local signing and native biometric behavior
@@ -151,7 +164,8 @@
 
 ## Phase boundary
 
-Phase 2.7 is complete. Stop here. Later phases may separately define
-transaction history, UI activity, token functionality, swaps, DApps,
-WalletConnect, notifications, backend indexing, replacement, speed-up,
-cancellation, automatic fee bumping, and other ecosystem capabilities.
+Phase 3.1 is complete. Stop here. Later phases may separately define ERC-20
+tokens, NFTs, portfolio valuation, fiat pricing, transaction history, UI
+activity, swaps, DApps, WalletConnect, notifications, backend indexing,
+replacement, speed-up, cancellation, automatic fee bumping, and other
+ecosystem capabilities.

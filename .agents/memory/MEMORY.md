@@ -6,3 +6,4 @@
 - [Account state consistency](account-state-consistency.md) — bind public snapshots to the selected network and captured block context; reject stale results after network changes.
 - [Local preview reset](preview-reset.md) — erase the wallet before secondary PIN cleanup and return to onboarding only after explicit confirmation.
 - [Broadcast and confirmation boundary](broadcast-confirmation.md) — Phase 2.7 sends exact already-signed bytes, observes receipts, and treats ambiguous outcomes as unknown.
+- [Native asset network binding](native-asset-network-binding.md) — multi-network balance reads use explicitly bound account-state services; never switch one active registry implicitly.

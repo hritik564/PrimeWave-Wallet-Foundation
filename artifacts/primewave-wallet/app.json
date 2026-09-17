@@ -1,16 +1,19 @@
 {
   "expo": {
-    "name": "PrimeWave Wallet",
-    "slug": "primewave-wallet",
+    "name": "WaveX",
+    "slug": "wavex",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "primewave-wallet",
+    "scheme": "wavex",
     "userInterfaceStyle": "dark",
     "ios": {
-      "supportsTablet": false
+      "supportsTablet": false,
+      "bundleIdentifier": "com.wavex.app"
     },
-    "android": {},
+    "android": {
+      "package": "com.wavex.app"
+    },
     "web": {
       "favicon": "./assets/images/icon.png"
     },
