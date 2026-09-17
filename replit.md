@@ -1,45 +1,50 @@
-# [Project name]
+# PrimeWave Wallet
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+PrimeWave Wallet is a mobile-first, strictly non-custodial foundation for the PrimeWave ecosystem.
 
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/primewave-wallet run dev` — run the Expo mobile app
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
 - `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
 - `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
 
 ## Stack
 
 - pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- Expo, React Native, Expo Router, and TypeScript for the mobile app
+- API: Express 5 (reserved for future backend capabilities)
+- DB: PostgreSQL + Drizzle ORM (not used by Phase 0A)
+- Build: Expo tooling and TypeScript
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `artifacts/primewave-wallet` — Expo mobile application and Phase 0A screen
+- `artifacts/primewave-wallet/src/theme/index.ts` — PrimeWave Wallet visual tokens
+- `artifacts/primewave-wallet/src/core/networks` — generic EVM network types and unconfigured registry
+- `artifacts/primewave-wallet/docs` — architecture, security, and development-state source documents
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- The first phase is frontend-only and must not create wallet secrets or connect to production chains.
+- PrimeWave Chain is represented as the future primary network, but its production values remain unset.
+- The app intentionally uses a single foundation route until wallet flows are approved.
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
+The current build communicates the PrimeWave Wallet foundation and its non-custodial boundary. Wallet functionality is intentionally deferred.
 
 ## User preferences
 
-_Populate as you build — explicit user instructions worth remembering across sessions._
+The product brief requires stopping after Phase 0A and waiting for approval before implementing wallet functionality.
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
+- Never add seed phrase, private key, PIN, password, biometric secret, decrypted vault, or encryption-key handling without a reviewed security design.
+- Never invent PrimeWave production chain values or add a production RPC connection in Phase 0A.
 
 ## Pointers
 
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details.

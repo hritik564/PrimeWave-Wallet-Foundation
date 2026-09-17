@@ -1,0 +1,1 @@
+- [Expo route root](expo-route-root.md) — PrimeWave Wallet routes live under src/app, not the legacy top-level app directory.

@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { theme } from '@/src/theme';
 
-const iconSource = require('../assets/images/icon.png');
+const iconSource = require('../../assets/images/icon.png');
 
 export default function FoundationScreen() {
   const insets = useSafeAreaInsets();
