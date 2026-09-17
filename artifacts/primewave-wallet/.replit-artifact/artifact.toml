@@ -1,0 +1,24 @@
+kind = "mobile"
+previewPath = "/primewave-wallet/"
+title = "PrimeWave Wallet"
+description = "A mobile-first foundation for the PrimeWave Wallet, establishing its visual system, non-custodial security boundary, generic EVM network architecture, and Phase 0A placeholder screen without implementing wallet functionality yet."
+version = "1.0.0"
+id = "artifacts/primewave-wallet"
+router = "expo-domain"
+
+[[services]]
+name = "expo"
+ensurePreviewReachable = "/status"
+paths = [ "/primewave-wallet/" ]
+localPort = 22454
+
+[services.development]
+run = "pnpm --filter @workspace/primewave-wallet run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/primewave-wallet", "run", "build" ]
+run = [ "pnpm", "--filter", "@workspace/primewave-wallet", "run", "serve" ]
+
+[services.env]
+PORT = "22454"
+BASE_PATH = "/primewave-wallet/"

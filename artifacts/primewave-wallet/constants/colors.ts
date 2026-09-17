@@ -1,0 +1,47 @@
+const colors = {
+  light: {
+    text: '#f6f8ff',
+    tint: '#7c8cff',
+    background: '#070b19',
+    foreground: '#f6f8ff',
+    card: '#10182d',
+    cardForeground: '#f6f8ff',
+    primary: '#7c8cff',
+    primaryForeground: '#070b19',
+    secondary: '#16213d',
+    secondaryForeground: '#dce4ff',
+    muted: '#111a31',
+    mutedForeground: '#98a7ca',
+    accent: '#50d9ff',
+    accentForeground: '#07101d',
+    destructive: '#ff7387',
+    destructiveForeground: '#210b13',
+    border: '#25345d',
+    input: '#25345d',
+  },
+
+  dark: {
+    text: '#f6f8ff',
+    tint: '#7c8cff',
+    background: '#070b19',
+    foreground: '#f6f8ff',
+    card: '#10182d',
+    cardForeground: '#f6f8ff',
+    primary: '#7c8cff',
+    primaryForeground: '#070b19',
+    secondary: '#16213d',
+    secondaryForeground: '#dce4ff',
+    muted: '#111a31',
+    mutedForeground: '#98a7ca',
+    accent: '#50d9ff',
+    accentForeground: '#07101d',
+    destructive: '#ff7387',
+    destructiveForeground: '#210b13',
+    border: '#25345d',
+    input: '#25345d',
+  },
+
+  radius: 20,
+};
+
+export default colors;
