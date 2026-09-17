@@ -259,7 +259,10 @@ function canonicalUnsignedTransaction(
 }
 
 export function serializeUnsignedTransaction(
-  transaction: UnsignedTransaction,
+  transaction:
+    | UnsignedTransaction
+    | Omit<LegacyUnsignedTransaction, 'canonicalRepresentation'>
+    | Omit<Eip1559UnsignedTransaction, 'canonicalRepresentation'>,
 ): string {
   return canonicalUnsignedTransaction(transaction);
 }

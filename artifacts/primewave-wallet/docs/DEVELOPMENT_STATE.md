@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 2.5 — unsigned EVM transaction construction (completed)**
+**Phase 2.6 — secure local EVM transaction signing (completed)**
 
 ## Completed work
 
@@ -85,19 +85,30 @@
   transaction previews with contract-interaction warnings.
 - Added network, chain-ID, RPC-error, concurrency, no-persistence, and
   no-broadcast construction tests.
+- Added transaction-bound Phase 2.6 authorization with canonical unsigned
+  transaction digests.
+- Added existing-authenticator gating and one-time opaque signing capabilities.
+- Added local Legacy and EIP-1559 signing through the existing `viem`
+  dependency without adding a cryptographic library.
+- Added local signed-transaction hashes and sender-recovery test vectors.
+- Added account, network, chain, fee, calldata, nonce, gas, value, and
+  transaction-type tampering rejection.
+- Added cancellation, authentication, vault/key-access, concurrency,
+  network-race, no-RPC, no-backend, no-persistence, and no-broadcast signing
+  tests.
 
 ## Pending work
 
 - Production PrimeWave Chain launch configuration must be supplied and reviewed
   before the primary network can be activated.
-- Recovery UX and authentication require separate scope and security review.
-- Signing, user confirmation, broadcasting, transaction history, token logic,
-  swaps, DApps, indexing, backend transaction APIs, and fiat pricing remain
-  outside this controlled increment.
+- Recovery UX and authentication UI require separate scope and security review.
+- Broadcasting, transaction history, receipt monitoring, replacement,
+  speed-up, cancellation, token logic, swaps, DApps, indexing, backend
+  transaction APIs, and fiat pricing remain outside this controlled increment.
 - Balance preflight validation is intentionally not implemented because it is
   optional and must not be mistaken for a guarantee before signing/broadcast.
-- Physical-device verification of any future signing or broadcasting flow has
-  not begun.
+- Physical-device verification of local signing and native biometric behavior
+  has not begun.
 
 ## Important architectural decisions
 
@@ -125,5 +136,6 @@
 
 ## Next recommended phase
 
-Signing and broadcasting require a separate security-reviewed phase. Do not
-begin it automatically. Phase 2.5 constructs unsigned transactions only.
+Broadcasting requires a separate security-reviewed Phase 2.7. Do not begin it
+automatically. Phase 2.6 performs local transaction signing only. Broadcasting
+is intentionally deferred to Phase 2.7.

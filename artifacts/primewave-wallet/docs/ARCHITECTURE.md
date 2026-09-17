@@ -244,6 +244,56 @@ envelope. It is read-only.
 **Phase 2.5 constructs unsigned transactions only. Signing and broadcasting
 are intentionally deferred.**
 
+## Local transaction signing
+
+Phase 2.6 adds `src/core/transactions/signing` as a local-only controlled
+transaction layer. It accepts only the validated unsigned transaction model
+from Phase 2.5 and a transaction-specific authorization. The authorization
+binds the account, sender, network, chain, transaction type, nonce, gas,
+value, recipient, calldata, fee model, fee fields, and the canonical
+transaction digest.
+
+The signing lifecycle is:
+
+```text
+UnsignedTransaction
+  ↓
+Transaction-specific explicit authorization
+  ↓
+Existing WalletAuthenticator unlocked-state check
+  ↓
+One-time opaque signing capability
+  ↓
+LocalWalletEngine HD-account derivation
+  ↓
+viem Legacy/EIP-1559 signing
+  ↓
+Local signed raw transaction + local hash
+  ↓
+Temporary signing references released
+  ↓
+STOP
+```
+
+The signing engine verifies the active network and chain before signing and
+again after the local operation. It rejects stale network context rather than
+switching or retrying. It tracks in-flight account IDs and rejects concurrent
+signing attempts for the same account.
+
+The existing `viem` dependency is reused for standard EVM transaction
+serialization and signing. No cryptographic primitives, RLP, or secp256k1
+implementation is added. The mnemonic and derived account remain inside the
+local wallet/security boundary; public signing results contain no secret
+material. No RPC, backend, analytics, or broadcast call is made.
+
+JavaScript/TypeScript garbage collection does not provide guaranteed
+cryptographic zeroization. Phase 2.6 releases temporary derived-account
+references and avoids caches, persistence, logs, and public secret-returning
+APIs. Stronger native cryptographic isolation remains a future hardening item.
+
+**Phase 2.6 performs local transaction signing only. Broadcasting is
+intentionally deferred to Phase 2.7.**
+
 ## Design system
 
 PrimeWave Wallet uses a centralized dark foundation with blue, cyan, and violet
@@ -280,7 +330,12 @@ website layout.
 9. **Phase 2.5 — unsigned transaction construction:** validated native
    transfers and generic contract calls, nonce handling, gas/fee composition,
    deterministic unsigned envelopes, previews, and network-race protection.
-10. **Future signing phase:** local signing, explicit user confirmation, and
-    broadcasting remain deferred and are not implemented here.
-11. **Future ecosystem capabilities:** discovery, swaps, DApp connectivity,
+10. **Phase 2.6 — secure local signing:** transaction-bound authorization,
+    existing authentication gating, local Legacy/EIP-1559 signing, local
+    transaction hashes, secret-lifetime minimization, and no-broadcast
+    enforcement.
+11. **Phase 2.7 — future broadcast boundary:** broadcasting, receipt handling,
+    confirmation polling, retries, replacement, speed-up, and cancellation
+    remain deferred.
+12. **Future ecosystem capabilities:** discovery, swaps, DApp connectivity,
     and PrimeWave integrations remain deferred.

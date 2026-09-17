@@ -316,7 +316,66 @@ quantities.
 
 No secrets or full RPC payloads are included in construction logs or errors.
 
-## 12. Error handling
+## 12. Phase 2.6 local signing boundary
+
+Phase 2.6 performs local transaction signing only. Broadcasting is intentionally
+deferred to Phase 2.7.
+
+The signing engine consumes the validated Phase 2.5 unsigned transaction and a
+transaction-specific authorization. The authorization includes and verifies:
+
+- account ID
+- normalized sender address
+- network ID
+- chain ID
+- transaction type
+- nonce
+- gas limit
+- value
+- recipient
+- calldata
+- Legacy or EIP-1559 fee model
+- fee fields
+- canonical unsigned transaction digest
+- explicit approval and authorization timestamp/context
+
+The engine independently checks the selected configured network and chain
+before authentication, before key access, and after signing. A network change
+fails closed with a normalized signing error. The engine never switches
+networks or retries against a different chain.
+
+Authentication uses the existing `WalletAuthenticator` contract and requires
+the wallet to report an authenticated/unlocked state. No second PIN,
+authentication system, or long-lived signing session is created. Cancelled or
+unavailable authentication stops signing and returns a normalized error.
+
+After successful authentication, the engine issues a one-time opaque signing
+capability bound to the account ID and transaction digest. The
+`LocalWalletEngine` consumes that capability, derives the requested HD account
+from the in-memory wallet secret, and signs with the existing `viem`
+dependency. It supports standard Legacy and EIP-1559 transactions with the
+validated chain ID. It does not modify nonce, gas, value, recipient, calldata,
+or fee parameters.
+
+The public result contains only the signed raw transaction, its locally
+computed hash, and public network/account metadata. It does not contain a
+private key, mnemonic, seed, decrypted vault contents, authentication
+credentials, or vault handles. The signer does not call the backend, RPC,
+analytics, cloud signing services, or `eth_sendRawTransaction`.
+
+Temporary derived-account references are released in a `finally` block and no
+signing key is stored in React state, global state, caches, AsyncStorage,
+localStorage, URLs, logs, errors, analytics, or transaction previews.
+JavaScript/TypeScript garbage collection cannot guarantee cryptographic
+zeroization; this is documented as a limitation, and native cryptographic
+isolation remains future hardening.
+
+Concurrent signing attempts for the same account are rejected rather than
+queued. Signing is only exposed through an explicit call; startup, refresh,
+background work, notifications, DApp discovery, and automatic retry do not
+trigger it.
+
+## 13. Error handling
 
 Errors shown to users must not expose private keys, recovery phrases,
 cryptographic material, authentication secrets, or secure-storage contents.
@@ -327,7 +386,7 @@ display raw stack traces to the user.
 Secret material must never be included in application error objects created by
 future security implementations.
 
-## 13. Memory handling
+## 14. Memory handling
 
 Cryptographic secrets should have the shortest practical lifetime in memory.
 Future implementations should minimize copies, clear sensitive buffers where

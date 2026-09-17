@@ -1,9 +1,18 @@
 import { entropyToMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
+import { keccak256, type Hex } from 'viem';
+import { mnemonicToAccount } from 'viem/accounts';
 import { secureLogger } from '@/src/core/security/logging';
+import { consumeSigningCapability } from '@/src/core/security/signing-capability';
+import type { SigningCapability } from '@/src/core/security/contracts';
 import type { AccountDerivationRequest, SecureVault } from '@/src/core/security/contracts';
 import type { WalletEngine, WalletSetupResult } from './contracts';
 import type { Wallet, WalletAccount } from './models';
+import type {
+  LegacyUnsignedTransaction,
+  Eip1559UnsignedTransaction,
+} from '@/src/core/transactions/construction';
+import type { LocalSigningKeyAccess } from '@/src/core/transactions/signing';
 import {
   derivePublicAccountFromMnemonic,
   EVM_DERIVATION_PREFIX,
@@ -26,7 +35,7 @@ type InMemorySecretState = {
 
 const secretStates = new WeakMap<LocalWalletEngine, InMemorySecretState>();
 
-export class LocalWalletEngine implements WalletEngine {
+export class LocalWalletEngine implements WalletEngine, LocalSigningKeyAccess {
   private accounts: WalletAccount[] = [];
   private walletId: string | null = null;
   private createdAt: string | null = null;
@@ -263,6 +272,89 @@ export class LocalWalletEngine implements WalletEngine {
     this.accounts = [];
     this.walletId = null;
     this.createdAt = null;
+  }
+
+  async signWithCapability(
+    capability: SigningCapability,
+    accountId: string,
+    transaction: LegacyUnsignedTransaction | Eip1559UnsignedTransaction,
+    transactionDigest: `0x${string}`,
+  ): Promise<{
+    readonly rawTransaction: `0x${string}`;
+    readonly transactionHash: `0x${string}`;
+  }> {
+    if (
+      !consumeSigningCapability(capability, {
+        accountId,
+        transactionDigest,
+      })
+    ) {
+      throw new WalletCoreError(
+        'SIGNING_ACCESS_DENIED',
+        'The wallet signing operation is not authorized.',
+      );
+    }
+
+    const state = secretStates.get(this);
+    const account = this.accounts.find((candidate) => candidate.accountId === accountId);
+    if (!state || !account) {
+      throw new WalletCoreError(
+        'WALLET_NOT_CREATED',
+        'Unlock the wallet before signing.',
+      );
+    }
+
+    let localAccount: ReturnType<typeof mnemonicToAccount> | null = null;
+    try {
+      localAccount = mnemonicToAccount(state.mnemonic, {
+        accountIndex: 0,
+        changeIndex: 0,
+        addressIndex: account.index,
+      });
+      if (localAccount.address.toLowerCase() !== account.address.toLowerCase()) {
+        throw new WalletCoreError(
+          'SIGNING_ACCOUNT_MISMATCH',
+          'The wallet account does not match the signing address.',
+        );
+      }
+      if (transaction.nonce > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw new WalletCoreError(
+          'DERIVATION_FAILED',
+          'The transaction nonce is outside the supported signing range.',
+        );
+      }
+
+      const signedTransaction = await localAccount.signTransaction(
+        transaction.feeModel === 'legacy'
+          ? {
+              chainId: Number(transaction.chainId),
+              nonce: Number(transaction.nonce),
+              to: transaction.to as `0x${string}`,
+              value: transaction.value,
+              data: transaction.data,
+              gas: transaction.gasLimit,
+              gasPrice: transaction.gasPrice,
+            }
+          : {
+              type: 'eip1559',
+              chainId: Number(transaction.chainId),
+              nonce: Number(transaction.nonce),
+              to: transaction.to as `0x${string}`,
+              value: transaction.value,
+              data: transaction.data,
+              gas: transaction.gasLimit,
+              maxFeePerGas: transaction.maxFeePerGas,
+              maxPriorityFeePerGas: transaction.maxPriorityFeePerGas,
+            },
+      );
+      const rawTransaction = signedTransaction as Hex;
+      return {
+        rawTransaction,
+        transactionHash: keccak256(rawTransaction),
+      };
+    } finally {
+      localAccount = null;
+    }
   }
 
   private async getVault(): Promise<SecureVault> {

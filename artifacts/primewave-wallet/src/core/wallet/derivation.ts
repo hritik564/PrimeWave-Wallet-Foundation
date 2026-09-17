@@ -18,7 +18,9 @@ export class WalletCoreError extends Error {
       | 'INVALID_MNEMONIC'
       | 'INVALID_ACCOUNT_INDEX'
       | 'WALLET_NOT_CREATED'
-      | 'DERIVATION_FAILED',
+      | 'DERIVATION_FAILED'
+      | 'SIGNING_ACCESS_DENIED'
+      | 'SIGNING_ACCOUNT_MISMATCH',
     message: string,
   ) {
     super(message);
