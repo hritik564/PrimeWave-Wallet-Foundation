@@ -38,7 +38,17 @@ export type AssetErrorCode =
   | 'DISCOVERY_LOG_QUERY_FAILED'
   | 'DISCOVERY_METADATA_FAILED'
   | 'DISCOVERY_PERSISTENCE_FAILED'
-  | 'DISCOVERY_UNSUPPORTED';
+  | 'DISCOVERY_UNSUPPORTED'
+  | 'PORTFOLIO_INVALID_REQUEST'
+  | 'PORTFOLIO_NETWORK_UNAVAILABLE'
+  | 'PORTFOLIO_NETWORK_NOT_CONFIGURED'
+  | 'PORTFOLIO_NETWORK_CHANGED'
+  | 'PORTFOLIO_CHAIN_MISMATCH'
+  | 'PORTFOLIO_METADATA_UNAVAILABLE'
+  | 'PORTFOLIO_BALANCE_UNAVAILABLE'
+  | 'PORTFOLIO_RESULT_LIMIT'
+  | 'PORTFOLIO_STALE_RESULT'
+  | 'PORTFOLIO_UNSUPPORTED';
 
 const SAFE_MESSAGES: Record<AssetErrorCode, string> = {
   ASSET_NOT_FOUND: 'The requested asset was not found.',
@@ -81,6 +91,16 @@ const SAFE_MESSAGES: Record<AssetErrorCode, string> = {
   DISCOVERY_METADATA_FAILED: 'The discovered token metadata could not be read.',
   DISCOVERY_PERSISTENCE_FAILED: 'The token preference could not be saved.',
   DISCOVERY_UNSUPPORTED: 'This token discovery operation is not supported.',
+  PORTFOLIO_INVALID_REQUEST: 'The portfolio request is invalid.',
+  PORTFOLIO_NETWORK_UNAVAILABLE: 'The portfolio network is unavailable.',
+  PORTFOLIO_NETWORK_NOT_CONFIGURED: 'The portfolio network is not configured.',
+  PORTFOLIO_NETWORK_CHANGED: 'The portfolio network changed during the read.',
+  PORTFOLIO_CHAIN_MISMATCH: 'The portfolio response belongs to a different chain.',
+  PORTFOLIO_METADATA_UNAVAILABLE: 'Portfolio asset metadata is unavailable.',
+  PORTFOLIO_BALANCE_UNAVAILABLE: 'Portfolio asset balance is unavailable.',
+  PORTFOLIO_RESULT_LIMIT: 'The portfolio result limit was exceeded.',
+  PORTFOLIO_STALE_RESULT: 'The portfolio result is stale.',
+  PORTFOLIO_UNSUPPORTED: 'This portfolio operation is not supported.',
 };
 
 export class AssetError extends Error {

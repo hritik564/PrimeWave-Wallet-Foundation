@@ -85,6 +85,10 @@ export class TokenRegistry {
     return this.tokens.get(getAssetIdentityKey(identity));
   }
 
+  getAll(): readonly ERC20Token[] {
+    return Object.freeze([...this.tokens.values()]);
+  }
+
   private assertTokenIdentity(
     token: ERC20Token,
     identity: TokenAssetIdentity,

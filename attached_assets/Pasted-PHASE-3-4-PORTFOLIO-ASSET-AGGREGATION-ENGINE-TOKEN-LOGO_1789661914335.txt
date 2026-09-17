@@ -1,0 +1,924 @@
+PHASE 3.4 — PORTFOLIO / ASSET AGGREGATION ENGINE + TOKEN LOGO ARCHITECTURE
+
+You are continuing development of PrimeWave Wallet, now branded in the product UI as WaveX.
+
+IMPORTANT:
+Implement ONLY Phase 3.4.
+Do not proceed automatically to any later phase.
+Do not redesign unrelated systems.
+Do not introduce unnecessary dependencies.
+Keep the implementation UI-independent unless explicitly required for pure domain contracts/models.
+This is a controlled security-sensitive wallet build.
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Build the UI-independent Portfolio / Asset Aggregation Engine.
+
+The engine must aggregate the wallet's currently supported asset types:
+
+1. Native EVM assets
+2. ERC-20 fungible tokens
+3. User-added tokens
+4. Discovered tokens
+
+It must provide a clean, deterministic, network-aware and account-aware portfolio representation that future WaveX UI screens can consume.
+
+This phase must ALSO establish a proper token-logo/icon architecture.
+
+However:
+
+- Do NOT add token price APIs
+- Do NOT add fiat valuation
+- Do NOT add external token lists
+- Do NOT add third-party token verification providers
+- Do NOT add swaps
+- Do NOT add token transfers
+- Do NOT add approvals/allowances/permits
+- Do NOT add NFTs
+- Do NOT add backend portfolio indexing
+- Do NOT add transaction history
+- Do NOT add signing/broadcasting
+- Do NOT build the full wallet UI
+
+==================================================
+2. ARCHITECTURAL PRINCIPLE
+==================================================
+
+Preserve this separation exactly:
+
+TOKEN IDENTITY
+→ COMPATIBILITY
+→ METADATA
+→ LOGO / ICON
+→ DISCOVERY
+→ PROVENANCE
+→ VERIFICATION
+→ TRUST
+
+NEVER collapse these concepts.
+
+A token logo does NOT imply:
+
+- verification
+- legitimacy
+- safety
+- popularity
+- trust
+
+A token name does not imply verification.
+
+A token symbol does not imply verification.
+
+A token logo does not imply verification.
+
+A discovered Transfer event does not imply legitimacy.
+
+A user-added token does not imply verification.
+
+The authoritative fungible-token identity remains:
+
+assetType + networkId + checksum-normalized contractAddress
+
+The same contract address on two different networks MUST remain two distinct assets.
+
+==================================================
+3. PORTFOLIO DOMAIN MODEL
+==================================================
+
+Create a UI-independent portfolio domain under an appropriate location such as:
+
+src/core/portfolio/
+
+Use the existing project architecture and naming conventions.
+
+Create typed models for:
+
+- Portfolio
+- PortfolioAccount
+- PortfolioNetwork
+- PortfolioAsset
+- PortfolioAssetBalance
+- PortfolioAssetStatus
+- PortfolioAssetSource
+- PortfolioVisibility
+- PortfolioSummary
+
+Do not duplicate existing AssetIdentity models unnecessarily.
+
+Reuse existing:
+
+- AssetRegistry
+- NativeAssetBalanceService
+- ERC-20 token engine
+- TokenRegistry
+- Token discovery engine
+- NetworkRegistry
+- EVM account state services
+- existing public wallet account models
+
+==================================================
+4. PORTFOLIO ASSET IDENTITY
+==================================================
+
+Every portfolio asset MUST retain its authoritative AssetIdentity.
+
+Native asset:
+
+assetType = native
+networkId = network
+assetId = native
+
+ERC-20:
+
+assetType = fungible_token
+networkId = network
+assetId = checksum-normalized contract address
+
+Do NOT identify portfolio assets using:
+
+- symbol
+- name
+- logo
+- decimals
+- display name
+
+Those are metadata.
+
+==================================================
+5. ACCOUNT + NETWORK ISOLATION
+==================================================
+
+Portfolio aggregation MUST be explicitly scoped by:
+
+- account
+- network
+
+Do not accidentally merge balances between accounts.
+
+Do not accidentally merge balances between networks.
+
+Example:
+
+Account A + Ethereum + USDC
+Account A + Base + USDC
+
+must remain two separate portfolio assets.
+
+Likewise:
+
+Account A + Ethereum
+Account B + Ethereum
+
+must remain separate portfolio views.
+
+A portfolio query must require enough context to make the account/network scope explicit.
+
+==================================================
+6. ASSET BALANCE MODEL
+==================================================
+
+Use exact BigInt-compatible/raw amount representation already established by the existing asset engines.
+
+Do not use floating-point numbers for blockchain amounts.
+
+A portfolio asset balance should contain enough information for future UI to display:
+
+- raw amount
+- decimals
+- formatted amount
+- symbol
+- name
+- network
+- account
+- asset identity
+
+Do not calculate fiat value.
+
+Do not calculate USD value.
+
+Do not use Number for large blockchain balances.
+
+==================================================
+7. PORTFOLIO ASSET STATES
+==================================================
+
+Create explicit asset states where useful, for example:
+
+- available
+- unavailable
+- metadata_unavailable
+- balance_unavailable
+- hidden
+
+Do not invent states that duplicate the existing token discovery state model.
+
+Keep these concepts separate:
+
+Discovery state
+Verification state
+Visibility state
+Portfolio availability state
+
+For example:
+
+A discovered token can have zero balance.
+
+A discovered token with zero balance must NOT automatically become hidden.
+
+A hidden token can still exist in the registry.
+
+A token being unverified does not mean it should be removed from the portfolio.
+
+==================================================
+8. VISIBILITY
+==================================================
+
+Reuse the existing Phase 3.3 token preference/visibility architecture where appropriate.
+
+Visibility is a presentation preference.
+
+Visibility MUST NOT represent:
+
+- trust
+- verification
+- legitimacy
+- risk
+- security
+
+Do not delete the on-chain asset merely because a user hides it.
+
+Do not treat hidden as removed from blockchain existence.
+
+==================================================
+9. TOKEN LOGO / ICON ARCHITECTURE
+==================================================
+
+This phase MUST introduce a clean, future-proof logo abstraction.
+
+Create a UI-independent model such as:
+
+TokenLogo
+or
+AssetIcon
+
+Use whichever naming best fits the existing architecture.
+
+The model should support concepts such as:
+
+- source
+- URI or reference
+- fallback type
+- optional dimensions/metadata if useful
+- provenance
+- status
+
+Keep it deliberately minimal.
+
+Possible logo sources should be represented explicitly, for example:
+
+- curated_registry
+- trusted_external_source
+- user_provided
+- none
+
+BUT DO NOT IMPLEMENT EXTERNAL TOKEN-LOGO PROVIDERS IN THIS PHASE.
+
+Do NOT fetch arbitrary logo URLs.
+
+Do NOT add an external token-list API.
+
+Do NOT automatically trust token contract metadata as a logo source.
+
+Do NOT store untrusted remote content as if it were verified.
+
+The architecture should simply allow a future trusted logo provider/registry to supply an icon.
+
+==================================================
+10. LOGO TRUST SEPARATION
+==================================================
+
+Logo metadata must be independent from token verification.
+
+For example:
+
+Token:
+
+USDT
+Logo: available
+Verification: unknown
+
+This is valid.
+
+Likewise:
+
+Token:
+ABC
+Logo: unavailable
+Verification: unknown
+
+This is valid.
+
+A logo MUST NEVER automatically change verificationStatus.
+
+Do not implement:
+
+"has logo => verified"
+
+or:
+
+"known logo => trusted"
+
+or:
+
+"popular symbol => verified"
+
+==================================================
+11. LOGO FALLBACK
+==================================================
+
+Define a deterministic fallback mechanism for assets without logos.
+
+The future UI must be able to render an asset even if no logo exists.
+
+The portfolio layer should expose enough information for a UI to generate a fallback such as:
+
+- token initials
+- symbol initials
+- deterministic asset-based fallback identifier
+
+Do not require a remote image.
+
+Do not generate random fallback identifiers.
+
+Do not use token symbol alone as the authoritative identity.
+
+A deterministic fallback may be derived from the asset identity and/or bounded display metadata.
+
+==================================================
+12. NATIVE ASSET ICONS
+==================================================
+
+Native assets should also be capable of having an icon/logo representation.
+
+Do not hardcode a large icon database.
+
+Use the existing network registry's native currency metadata as the foundation.
+
+The architecture should allow:
+
+PrimeWave native asset
+Ethereum ETH
+BNB
+Polygon POL/MATIC as represented by the configured network metadata
+Arbitrum ETH
+Base ETH
+Optimism ETH
+
+Do not invent future PrimeWave branding/token metadata.
+
+For the PrimeWave placeholder network, continue respecting the existing placeholder restrictions.
+
+==================================================
+13. TOKEN METADATA REUSE
+==================================================
+
+Do NOT create another ERC-20 metadata engine.
+
+Reuse Phase 3.2.
+
+The portfolio engine should consume existing token metadata:
+
+- name
+- symbol
+- decimals
+- metadata status
+- contract identity
+
+If metadata is unavailable, the portfolio engine must represent that cleanly.
+
+Never silently invent:
+
+- decimals
+- token symbol
+- token name
+
+==================================================
+14. TOKEN DISCOVERY REUSE
+==================================================
+
+Do NOT create another discovery engine.
+
+Reuse Phase 3.3.
+
+The portfolio engine should be able to consume:
+
+- user-added assets
+- discovered assets
+- registry assets
+
+while preserving provenance.
+
+Example provenance:
+
+user_added
+discovered
+reserved_registry/external_source
+
+Do not collapse these into one "verified" category.
+
+==================================================
+15. PORTFOLIO AGGREGATION
+==================================================
+
+Create a PortfolioAggregationService or equivalent.
+
+It should support controlled aggregation of assets for:
+
+- one account
+- one network
+- multiple configured networks where explicitly requested
+
+Do not silently query every network if the caller did not request it.
+
+Do not silently change the active network.
+
+Do not silently switch RPC endpoints.
+
+Respect the existing NetworkRegistry and RPC rules.
+
+Only query configured/allowed networks.
+
+PrimeWave placeholder networks must remain rejected where existing engines require configuration.
+
+==================================================
+16. BALANCE COLLECTION
+==================================================
+
+For native assets:
+
+Reuse NativeAssetBalanceService / existing account-state infrastructure.
+
+For ERC-20 assets:
+
+Reuse the existing Phase 3.2 ERC-20 balance functionality.
+
+Do not implement token transfers.
+
+Do not implement allowances.
+
+Do not implement approvals.
+
+Do not implement permits.
+
+Do not implement token writes.
+
+All portfolio blockchain access must remain read-only.
+
+==================================================
+17. PORTFOLIO ASSET DISCOVERY RELATION
+==================================================
+
+Do not assume every discovered token belongs in the visible portfolio.
+
+The engine should distinguish:
+
+1. Known asset
+2. Discovered asset
+3. User-added asset
+4. Visible asset
+5. Hidden asset
+6. Asset with non-zero balance
+7. Asset with zero balance
+
+These properties must remain independent.
+
+Example:
+
+A token can be:
+
+discovered
++ zero balance
++ visible
++ unverified
+
+This is valid.
+
+==================================================
+18. DUPLICATION RULES
+==================================================
+
+The portfolio must deduplicate by authoritative asset identity.
+
+The following should resolve to the same asset identity on the same network:
+
+0xabc...
+and
+checksum-normalized equivalent address
+
+Different provenance MUST NOT create duplicate portfolio assets.
+
+For example:
+
+user_added token X
+and
+discovered token X
+
+must resolve to one authoritative asset identity with provenance/observation information preserved separately.
+
+Same contract address on different networks MUST NOT deduplicate.
+
+==================================================
+19. PORTFOLIO SUMMARY
+==================================================
+
+Create a summary model containing useful non-financial aggregation information such as:
+
+- number of networks represented
+- number of visible assets
+- number of hidden assets
+- number of assets with balances
+- number of native assets
+- number of fungible tokens
+- unavailable asset count if useful
+
+Do NOT include:
+
+- fiat totals
+- USD value
+- profit/loss
+- price
+- market cap
+- portfolio performance
+- financial recommendations
+
+This phase is asset aggregation only.
+
+==================================================
+20. REFRESH BEHAVIOR
+==================================================
+
+Portfolio refresh must be explicit.
+
+Do not create uncontrolled background polling.
+
+Do not create infinite retry loops.
+
+Do not silently switch networks.
+
+Do not silently fail over to another RPC endpoint unless the existing RPC layer explicitly permits it.
+
+Preserve network/account context throughout the aggregation operation.
+
+If the network changes during an operation, reject or mark the result stale according to existing network-change conventions.
+
+Do not return data pretending it belongs to a different network.
+
+==================================================
+21. ERROR NORMALIZATION
+==================================================
+
+Use sanitized portfolio-specific errors.
+
+Errors must NOT contain:
+
+- private keys
+- seed phrases
+- PINs
+- authentication secrets
+- secure vault contents
+- raw secret material
+- unnecessary RPC credentials
+- sensitive internal implementation details
+
+Reuse existing network/token/RPC error normalization where appropriate.
+
+Do not expose raw RPC URLs unnecessarily.
+
+==================================================
+22. PERSISTENCE
+==================================================
+
+Do NOT introduce persistent portfolio balance storage.
+
+Blockchain balances are read-only live observations.
+
+If portfolio preferences need to reference existing Phase 3.3 public preferences, use the existing public-only repository abstraction.
+
+Do NOT use SecureStore for:
+
+- token metadata
+- token logos
+- portfolio metadata
+- public token preferences
+
+Do NOT create AsyncStorage-based persistence merely for convenience.
+
+If persistence architecture is genuinely required for the portfolio model, create only a clean public-data repository interface and keep the implementation isolated.
+
+Do not store secrets.
+
+==================================================
+23. SECURITY BOUNDARY
+==================================================
+
+Portfolio aggregation MUST NOT access:
+
+- mnemonic
+- private keys
+- SecureVault secrets
+- signing capabilities
+- PIN
+- biometric credentials
+- WalletAuthenticator unlock secrets
+
+Portfolio aggregation is read-only.
+
+Explicitly document this boundary.
+
+The following MUST remain impossible through portfolio APIs:
+
+- signing
+- transaction authorization
+- broadcasting
+- exporting private keys
+- exporting recovery phrases
+
+==================================================
+24. RPC AUDIT
+==================================================
+
+Audit every RPC method used by the portfolio layer.
+
+Allowed examples include read-only methods such as:
+
+- eth_chainId
+- eth_blockNumber
+- eth_getBalance
+- eth_getTransactionCount
+- eth_getCode
+- eth_call
+- eth_getLogs
+- other existing read-only methods already approved
+
+ABSOLUTELY DO NOT introduce:
+
+- eth_sendRawTransaction
+- transaction signing RPC methods
+- wallet_* signing methods
+- token write methods
+
+Portfolio aggregation must remain read-only.
+
+==================================================
+25. PERFORMANCE / BOUNDS
+==================================================
+
+Do not create an architecture that can accidentally scan the entire blockchain.
+
+Do not scan from genesis.
+
+Do not create unbounded token discovery from the portfolio layer.
+
+Reuse the bounded discovery controls established in Phase 3.3.
+
+Keep multi-network aggregation explicitly bounded.
+
+Do not introduce uncontrolled concurrency that could overwhelm RPC providers.
+
+==================================================
+26. TESTS
+==================================================
+
+Add focused tests covering at minimum:
+
+Portfolio model construction
+
+Native asset aggregation
+
+ERC-20 asset aggregation
+
+Account isolation
+
+Network isolation
+
+Multi-network separation
+
+Token identity deduplication
+
+Checksum normalization
+
+User-added provenance preservation
+
+Discovered provenance preservation
+
+Registry provenance preservation
+
+Visibility preservation
+
+Hidden asset handling
+
+Zero-balance asset handling
+
+Metadata reuse
+
+Missing metadata handling
+
+Logo model construction
+
+Logo source separation
+
+Logo does not imply verification
+
+Missing-logo fallback
+
+Deterministic fallback
+
+Native asset icon handling
+
+Different networks with same symbol remain distinct
+
+Same token with different provenance remains one asset identity
+
+Duplicate observations do not create duplicate portfolio assets
+
+Network-change/stale-result behavior
+
+Invalid/unconfigured network handling
+
+PrimeWave placeholder handling according to existing rules
+
+Error normalization
+
+No secret access
+
+No SecureStore access for portfolio data
+
+No signing access
+
+No broadcasting
+
+No backend dependency
+
+No write-capable token methods
+
+No unbounded chain scanning
+
+No floating-point blockchain amount calculations
+
+Large BigInt balance handling
+
+Concurrent/refresh behavior where relevant
+
+Also add regression tests ensuring existing Phase 3.1, 3.2 and 3.3 behavior remains intact.
+
+==================================================
+27. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+
+Document:
+
+- portfolio architecture
+- account/network isolation
+- asset aggregation
+- identity rules
+- provenance handling
+- visibility semantics
+- logo/icon architecture
+- logo vs verification separation
+- fallback icon strategy
+- read-only security boundary
+- persistence limitations
+- what remains intentionally deferred
+
+Clearly state:
+
+Portfolio aggregation does not provide financial valuation.
+
+Logo availability does not imply token verification or trust.
+
+==================================================
+28. DEPENDENCY DISCIPLINE
+==================================================
+
+Do not add dependencies unless genuinely necessary.
+
+Prefer existing project dependencies and utilities.
+
+Do not add an image library.
+
+Do not add a token-list SDK.
+
+Do not add a price API SDK.
+
+Do not add a wallet SDK.
+
+Do not replace existing viem architecture.
+
+==================================================
+29. EXPLICITLY OUT OF SCOPE
+==================================================
+
+STOP.
+
+Do NOT implement:
+
+- Send UI
+- Receive UI
+- token transfer
+- approve
+- allowance
+- permit
+- swap
+- cross-chain swap
+- price feeds
+- fiat conversion
+- portfolio valuation
+- P&L
+- NFT support
+- NFT gallery
+- transaction history
+- backend indexing
+- external token lists
+- external verification providers
+- risk scoring
+- scam detection
+- token popularity ranking
+- WalletConnect
+- DApp browser
+- DApp sessions
+- notifications
+- analytics
+- full wallet UI
+- Home screen
+- Assets screen
+- Settings UI
+- account management UI
+
+Do not proceed to Phase 4.
+
+==================================================
+30. FINAL ACCEPTANCE CRITERIA
+==================================================
+
+Phase 3.4 is complete only if:
+
+1. Portfolio aggregation is UI-independent.
+2. Native and ERC-20 assets can be represented together.
+3. Account isolation is enforced.
+4. Network isolation is enforced.
+5. Authoritative AssetIdentity remains the deduplication key.
+6. Existing Phase 3.2 token metadata is reused.
+7. Existing Phase 3.3 discovery/provenance is reused.
+8. Visibility remains independent from trust.
+9. Verification remains independent from logo availability.
+10. Logo/icon architecture exists without external token-logo APIs.
+11. Assets without logos have deterministic fallback information.
+12. Blockchain amounts remain exact BigInt/string representations.
+13. Portfolio blockchain access is read-only.
+14. No signing or broadcasting is reachable.
+15. No secret material is accessed or persisted.
+16. No unbounded chain scanning is introduced.
+17. No prices or fiat valuation are introduced.
+18. PrimeWave placeholder restrictions remain intact.
+19. Tests comprehensively cover the above boundaries.
+20. Existing test suite remains green.
+21. TypeScript passes.
+22. Expo/Metro workflow passes.
+23. git diff --check passes.
+24. Documentation is updated.
+25. Implementation stops strictly at Phase 3.4.
+
+==================================================
+31. FINAL REPORT
+==================================================
+
+At the end, report:
+
+- Files added
+- Files modified
+- Portfolio architecture implemented
+- Logo/icon architecture implemented
+- Aggregation behavior
+- Identity/deduplication behavior
+- Account/network isolation
+- Security boundary
+- Persistence behavior
+- RPC methods used
+- Tests passed / total
+- TypeScript result
+- Expo/Metro result
+- git diff --check result
+- Any warnings
+- Any deferred items
+
+Do NOT claim physical-device validation unless it was actually performed.
+
+STOP AFTER PHASE 3.4.
