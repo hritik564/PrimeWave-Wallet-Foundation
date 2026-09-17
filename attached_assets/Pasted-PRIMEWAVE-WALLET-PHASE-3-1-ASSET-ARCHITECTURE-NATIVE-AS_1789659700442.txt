@@ -1,0 +1,1077 @@
+PRIMEWAVE WALLET — PHASE 3.1
+ASSET ARCHITECTURE & NATIVE ASSET ENGINE
+=========================================
+
+You are continuing development of PrimeWave Wallet.
+
+IMPORTANT:
+This is Phase 3.1 ONLY.
+
+Build the asset abstraction and native EVM asset engine.
+
+DO NOT implement:
+- ERC-20 tokens
+- token discovery
+- token metadata APIs
+- NFT support
+- swaps
+- DEX integration
+- DApps
+- WalletConnect
+- transaction history
+- Activity UI
+- portfolio UI
+- fiat pricing
+- backend asset APIs
+- notifications
+- send/receive UI
+- transaction signing
+- transaction broadcasting
+
+Do not redesign the existing architecture.
+
+This phase must remain UI-independent.
+
+==================================================
+PRODUCT REQUIREMENTS
+==================================================
+
+PrimeWave Wallet is a non-custodial multi-chain EVM wallet.
+
+V1 supports:
+
+- PrimeWave Chain
+- Ethereum
+- BNB Chain
+- Polygon
+- Arbitrum
+- Base
+- Optimism
+- future/custom EVM networks
+
+The asset architecture must therefore NOT assume:
+
+- ETH is always the native asset
+- one network has one fixed symbol
+- decimals are always 18
+- one asset exists globally across all networks
+
+Assets are network-scoped.
+
+==================================================
+CURRENT ARCHITECTURE
+==================================================
+
+Existing architecture:
+
+PRIMEWAVE UI
+  Home / Assets / Swap / Activity / Settings
+       ↓
+WALLET ENGINE
+  Accounts / Signing / Transactions / Sessions
+       ↓
+BLOCKCHAIN ENGINE
+  EVM / RPC / Gas / Tokens / Networks
+       ↓
+SECURE DEVICE LAYER
+  Keychain / Keystore / Biometrics / Encryption
+
+Existing completed blockchain layers:
+
+- Network Registry
+- EVM RPC Provider
+- Account State Service
+- Gas/Fee Engine
+- Transaction Construction
+- Local Signing
+- Transaction Broadcasting / Confirmation
+
+Do not duplicate these systems.
+
+==================================================
+PHASE 3.1 OBJECTIVE
+==================================================
+
+Create a clean asset architecture that can represent:
+
+1. Native EVM assets
+2. Future ERC-20 assets
+3. Future NFTs / other asset classes
+
+BUT IMPLEMENT ONLY NATIVE ASSETS IN THIS PHASE.
+
+The architecture should allow later token support without redesigning the entire portfolio system.
+
+==================================================
+1. ASSET TYPE SYSTEM
+==================================================
+
+Create a strongly typed asset model.
+
+At minimum establish:
+
+AssetType
+
+with:
+
+- native
+- fungible_token
+- nft
+
+Only `native` should be implemented functionally in Phase 3.1.
+
+The other types may exist as architectural types if useful, but MUST NOT have incomplete functionality pretending to work.
+
+==================================================
+2. ASSET IDENTITY
+==================================================
+
+Create a stable asset identity model.
+
+An asset must not be identified only by:
+
+symbol
+
+or:
+
+name.
+
+For native assets, identity should be network-scoped.
+
+Conceptually:
+
+AssetIdentity
+
+- assetType
+- networkId
+- assetId
+
+For a native asset:
+
+assetId can be a canonical native identifier such as:
+
+"native"
+
+The architecture should make it impossible to accidentally treat:
+
+ETH on Ethereum
+
+as the same blockchain asset as:
+
+ETH-like assets on another network.
+
+Do not use symbol as the primary key.
+
+==================================================
+3. NATIVE ASSET MODEL
+==================================================
+
+Create a NativeAsset model containing at minimum:
+
+- asset type
+- stable asset ID
+- network ID
+- chain ID
+- name
+- symbol
+- decimals
+- native currency identifier
+- enabled/availability state
+
+Do not duplicate native currency information unnecessarily.
+
+Prefer deriving the native asset metadata from the existing EvmNetwork registry where appropriate.
+
+The network registry remains the source of truth for:
+
+- native currency name
+- native currency symbol
+- native currency decimals
+
+If the existing registry currently has the necessary metadata, reuse it.
+
+If PrimeWave's final Mainnet native currency metadata is still placeholder/unconfigured, do NOT invent it.
+
+==================================================
+4. ASSET REGISTRY
+==================================================
+
+Create an AssetRegistry or equivalent abstraction.
+
+Responsibilities:
+
+- resolve native asset for a network
+- resolve asset by stable identity
+- validate asset/network relationship
+- reject unsupported asset types
+- prevent duplicate identities
+
+Do NOT create a hardcoded global list like:
+
+ETH
+BNB
+MATIC
+ARB
+BASE
+
+Instead derive native assets from the network registry.
+
+The architecture must support future networks without rewriting the asset engine.
+
+==================================================
+5. NETWORK-SCOPED ASSET RULE
+==================================================
+
+Every asset operation must carry network context.
+
+Do not allow:
+
+getBalance(address)
+
+without knowing which network is intended.
+
+Prefer:
+
+getBalance(networkId, address)
+
+or an equivalent strongly typed request.
+
+This is important because the same EVM address can exist on multiple networks while representing different balances.
+
+==================================================
+6. NATIVE BALANCE ENGINE
+==================================================
+
+Create a UI-independent NativeAssetBalanceService.
+
+It should retrieve the native asset balance using the existing:
+
+EvmAccountStateService
+
+Do NOT duplicate:
+
+eth_getBalance
+
+logic.
+
+The service should return a structured balance model.
+
+Conceptually:
+
+NativeAssetBalance
+
+- asset identity
+- network ID
+- chain ID
+- account ID
+- address
+- raw balance as bigint
+- decimals
+- symbol
+- exact display amount
+- retrieval timestamp
+- block context where available
+
+The raw blockchain amount MUST remain bigint.
+
+==================================================
+7. EXACT AMOUNT REPRESENTATION
+==================================================
+
+Do not use JavaScript floating point for balances.
+
+Examples that must remain exact:
+
+1 wei
+1000000000000000000 wei
+123456789012345678901234567890 wei
+
+Use bigint internally.
+
+Human-readable formatting must use exact decimal conversion.
+
+Do not use:
+
+parseFloat
+Number(balance)
+toFixed on blockchain quantities
+floating-point multiplication
+
+for financial calculations.
+
+==================================================
+8. DISPLAY FORMATTING
+==================================================
+
+Create a safe exact amount formatter.
+
+For example:
+
+formatAssetAmount(rawAmount, decimals)
+
+Requirements:
+
+- deterministic
+- no floating-point arithmetic
+- handles zero
+- handles very large values
+- handles very small values
+- handles arbitrary decimals
+- preserves exactness internally
+- supports trimming unnecessary trailing zeros for display
+
+Examples conceptually:
+
+1000000000000000000 / 18
+→ "1"
+
+1500000000000000000 / 18
+→ "1.5"
+
+1 / 18
+→ "0.000000000000000001"
+
+Do not round the underlying value.
+
+If display precision is intentionally limited, make that a presentation-only operation and document it.
+
+==================================================
+9. PARSING HUMAN AMOUNTS
+==================================================
+
+Create a safe conversion utility for future transaction UI use.
+
+Conceptually:
+
+parseAssetAmount("1.5", 18)
+
+→
+
+1500000000000000000n
+
+Requirements:
+
+- exact decimal parsing
+- no floating point
+- reject negative amounts unless explicitly supported
+- reject malformed decimals
+- reject exponent notation
+- reject NaN
+- reject Infinity
+- reject excessive decimal places
+- reject overflow
+- reject empty values
+
+This utility must NOT be connected to sending yet.
+
+It is only an asset arithmetic primitive.
+
+==================================================
+10. DECIMAL RULES
+==================================================
+
+Decimals are metadata.
+
+Never assume:
+
+18 decimals
+
+for every native asset.
+
+Use the network registry's configured decimals.
+
+Validate:
+
+- decimals is a non-negative integer
+- reasonable bounds
+- no malformed decimal metadata
+
+Do not invent decimals for placeholder networks.
+
+==================================================
+11. NATIVE ASSET RESOLUTION
+==================================================
+
+Given a valid configured network:
+
+resolveNativeAsset(networkId)
+
+must return a deterministic NativeAsset.
+
+For example:
+
+Ethereum:
+networkId = ethereum
+chainId = 1
+native symbol = ETH
+decimals = configured value
+
+BNB Chain:
+networkId = bnb
+chainId = 56
+native symbol = BNB
+decimals = configured value
+
+Polygon:
+networkId = polygon
+chainId = 137
+native symbol = configured native symbol
+decimals = configured value
+
+Do not hardcode these values if they already exist in the network registry.
+
+==================================================
+12. PRIMEWAVE PLACEHOLDER
+==================================================
+
+PrimeWave Mainnet remains unconfigured/placeholder until official configuration is supplied.
+
+Therefore:
+
+resolveNativeAsset(primewave-mainnet)
+
+must follow the same configuration rules as the network registry.
+
+Do not invent:
+
+- PrimeWave chain ID
+- PrimeWave RPC
+- native symbol
+- native decimals
+- explorer
+
+If the network is not configured:
+
+reject native asset resolution.
+
+==================================================
+13. ACCOUNT OWNERSHIP
+==================================================
+
+Native balance retrieval must operate on public account information only.
+
+It may accept:
+
+- account ID
+- public address
+
+It must NOT require:
+
+- private key
+- mnemonic
+- vault access
+- PIN
+- biometric authentication
+
+Balance retrieval is read-only.
+
+==================================================
+14. ACTIVE NETWORK BEHAVIOR
+==================================================
+
+Do not silently assume the active network.
+
+The caller must explicitly identify the network.
+
+If the architecture chooses to support an active-network convenience method, it must:
+
+- read the currently selected network
+- reject if none is selected
+- never silently switch networks
+
+Do not create hidden network switching.
+
+==================================================
+15. NETWORK CONSISTENCY
+==================================================
+
+When retrieving a balance:
+
+capture:
+
+- network ID
+- chain ID
+
+before the operation.
+
+Verify the relevant network context remains valid before returning the result.
+
+If the active network changed during an active-network operation:
+
+reject with the established network-change error.
+
+For explicitly network-scoped operations, continue using the requested network context and do not silently switch it.
+
+==================================================
+16. STALE DATA
+==================================================
+
+Do not create a persistent balance cache in this phase.
+
+Each retrieval should represent a fresh RPC-backed observation.
+
+Include:
+
+- retrieval timestamp
+- latest known block context if already available
+
+Do not claim the balance is real-time.
+
+Do not poll continuously.
+
+Do not create background balance refresh.
+
+That belongs to the portfolio layer.
+
+==================================================
+17. BLOCK CONTEXT
+==================================================
+
+Where practical, associate the balance with the latest block context obtained by the existing account-state service.
+
+Do not introduce duplicate block-number RPC calls if existing services already provide this information.
+
+The result may include:
+
+- block number
+- block hash if available
+- retrieval timestamp
+
+This allows later portfolio systems to reason about stale observations.
+
+==================================================
+18. MULTI-ACCOUNT SUPPORT
+==================================================
+
+The asset engine must support multiple local wallet accounts.
+
+Balance identity must include:
+
+- account ID
+- public address
+- network ID
+- asset identity
+
+Do not assume account index 0.
+
+Do not automatically choose the first account.
+
+Do not persist a separate account balance database.
+
+==================================================
+19. MULTI-NETWORK SUPPORT
+==================================================
+
+The same wallet account address can query:
+
+Ethereum
+BNB Chain
+Polygon
+Arbitrum
+Base
+Optimism
+PrimeWave when configured
+
+independently.
+
+Do not merge balances across networks.
+
+Do not calculate:
+
+"Total ETH"
+
+across different networks.
+
+That requires a later portfolio valuation layer.
+
+==================================================
+20. ASSET STATUS
+==================================================
+
+Create a clear asset availability state.
+
+For example:
+
+available
+unconfigured
+disabled
+unsupported
+
+Use the existing network configuration rules.
+
+Do not expose placeholder assets as if they were usable.
+
+==================================================
+21. SAFE PUBLIC MODELS
+==================================================
+
+Public asset/balance models may contain:
+
+- asset ID
+- network ID
+- chain ID
+- asset type
+- name
+- symbol
+- decimals
+- account ID
+- public address
+- raw balance
+- formatted balance
+- block context
+- timestamp
+- status
+
+They MUST NOT contain:
+
+- private key
+- mnemonic
+- seed
+- vault contents
+- PIN
+- biometric secret
+- signing capability
+
+==================================================
+22. NO FIAT
+==================================================
+
+Do not implement:
+
+- USD price
+- INR price
+- portfolio value
+- exchange rates
+- P&L
+- price charts
+
+Those belong to a later portfolio/pricing layer.
+
+The asset engine only knows:
+
+what the asset is
+
+and
+
+how much exists on-chain.
+
+==================================================
+23. NO TOKEN LOGIC
+==================================================
+
+Do NOT implement ERC-20 functionality in this phase.
+
+Specifically do not add:
+
+- balanceOf
+- decimals() contract calls
+- symbol() contract calls
+- name() contract calls
+- allowance
+- approve
+- transfer
+- transferFrom
+- token discovery
+- token lists
+- token verification
+- spam token detection
+
+Those belong to Phase 3.2+.
+
+The architecture should make future ERC-20 support easy without implementing it now.
+
+==================================================
+24. NO TRANSACTION LOGIC
+==================================================
+
+Do not connect this asset engine to:
+
+- transaction construction
+- signing
+- broadcasting
+- send UI
+
+The parse/format utilities may later be used by transaction UI, but this phase must not initiate transactions.
+
+==================================================
+25. SECURITY
+==================================================
+
+The asset engine must be read-only.
+
+It must never:
+
+- sign
+- broadcast
+- access secrets
+- unlock wallet
+- authenticate user
+- call backend for balance truth
+- persist sensitive data
+
+RPC calls contain public address information only.
+
+==================================================
+26. ERROR HANDLING
+==================================================
+
+Use existing normalized/sanitized error architecture.
+
+Create errors as needed for:
+
+- asset not found
+- unsupported asset
+- network unavailable
+- network not configured
+- invalid address
+- invalid asset metadata
+- invalid amount
+- decimal overflow
+- malformed amount
+- balance retrieval failure
+- network changed
+- chain mismatch
+- RPC failure
+
+Do not expose:
+
+- raw RPC URLs
+- secrets
+- authentication data
+- raw internal stack traces
+
+==================================================
+27. TESTING
+==================================================
+
+Create comprehensive offline tests using fake RPC transports.
+
+At minimum test:
+
+1. native asset resolution for Ethereum
+2. native asset resolution for BNB
+3. native asset resolution for Polygon
+4. native asset resolution for Arbitrum
+5. native asset resolution for Base
+6. native asset resolution for Optimism
+7. PrimeWave placeholder rejection
+8. unknown network rejection
+9. disabled network rejection
+10. unconfigured network rejection
+11. asset identity uniqueness
+12. native asset network scoping
+13. native balance retrieval
+14. large balance
+15. zero balance
+16. exact bigint preservation
+17. exact balance formatting
+18. tiny balance formatting
+19. large balance formatting
+20. trailing zero formatting
+21. parse "1"
+22. parse "1.5"
+23. parse smallest unit
+24. parse zero
+25. malformed amount rejection
+26. negative amount rejection
+27. exponent notation rejection
+28. excessive decimals rejection
+29. NaN rejection
+30. Infinity rejection
+31. unsafe number rejection
+32. decimal metadata validation
+33. explicit network balance retrieval
+34. multiple account balances
+35. same address across multiple networks remains separate
+36. network-change rejection
+37. chain mismatch
+38. RPC failure normalization
+39. no persistence
+40. no secret material
+41. no signing
+42. no broadcasting
+43. no backend calls
+44. deterministic repeated balance result structure
+45. block context preservation where available
+
+==================================================
+28. ARITHMETIC SECURITY TESTS
+==================================================
+
+Pay special attention to exact financial arithmetic.
+
+Test:
+
+- 1 wei-equivalent smallest unit
+- 10^18-scale balances
+- very large bigint balances
+- maximum supported decimal precision
+- leading zeros
+- trailing zeros
+- "0.000000000000000001" at 18 decimals
+- "1.000000000000000000"
+- invalid "1.0000000000000000001" at 18 decimals
+- invalid "1e18"
+- invalid "01.5" if the chosen grammar rejects it
+- empty string
+- whitespace behavior
+
+Define deterministic normalization rules.
+
+==================================================
+29. SECURITY LEAK TESTS
+==================================================
+
+Verify no:
+
+- mnemonic
+- private key
+- PIN
+- vault contents
+- signing capability
+
+appears in:
+
+- asset models
+- balance models
+- errors
+- logs
+
+==================================================
+30. NO BROADCAST TEST
+==================================================
+
+Use a fake RPC transport that fails the test if:
+
+eth_sendRawTransaction
+
+is invoked.
+
+The complete Phase 3.1 test suite must pass without any broadcast.
+
+==================================================
+31. NO TOKEN CONTRACT TEST
+==================================================
+
+The Phase 3.1 native asset engine must not call:
+
+- balanceOf
+- decimals
+- symbol
+- name
+- transfer
+- approve
+- allowance
+- transferFrom
+
+The fake RPC transport should record methods.
+
+Verify native balance retrieval uses the existing native balance infrastructure rather than accidentally invoking ERC-20 methods.
+
+==================================================
+32. NO PERSISTENCE
+==================================================
+
+Verify:
+
+- no AsyncStorage
+- no localStorage
+- no SecureStore writes
+- no database writes
+- no backend persistence
+
+Native balances are read-only observations.
+
+==================================================
+33. ARCHITECTURAL DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+src/core/transactions/README.md only if relevant
+Create:
+
+src/core/assets/README.md
+
+Document:
+
+- asset abstraction
+- asset identity
+- network scoping
+- native asset model
+- balance model
+- exact amount handling
+- formatting/parsing rules
+- multi-account behavior
+- multi-network behavior
+- placeholder network handling
+- read-only security boundary
+- future token extension point
+- intentionally deferred functionality
+
+Clearly state:
+
+"Phase 3.1 implements the asset abstraction and native EVM asset engine only. ERC-20/token functionality is intentionally deferred."
+
+==================================================
+34. FILE ORGANIZATION
+==================================================
+
+Prefer:
+
+src/core/assets/
+
+with a structure similar to:
+
+assets/
+  models.ts
+  registry.ts
+  errors.ts
+  native/
+    models.ts
+    service.ts
+    amount.ts
+    index.ts
+    tests/
+  index.ts
+  README.md
+
+Adapt to the existing repository conventions.
+
+Do not create unnecessary files.
+
+==================================================
+35. DEPENDENCY POLICY
+==================================================
+
+Do not add dependencies unless genuinely necessary.
+
+Reuse:
+
+- existing network registry
+- existing RPC provider
+- existing account-state service
+- existing validation utilities
+- existing bigint formatting utilities if available
+
+Do not duplicate existing libraries.
+
+==================================================
+36. PERFORMANCE
+==================================================
+
+Do not introduce:
+
+- continuous polling
+- background refresh
+- expensive scans
+- network-wide asset enumeration
+
+A native balance query should perform only the minimum required RPC work.
+
+==================================================
+37. REQUIRED VALIDATION
+==================================================
+
+Run:
+
+- Phase 3.1 tests
+- full existing test suite
+- TypeScript
+- Expo dependency check
+- Expo Doctor
+- Expo public config
+- git diff --check
+- Expo/Metro workflow validation if available
+
+Do not delete previous tests.
+
+Do not weaken previous security tests.
+
+==================================================
+38. FINAL REPORT
+==================================================
+
+When complete, report:
+
+1. Files created
+2. Files modified
+3. Asset models
+4. Asset identity strategy
+5. Native asset registry
+6. Network scoping
+7. Native balance implementation
+8. Amount formatting implementation
+9. Amount parsing implementation
+10. BigInt handling
+11. Multi-account behavior
+12. Multi-network behavior
+13. PrimeWave placeholder behavior
+14. RPC methods used
+15. Token methods confirmed NOT used
+16. Signing confirmed NOT used
+17. Broadcasting confirmed NOT used
+18. Persistence confirmed NOT used
+19. Backend confirmed NOT used
+20. Test count
+21. Test failures
+22. TypeScript result
+23. Expo Doctor result
+24. Expo config result
+25. Metro result
+26. Warnings
+27. Security limitations
+28. Deferred functionality
+
+==================================================
+ABSOLUTE STOP CONDITION
+==================================================
+
+STOP after Phase 3.1.
+
+DO NOT implement:
+
+- ERC-20
+- token balances
+- token metadata
+- token discovery
+- token verification
+- NFTs
+- portfolio valuation
+- fiat prices
+- transaction history
+- Send UI
+- Receive UI
+- swaps
+- DEX
+- DApps
+- WalletConnect
+- notifications
+- backend indexing
+
+Those belong to later phases.
+
+==================================================
+FINAL PRINCIPLE
+==================================================
+
+Phase 3.1 should establish:
+
+NETWORK
+   ↓
+NATIVE ASSET
+   ↓
+ACCOUNT
+   ↓
+ON-CHAIN BALANCE
+   ↓
+EXACT BIGINT REPRESENTATION
+   ↓
+SAFE DISPLAY FORMAT
+
+Nothing more.
+
+Do not allow this phase to become a token or portfolio implementation.
