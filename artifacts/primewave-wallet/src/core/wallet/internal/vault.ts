@@ -1,6 +1,6 @@
 import { validateMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import type { EncryptedWalletState, SecureVault } from '@/src/core/security';
+import type { EncryptedWalletState, SecureVault } from '@/src/core/security/contracts';
 
 export const CURRENT_VAULT_VERSION = 1 as const;
 export const VAULT_STORAGE_KEY = 'primewave.wallet.vault';

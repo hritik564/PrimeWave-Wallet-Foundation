@@ -17,8 +17,7 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-local-authentication",
-      "expo-screen-capture"
+      "expo-local-authentication"
     ],
     "experiments": {
       "typedRoutes": true,

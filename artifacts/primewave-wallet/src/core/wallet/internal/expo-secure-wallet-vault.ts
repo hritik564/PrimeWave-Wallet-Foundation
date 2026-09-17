@@ -3,6 +3,9 @@ import { SecureWalletVault } from './vault';
 
 class ExpoSecureStoreAdapter {
   isAvailableAsync(): Promise<boolean> {
+    if (typeof document !== 'undefined') {
+      return Promise.resolve(false);
+    }
     return SecureStore.isAvailableAsync();
   }
 

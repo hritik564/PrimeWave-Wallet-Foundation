@@ -1,9 +1,8 @@
-import { Platform } from 'react-native';
 import type { ScreenPrivacyController, SensitiveScreen } from './privacy';
 
 class ExpoScreenPrivacyController implements ScreenPrivacyController {
   private async setProtected(enabled: boolean): Promise<void> {
-    if (Platform.OS === 'web') {
+    if (typeof document !== 'undefined') {
       return;
     }
     try {

@@ -1,5 +1,4 @@
 import { scryptAsync } from '@noble/hashes/scrypt.js';
-import { Platform } from 'react-native';
 import type {
   AuthenticationResult,
   BiometricAvailability,
@@ -121,6 +120,10 @@ function isAutoLockPolicy(value: unknown): value is AutoLockPolicy {
   return value === 0 || value === 30 || value === 300 || value === 900;
 }
 
+async function isWebPlatform(): Promise<boolean> {
+  return typeof document !== 'undefined';
+}
+
 function parseRecord(payload: string): AuthenticationRecord {
   let parsed: unknown;
   try {
@@ -132,27 +135,36 @@ function parseRecord(payload: string): AuthenticationRecord {
     );
   }
 
+  if (typeof parsed !== 'object' || parsed === null) {
+    throw new AuthenticationError(
+      'AUTHENTICATION_STATE_INVALID',
+      'Authentication is unavailable.',
+    );
+  }
+
+  const record = parsed as Record<string, unknown>;
+  const saltHex = record.saltHex;
+  const verifierHex = record.verifierHex;
+  const biometricEnabled = record.biometricEnabled;
+  const autoLockPolicy = record.autoLockPolicy;
+  const failedAttempts = record.failedAttempts;
+  const lockedUntil = record.lockedUntil;
+
   if (
-    typeof parsed !== 'object' ||
-    parsed === null ||
-    !('version' in parsed) ||
-    parsed.version !== AUTHENTICATION_RECORD_VERSION ||
-    !('saltHex' in parsed) ||
-    typeof parsed.saltHex !== 'string' ||
-    parsed.saltHex.length !== SALT_BYTES * 2 ||
-    !('verifierHex' in parsed) ||
-    typeof parsed.verifierHex !== 'string' ||
-    parsed.verifierHex.length !== SCRYPT_DK_LEN * 2 ||
-    !('biometricEnabled' in parsed) ||
-    typeof parsed.biometricEnabled !== 'boolean' ||
-    !('autoLockPolicy' in parsed) ||
-    !isAutoLockPolicy(parsed.autoLockPolicy) ||
-    !('failedAttempts' in parsed) ||
-    !Number.isSafeInteger(parsed.failedAttempts) ||
-    parsed.failedAttempts < 0 ||
-    !('lockedUntil' in parsed) ||
-    (parsed.lockedUntil !== null &&
-      (!Number.isSafeInteger(parsed.lockedUntil) || parsed.lockedUntil < 0))
+    record.version !== AUTHENTICATION_RECORD_VERSION ||
+    typeof saltHex !== 'string' ||
+    saltHex.length !== SALT_BYTES * 2 ||
+    typeof verifierHex !== 'string' ||
+    verifierHex.length !== SCRYPT_DK_LEN * 2 ||
+    typeof biometricEnabled !== 'boolean' ||
+    !isAutoLockPolicy(autoLockPolicy) ||
+    typeof failedAttempts !== 'number' ||
+    !Number.isSafeInteger(failedAttempts) ||
+    failedAttempts < 0 ||
+    (lockedUntil !== null &&
+      typeof lockedUntil !== 'number') ||
+    (lockedUntil !== null &&
+      (!Number.isSafeInteger(lockedUntil) || lockedUntil < 0))
   ) {
     throw new AuthenticationError(
       'AUTHENTICATION_STATE_INVALID',
@@ -160,17 +172,17 @@ function parseRecord(payload: string): AuthenticationRecord {
     );
   }
 
-  hexToBytes(parsed.saltHex);
-  hexToBytes(parsed.verifierHex);
+  hexToBytes(saltHex);
+  hexToBytes(verifierHex);
 
   return {
     version: AUTHENTICATION_RECORD_VERSION,
-    saltHex: parsed.saltHex,
-    verifierHex: parsed.verifierHex,
-    biometricEnabled: parsed.biometricEnabled,
-    autoLockPolicy: parsed.autoLockPolicy,
-    failedAttempts: parsed.failedAttempts,
-    lockedUntil: parsed.lockedUntil,
+    saltHex,
+    verifierHex,
+    biometricEnabled,
+    autoLockPolicy,
+    failedAttempts: failedAttempts as number,
+    lockedUntil: lockedUntil as number | null,
   };
 }
 
@@ -195,7 +207,7 @@ function getBiometricType(types: number[]): BiometricType | null {
 
 class ExpoAuthenticationStorage implements AuthenticationStorage {
   async isAvailableAsync(): Promise<boolean> {
-    if (Platform.OS === 'web') {
+    if (await isWebPlatform()) {
       return false;
     }
     const SecureStore = await import('expo-secure-store');
@@ -251,6 +263,7 @@ export class AuthenticationManager implements WalletAuthenticator {
   private readonly onLock?: () => void;
   private state: WalletLockState = 'LOCKED';
   private autoLockTimer: ReturnType<typeof setTimeout> | null = null;
+  private isBackgrounded = false;
 
   constructor(options?: {
     storage?: AuthenticationStorage;
@@ -409,7 +422,7 @@ export class AuthenticationManager implements WalletAuthenticator {
   }
 
   async determineBiometricAvailability(): Promise<BiometricAvailability> {
-    if (Platform.OS === 'web') {
+    if (await isWebPlatform()) {
       return { available: false, type: null };
     }
 
@@ -445,16 +458,32 @@ export class AuthenticationManager implements WalletAuthenticator {
   async setAutoLockPolicy(policy: AutoLockPolicy): Promise<void> {
     const record = await this.requireRecord();
     await this.writeRecord({ ...record, autoLockPolicy: policy });
-    this.scheduleAutoLock(policy);
+    if (this.isBackgrounded) {
+      this.scheduleAutoLock(policy);
+    }
   }
 
   async handleAppStateChange(
     nextState: 'active' | 'background' | 'inactive',
   ): Promise<void> {
     if (nextState === 'active') {
+      this.isBackgrounded = false;
+      this.clearAutoLockTimer();
       return;
     }
-    const record = await this.readRecord();
+    this.isBackgrounded = true;
+    let record: AuthenticationRecord | null;
+    try {
+      record = await this.readRecord();
+    } catch (error) {
+      if (
+        error instanceof AuthenticationError &&
+        error.code === 'AUTHENTICATION_UNAVAILABLE'
+      ) {
+        return;
+      }
+      throw error;
+    }
     if (!record) {
       return;
     }
@@ -463,6 +492,7 @@ export class AuthenticationManager implements WalletAuthenticator {
 
   async lockWallet(): Promise<void> {
     this.clearAutoLockTimer();
+    this.isBackgrounded = false;
     this.state = 'LOCKED';
     this.onLock?.();
     secureLogger.info('Wallet locked');

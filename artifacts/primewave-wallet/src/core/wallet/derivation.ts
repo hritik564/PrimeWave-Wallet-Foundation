@@ -8,6 +8,10 @@ import type { WalletAccount } from './models';
 
 export const EVM_DERIVATION_PREFIX = "m/44'/60'/0'/0";
 
+export function normalizeRecoveryPhrase(recoveryPhrase: string): string {
+  return recoveryPhrase.trim().toLowerCase().split(/\s+/).join(' ');
+}
+
 export class WalletCoreError extends Error {
   constructor(
     public readonly code:

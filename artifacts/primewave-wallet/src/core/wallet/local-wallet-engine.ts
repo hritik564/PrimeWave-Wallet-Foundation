@@ -1,12 +1,13 @@
 import { entropyToMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
-import { secureLogger } from '@/src/core/security';
-import type { AccountDerivationRequest } from '@/src/core/security';
+import { secureLogger } from '@/src/core/security/logging';
+import type { AccountDerivationRequest, SecureVault } from '@/src/core/security/contracts';
 import type { WalletEngine, WalletSetupResult } from './contracts';
 import type { Wallet, WalletAccount } from './models';
 import {
   derivePublicAccountFromMnemonic,
   EVM_DERIVATION_PREFIX,
+  normalizeRecoveryPhrase,
   validateRecoveryPhrase,
   WalletCoreError,
 } from './derivation';
@@ -14,7 +15,6 @@ import {
   consumeEncryptedWalletState,
   createEncryptedWalletState,
 } from './internal/vault';
-import type { SecureVault } from '@/src/core/security';
 
 export interface WalletEntropyProvider {
   getRandomBytesAsync(byteCount: number): Promise<Uint8Array>;

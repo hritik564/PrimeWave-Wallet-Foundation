@@ -88,6 +88,41 @@ test('persists and restores the wallet across engine instances', async () => {
   );
 });
 
+test('prepares a generated wallet without persisting it before backup confirmation', async () => {
+  const { vault } = createVaultHarness();
+  const engine = new LocalWalletEngine(vault, new DeterministicEntropyProvider());
+
+  const prepared = await engine.prepareWallet();
+
+  assert.equal(prepared.recoveryPhrase.split(' ').length, 12);
+  assert.equal(await engine.hasPersistedWallet(), false);
+
+  await engine.persistPreparedWallet();
+  assert.equal(await engine.hasPersistedWallet(), true);
+});
+
+test('imports a normalized BIP-39 phrase and preserves the known address vector', async () => {
+  const { storage, vault } = createVaultHarness();
+  const engine = new LocalWalletEngine(vault, new DeterministicEntropyProvider());
+  const phrase = '  TEST test test test test test test test test test test junk  ';
+
+  const prepared = await engine.prepareImportWallet(phrase);
+
+  assert.equal(
+    prepared.accounts[0].address,
+    '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266',
+  );
+  assert.equal(await engine.hasPersistedWallet(), false);
+
+  await engine.persistPreparedWallet();
+  const restored = await new LocalWalletEngine(
+    new SecureWalletVault(storage),
+    new DeterministicEntropyProvider(),
+  ).loadWallet();
+
+  assert.equal(restored?.accounts[0].address, prepared.accounts[0].address);
+});
+
 test('missing vaults return safe empty status', async () => {
   const { vault } = createVaultHarness();
 

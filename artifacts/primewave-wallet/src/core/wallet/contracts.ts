@@ -2,7 +2,7 @@ import type {
   AccountDerivationRequest,
   SecureVault,
   WalletAuthenticator,
-} from '@/src/core/security';
+} from '@/src/core/security/contracts';
 import type { Wallet, WalletAccount } from './models';
 
 export interface WalletSetupResult {
