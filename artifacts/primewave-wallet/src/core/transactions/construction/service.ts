@@ -28,6 +28,8 @@ import type {
   TransactionIntent,
   TransactionPreview,
   TransactionType,
+  LegacyUnsignedTransaction,
+  Eip1559UnsignedTransaction,
   UnsignedTransaction,
 } from './models';
 
@@ -227,7 +229,9 @@ function errorCategory(error: unknown): string {
 }
 
 function canonicalUnsignedTransaction(
-  transaction: Omit<UnsignedTransaction, 'canonicalRepresentation'>,
+  transaction:
+    | Omit<LegacyUnsignedTransaction, 'canonicalRepresentation'>
+    | Omit<Eip1559UnsignedTransaction, 'canonicalRepresentation'>,
 ): string {
   const common = {
     chainId: transaction.chainId.toString(),
@@ -361,7 +365,10 @@ export class TransactionConstructionEngine {
     this.accounts = new Map(
       accounts.map((account) => {
         const address = normalizeAddress(account.address, 'INVALID_FROM_ADDRESS');
-        return [address.toLowerCase(), { ...account, address }] as const;
+        return [
+          address.toLowerCase(),
+          { accountId: account.accountId, address },
+        ] as const;
       }),
     );
     this.now = options.now ?? (() => Date.now());
@@ -373,23 +380,34 @@ export class TransactionConstructionEngine {
   }
 
   async construct(intent: TransactionIntent): Promise<TransactionPreview> {
-    let normalized: NormalizedTransactionIntent | undefined;
     try {
-      normalized = normalizeIntent(intent);
+      const normalized = normalizeIntent(intent);
       return await this.runLogged(async () => {
         assertMatchingContext(
           this.registry,
           this.provider,
           this.network,
-          normalized?.networkId,
+          normalized.networkId,
         );
-        if (!this.accounts.has(normalized?.from.toLowerCase() ?? '')) {
+        if (!this.accounts.has(normalized.from.toLowerCase())) {
           throw new TransactionConstructionError('UNKNOWN_ACCOUNT');
         }
 
-        const nonce =
-          normalized.nonce ??
-          (await this.accountStateService.getNonce(normalized.from)).value;
+        let nonce: bigint;
+        if (normalized.nonce !== undefined) {
+          nonce = normalized.nonce;
+        } else {
+          const nonceState = await this.accountStateService.getNonce(normalized.from);
+          if (
+            nonceState.address !== normalized.from ||
+            nonceState.networkId !== this.network.id ||
+            nonceState.chainId !== BigInt(this.network.chainId as number) ||
+            nonceState.value < 0n
+          ) {
+            throw new TransactionConstructionError('CONSTRUCTION_FAILED');
+          }
+          nonce = nonceState.value;
+        }
         assertMatchingContext(this.registry, this.provider, this.network);
 
         let gasLimit = normalized.gasLimit;
@@ -403,7 +421,10 @@ export class TransactionConstructionEngine {
           if (estimate.gasLimit === 0n) {
             throw new TransactionConstructionError('GAS_ESTIMATION_FAILED');
           }
-          if (estimate.chainId !== BigInt(this.network.chainId as number)) {
+          if (
+            estimate.networkId !== this.network.id ||
+            estimate.chainId !== BigInt(this.network.chainId as number)
+          ) {
             throw new TransactionConstructionError('CHAIN_ID_MISMATCH');
           }
           gasLimit = estimate.gasLimit;
@@ -414,7 +435,10 @@ export class TransactionConstructionEngine {
         if (feeData.model === 'unavailable') {
           throw new TransactionConstructionError('FEE_UNAVAILABLE');
         }
-        if (feeData.chainId !== BigInt(this.network.chainId as number)) {
+        if (
+          feeData.networkId !== this.network.id ||
+          feeData.chainId !== BigInt(this.network.chainId as number)
+        ) {
           throw new TransactionConstructionError('CHAIN_ID_MISMATCH');
         }
         assertMatchingContext(this.registry, this.provider, this.network);

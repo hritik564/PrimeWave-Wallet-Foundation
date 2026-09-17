@@ -187,6 +187,63 @@ reject results if the registry's active network changes during the operation.
 Snapshots are not persisted or cached, and the service has no dependency on
 wallet secrets, SecureStore, authentication, or UI components.
 
+## Unsigned transaction construction
+
+Phase 2.5 adds the UI-independent construction engine in
+`src/core/transactions/construction`. It receives a `TransactionIntent`, a
+configured active-network context, and public wallet-account metadata only.
+It never receives or imports private keys, recovery phrases, vault handles,
+PINs, biometric secrets, signing capabilities, or SecureStore.
+
+The construction lifecycle is:
+
+```text
+TransactionIntent
+  ↓
+Validation and normalization
+  ↓
+Known local public-account validation
+  ↓
+Network and RPC chain validation
+  ↓
+Nonce retrieval or explicit nonce
+  ↓
+Gas estimation or explicit gas limit
+  ↓
+Legacy/EIP-1559 fee selection
+  ↓
+UnsignedTransaction
+  ↓
+TransactionPreview
+```
+
+Native transfers require a recipient and use empty calldata. Generic contract
+calls accept opaque hexadecimal calldata without ABI decoding or safety claims.
+Contract-creation transactions are not introduced in this phase.
+
+The engine uses the existing `EvmAccountStateService` for nonce reads, the
+existing `EvmRpcProvider` for public reads, and the existing `GasFeeEngine` for
+gas estimation and fee data. It does not duplicate RPC or fee logic. Explicit
+gas limits and nonces are validated and used exactly as supplied; omitted
+values are read or estimated without local counters, persistence, padding, or
+automatic multipliers.
+
+Every construction is bound to the active configured network. The engine
+captures network identity, verifies the RPC chain ID through the reused
+services, checks the active network after asynchronous operations, and rejects
+`NETWORK_CHANGED` rather than rebuilding against a new network. The
+transaction chain ID comes only from the validated registry context.
+
+The returned transaction is unsigned and deterministic. Addresses and calldata
+are normalized, fee models are explicit, quantities remain `bigint`, and the
+canonical test/debug representation uses decimal strings for quantities. The
+preview exposes native value, maximum estimated network fee, maximum total
+native amount, fee fields, nonce, gas limit, warnings, and the unsigned
+envelope. It is read-only.
+
+**Phase 2.5 constructs unsigned transactions only. Signing and broadcasting
+are intentionally deferred.**
+
 ## Design system
 
 PrimeWave Wallet uses a centralized dark foundation with blue, cyan, and violet
@@ -218,7 +275,12 @@ website layout.
    state, native balances, nonces, contract-code observations, latest block
    state, lossless snapshots, and network-consistency protection. This
    controlled increment is complete; it performs no token or transaction work.
-8. **Phase 3 — transactions and signing:** local signing, user confirmation,
-   and broadcast flows.
-9. **Phase 4 — ecosystem capabilities:** discovery, swaps, DApp connectivity,
-   and PrimeWave integrations.
+8. **Phase 2.4 — EVM gas and fee engine:** read-only gas estimation, Legacy and
+   EIP-1559 fee data, lossless fee quotes, and safe native-unit formatting.
+9. **Phase 2.5 — unsigned transaction construction:** validated native
+   transfers and generic contract calls, nonce handling, gas/fee composition,
+   deterministic unsigned envelopes, previews, and network-race protection.
+10. **Future signing phase:** local signing, explicit user confirmation, and
+    broadcasting remain deferred and are not implemented here.
+11. **Future ecosystem capabilities:** discovery, swaps, DApp connectivity,
+    and PrimeWave integrations remain deferred.

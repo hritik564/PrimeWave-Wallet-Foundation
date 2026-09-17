@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 2.3 — EVM account and chain state (completed)**
+**Phase 2.5 — unsigned EVM transaction construction (completed)**
 
 ## Completed work
 
@@ -70,15 +70,34 @@
 - Added offline account-state tests for invalid addresses, zero and very large
   balances, nonces, code classification, snapshots, stale results, provider
   errors, concurrency, and no persistent state.
+- Added the Phase 2.4 read-only gas and fee engine with lossless gas estimates,
+  Legacy/EIP-1559 fee data, fee quotes, safe errors, and native-unit display
+  formatting.
+- Added the Phase 2.5 unsigned transaction construction engine for native
+  transfers and generic contract calls.
+- Added public-account ownership validation so construction cannot substitute an
+  unknown sender account.
+- Added exact bigint validation for value, nonce, gas limit, and fees, with no
+  floating-point conversion, padding, or local nonce state.
+- Added nonce retrieval through the existing account-state service and gas/fee
+  reuse through the existing Phase 2.4 engine.
+- Added deterministic unsigned transaction representations and read-only
+  transaction previews with contract-interaction warnings.
+- Added network, chain-ID, RPC-error, concurrency, no-persistence, and
+  no-broadcast construction tests.
 
 ## Pending work
 
 - Production PrimeWave Chain launch configuration must be supplied and reviewed
   before the primary network can be activated.
 - Recovery UX and authentication require separate scope and security review.
-- Aggressive endpoint failover, network health checks, token discovery,
-  portfolio aggregation, and live application read flows remain outside this
-  controlled increment.
+- Signing, user confirmation, broadcasting, transaction history, token logic,
+  swaps, DApps, indexing, backend transaction APIs, and fiat pricing remain
+  outside this controlled increment.
+- Balance preflight validation is intentionally not implemented because it is
+  optional and must not be mistaken for a guarantee before signing/broadcast.
+- Physical-device verification of any future signing or broadcasting flow has
+  not begun.
 
 ## Important architectural decisions
 
@@ -106,6 +125,5 @@
 
 ## Next recommended phase
 
-**Phase 2.4 — network health and asset read models**, covering endpoint health
-checks, explicit failover policy, and public token/portfolio read boundaries.
-Do not begin it automatically.
+Signing and broadcasting require a separate security-reviewed phase. Do not
+begin it automatically. Phase 2.5 constructs unsigned transactions only.

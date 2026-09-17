@@ -273,7 +273,50 @@ crash reporting, URLs, and query parameters.
 Complete transaction payloads should not be logged when they could contain
 sensitive user information.
 
-## 11. Error handling
+## 11. Phase 2.5 unsigned transaction boundary
+
+Phase 2.5 constructs unsigned transactions only. Signing and broadcasting are
+intentionally deferred.
+
+The construction engine accepts:
+
+- Public sender and recipient addresses
+- Public wallet-account metadata for sender ownership validation
+- Native value and opaque hexadecimal calldata
+- Optional public nonce and gas-limit quantities
+- The selected configured network ID
+
+It may perform only public read operations required for construction:
+
+- `eth_chainId`
+- `eth_getTransactionCount`
+- `eth_estimateGas`
+- `eth_gasPrice`
+- `eth_maxPriorityFeePerGas`
+- `eth_getBlockByNumber`
+
+It does not import SecureStore, SecureVault, mnemonic storage, private-key
+storage, biometric authentication, PIN storage, or signing capability
+implementations. It does not unlock the wallet, create signatures, call
+`eth_sendRawTransaction`, persist transaction state, or expose a method for
+signing or broadcasting.
+
+The sender must match a known public local wallet account. The constructor
+does not derive, substitute, unlock, or retrieve a private key. Generic
+contract calldata remains opaque; the preview adds only a caution that contract
+interactions may have arbitrary effects. It does not call a contract safe,
+trusted, harmless, or approved.
+
+Network identity and chain ID are captured from the active registry/provider
+context. The engine checks for network changes after nonce, gas, and fee reads
+and fails closed with a sanitized network-change error. A canonical
+representation converts bigint quantities to decimal strings only for
+deterministic tests/debugging; the in-memory transaction model retains bigint
+quantities.
+
+No secrets or full RPC payloads are included in construction logs or errors.
+
+## 12. Error handling
 
 Errors shown to users must not expose private keys, recovery phrases,
 cryptographic material, authentication secrets, or secure-storage contents.
@@ -284,7 +327,7 @@ display raw stack traces to the user.
 Secret material must never be included in application error objects created by
 future security implementations.
 
-## 12. Memory handling
+## 13. Memory handling
 
 Cryptographic secrets should have the shortest practical lifetime in memory.
 Future implementations should minimize copies, clear sensitive buffers where
@@ -296,7 +339,7 @@ JavaScript garbage collection does not guarantee secure memory wiping. PrimeWave
 Wallet must document this limitation honestly and use platform-native
 mechanisms where appropriate.
 
-## 13. Backup and recovery
+## 14. Backup and recovery
 
 The recovery phrase is the user's ultimate recovery mechanism. PrimeWave must
 not provide server-side recovery for a non-custodial wallet.
@@ -319,7 +362,7 @@ If the user loses the recovery phrase and access to the wallet, PrimeWave
 cannot recover the wallet for them. This limitation must be communicated
 clearly before wallet creation is implemented.
 
-## 14. Multiple accounts
+## 15. Multiple accounts
 
 The future vault must support multiple EVM accounts without exposing private
 keys to UI components:
@@ -336,14 +379,14 @@ Account addresses may be presented to the UI as sensitive public data.
 Derivation and signing material remains encapsulated inside the wallet and
 security layers.
 
-## 15. Security testing structure
+## 16. Security testing structure
 
 Phase 0B adds a reviewable test-case plan under
 `src/core/security/tests/SECURITY_TEST_CASES.md`. These are not fake passing
 tests. A real test runner and concrete implementations must be added before
 the corresponding contract tests are marked complete.
 
-## 16. Phase 1A cryptographic implementation
+## 17. Phase 1A cryptographic implementation
 
 Phase 1A uses the following exact dependencies:
 
@@ -375,7 +418,7 @@ m/44'/60'/0'/0/<accountIndex>
 PrimeWave does not have a separate seed or derivation path. The same EVM
 account can later be used on any supported EVM network.
 
-## 17. Phase 1B-1 vault and secret handling
+## 18. Phase 1B-1 vault and secret handling
 
 Wallet creation obtains 16 bytes from `expo-crypto`, converts that entropy to a
 12-word BIP-39 phrase, and immediately clears the temporary entropy buffer on a
@@ -439,7 +482,7 @@ the security boundary. Retrieval returns an opaque handle rather than raw
 secret material through the public engine model. No public API provides
 `getMnemonic`, `getPrivateKey`, `exportPrivateKey`, or equivalent access.
 
-## 18. Phase 1B-1 verification and limitations
+## 19. Phase 1B-1 verification and limitations
 
 Offline tests cover:
 
@@ -460,7 +503,7 @@ broadcasting, cloud backup, or backend recovery. JavaScript memory clearing is
 best-effort and platform storage behavior must still be tested on real iOS and
 Android devices.
 
-## 19. Dependency and backend rules
+## 20. Dependency and backend rules
 
 No custom cryptography, encryption, mnemonic generation, or elliptic-curve
 logic is allowed. Dependency changes require the same review for maintenance,
