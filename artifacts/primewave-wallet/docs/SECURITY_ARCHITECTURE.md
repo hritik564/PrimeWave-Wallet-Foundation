@@ -560,6 +560,212 @@ portfolio valuation, price feeds, history, DApps, WalletConnect, signing,
 broadcasting, background execution, backend indexing, external lists,
 verification providers, and risk systems remain deferred.**
 
+### Phase 3.5 portfolio read model
+
+`PortfolioReadModelService` is an application-level transformation over
+`PortfolioAggregationService`. It handles public account and asset data only.
+It has no access to SecureStore, SecureVault, Keychain/Keystore,
+WalletAuthenticator, `LocalWalletEngine` secrets, mnemonics, private keys,
+signing, transaction authorization, broadcasting, or native authentication.
+
+The service is read-only and in-memory. It does not use AsyncStorage,
+`localStorage`, filesystem persistence, a database, backend services, price
+feeds, fiat conversion, analytics, token-list providers, or logo providers.
+It does not perform blockchain reads independently; all public balance data
+comes from the existing aggregation service.
+
+The read model keeps asset identity, visibility, verification, provenance,
+metadata completeness, balance state, availability state, and icon fallback
+state separate. It never infers verification from names, symbols, decimals,
+balances, discovery, provenance, or logo presence. PrimeWave placeholder
+configuration remains unavailable and no production network values are
+invented.
+
+### Phase 4.1 WaveX Home UI
+
+The authenticated Home UI consumes only public wallet/account metadata and the
+existing `PortfolioReadModelService`:
+
+```text
+Wallet unlock
+      ↓
+WaveX Home
+      ↓
+PortfolioReadModelService
+      ↓
+Public asset presentation
+```
+
+Home has no access to SecureStore, SecureVault, Keychain/Keystore,
+`WalletAuthenticator`, mnemonics, seeds, private keys, PINs, signing
+capabilities, transaction authorization secrets, transaction construction, or
+broadcasting. It cannot determine token trust and does not infer verification
+from logos, names, symbols, discovery, or balances.
+
+### Phase 4.2 WaveX Assets UI
+
+The Assets screen receives only the public account/network context and the
+existing `PortfolioReadModelService` result. Home and Assets share the same
+read-model source; Assets does not make direct RPC calls or duplicate asset
+aggregation.
+
+Search and All/Visible/Hidden filters are local in-memory presentation
+operations over `PortfolioAssetViewModel`. Visibility remains independent from
+availability, balance, metadata completeness, and verification. A logo,
+symbol, name, discovery observation, or balance never becomes verification
+evidence.
+
+Assets has no access to SecureStore, SecureVault, Keychain/Keystore,
+`WalletAuthenticator`, mnemonics, seeds, private keys, PINs, signing
+capabilities, transaction authorization secrets, transaction construction, or
+broadcasting. Asset rows are display/navigation only and lead only to a
+controlled future-detail placeholder.
+
+The Receive UI consumes only the public account address and selected network
+metadata. Its QR payload is public-address-only, its clipboard operation writes
+only that address, and its share operation contains only the address and
+selected network name. The UI never reads, logs, or persists clipboard
+contents. Receive has no transaction-signing authority and does not call
+transaction construction, signing, broadcasting, camera, or recipient-parsing
+services.
+
+Receive, Scan, network selection, and the non-Home destinations remain
+controlled where their behavior is not implemented; Receive is the exception
+for the read-only address/QR/copy/share flow defined in Phase 4.4. Refresh is
+an explicit read-model request only; Home does not persist public balances,
+create a second cache, poll in the background, or retry RPC calls
+automatically. Unavailable and error states remain visibly distinct from zero
+balances, and raw provider details are sanitized before display.
+
+### Phase 4.5 WaveX Send UI boundary
+
+The Send screen is a public-data preparation surface only. It may consume the
+selected network, public wallet account metadata, and the existing
+`PortfolioReadModel`/`PortfolioAssetViewModel` result. It must not import or
+access SecureStore, SecureVault, secret/key managers, mnemonic data, private
+keys, wallet-authentication unlock APIs, signing capabilities, transaction
+construction, gas estimation, nonce retrieval, broadcasting, or backend
+services.
+
+The screen validates EVM recipient syntax locally through the existing
+normalization utility and uses exact bigint parsing for asset amounts. A valid
+address is not represented as safe, trusted, verified, an EOA, or a contract.
+The selected asset must remain bound to the active network through
+`AssetIdentity`; a network change clears the recipient, amount, and review
+draft rather than carrying ambiguous form state across networks.
+
+Review creates only a public draft with account ID, sender public address,
+network ID, selected asset identity, recipient, amount, and an optional token
+contract address. No transaction is constructed, no gas or nonce is read, no
+signature is produced, and no broadcast or blockchain mutation occurs.
+Native MAX represents the current balance only and does not subtract an
+uncomputed gas cost. Clipboard paste uses the existing boundary without
+clipboard history, persistence, logging, or transmission. Scan remains
+deferred and does not request camera permissions.
+
+### Phase 4.6 transaction review boundary
+
+The transaction review screen is a safety checkpoint between public send
+preparation and the later secure signing phase. It may consume the Phase 4.5
+public send draft, public account and network metadata, selected-network
+portfolio balances, read-only Phase 2.4 gas and fee data, and a Phase 2.5
+unsigned transaction preview.
+
+Before construction, the review requires the draft network to remain
+registered, enabled, configured, and active. The construction engine must
+confirm the remote chain ID. Asset identity remains
+`assetType + networkId + assetId`, with the ERC-20 contract address treated as
+authoritative. Token names, symbols, decimals, provenance, and verification
+status remain independent read-model data and never become trust claims.
+
+The review performs exact bigint balance checks. Native transfers must fit
+within the maximum native total reported by the construction preview. ERC-20
+transfers must fit within the token balance and must also leave enough native
+balance for the reported network fee. Fee model, fee currency, gas limit,
+estimated fee, and maximum total are shown without floating-point conversion,
+hidden padding, fee markup, or automatic fee changes.
+
+The Confirm Transaction action revalidates the public draft and reconstructs
+the read-only preview. It rejects stale account, sender, recipient, amount,
+asset, network, chain, fee-model, or canonical unsigned-transaction context.
+It returns a public `confirmed-for-signing` state only. It does not access
+SecureStore, SecureVault, mnemonic material, private keys, PINs, biometric
+credentials, signing capabilities, or authentication APIs. It never calls
+`eth_sendRawTransaction`, the signing service, or the broadcast service.
+Phase 4.7 is responsible for the explicit secure signing authorization
+handoff.
+
+### Phase 4.7 secure authorization and signing boundary
+
+The Phase 4.7 execution path starts only after the user explicitly confirms
+the Phase 4.6 review. The UI then requests authentication through the existing
+wallet access facade: configured biometrics where available, with the existing
+PIN path as fallback. No second PIN system, authentication record, or signing
+session is created.
+
+After authentication succeeds, the public review context is checked again and
+the unsigned transaction is reconstructed for comparison. A changed account,
+sender, active network, chain, recipient, amount, asset, nonce, gas limit, fee
+field, fee model, or canonical unsigned transaction identity stops the flow
+and requires a fresh review. The existing Phase 2.6
+`createTransactionSigningAuthorization` and `TransactionSigningEngine` then
+perform the transaction-bound authorization and local signing.
+
+The one-time signing capability remains opaque, account-bound, and digest-bound.
+`LocalWalletEngine` is the only key-access implementation. Mnemonics, private
+keys, derived signing accounts, PINs, biometric responses, and vault handles
+never enter React state, navigation parameters, logs, analytics, API
+requests, or persistent application storage outside the approved vault.
+
+The public result is limited to signed raw bytes, a local transaction hash, and
+public network/account metadata. The UI presents `Transaction Signed` and
+`Ready to Broadcast`; it never presents `Sent`, `Broadcasted`, or
+`Confirmed on-chain`. Phase 4.7 does not import or invoke
+`TransactionBroadcastEngine`, `broadcast()`, `sendRawTransaction()`, or
+`eth_sendRawTransaction`.
+
+Preview Test Mode remains fail-closed for authentication and signing. It may
+show a clearly labeled inability to sign, but it never creates a fake hash or
+claims simulated signing is a real blockchain transaction. Native biometric
+behavior requires an iOS or Android development build and is not claimed to be
+validated by Expo Web Preview.
+
+Preview Test Mode continues to use only its fixed public development context.
+The Send flow does not weaken its isolation from native secure storage,
+biometrics, the local wallet secret APIs, signing, broadcasting, and backend
+services.
+
+### Phase 4.8 broadcast and confirmation boundary
+
+Phase 4.8 exposes the existing Phase 2.7 broadcast engine only after an
+explicit user press on `Broadcast Transaction`. The UI passes the exact
+`SignedTransaction` produced by Phase 4.7 to `TransactionBroadcastEngine`; it
+does not call RPC directly, duplicate `eth_sendRawTransaction`, reserialize
+raw bytes, re-sign, alter transaction fields, or add a retry loop.
+
+Before submission, the UI checks that the active configured network and chain
+still match the signed transaction and that the signed sender and transaction
+type still match the reviewed unsigned context. Network or account changes
+stop the operation before the broadcast engine is called. The engine remains
+responsible for raw-byte validation, hash consistency, provider chain checks,
+idempotency, concurrency, RPC normalization, and ambiguous send outcomes.
+
+The user sees separate `Broadcasting`, `Broadcasted`, `Confirming`,
+`Confirmed`, `Reverted`, `Failed`, and `Unknown` states. Receipt monitoring
+uses the existing bounded Phase 2.7 confirmation mechanism. A timeout or
+uncertain send is never presented as a definitive failure and never triggers
+automatic rebroadcast. Explicit reconciliation uses the existing
+transaction-lookup method.
+
+Transaction hashes remain public and may use the existing public clipboard
+boundary. Explorer links are generated only from validated configured-network
+transaction templates; placeholder or malformed explorer metadata produces no
+link. No private key, mnemonic, signing capability, authentication material,
+or secret vault content enters broadcast or confirmation state.
+
+The browser Preview Test Mode remains unable to sign, broadcast, or monitor
+transactions and does not create fake transaction hashes.
+
 ### Development-only Replit web preview mode
 
 The Replit web preview cannot use native SecureStore, so it fails closed for

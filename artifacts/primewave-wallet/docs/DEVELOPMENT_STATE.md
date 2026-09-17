@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 3.4 — portfolio aggregation and token-logo architecture (completed)**
+**Phase 4.8 — WAVEX transaction broadcast and confirmation lifecycle (completed)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -178,6 +178,15 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 - Added 12 offline portfolio tests covering aggregation, isolation,
   deduplication, provenance, visibility, zero balances, metadata gaps, icons,
   fallbacks, chain/network races, limits, safe errors, and forbidden methods.
+- Added Phase 3.5 `PortfolioReadModelService` and stable
+  `PortfolioReadModel`/`PortfolioAssetViewModel` types above aggregation.
+- Added explicit balance, availability, metadata, verification, visibility,
+  provenance, icon, warning, and read-state presentation boundaries.
+- Added deterministic visible/available/positive/native/identity ordering and
+  account/network context validation without duplicate blockchain reads.
+- Added six focused Phase 3.5 read-model tests for transformation, exact
+  bigint preservation, visibility, verification, metadata, availability,
+  ordering, isolation, normalized errors, and aggregation delegation.
 - Added isolated `src/core/development/preview-test-mode.ts` for Replit web
   preview UI testing.
 - Added simulated onboarding, six-digit test PIN, lock, unlock, reset, and
@@ -189,6 +198,97 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 - Added preview security tests for development-only availability, invalid PINs,
   lock/unlock/reset idempotency, refresh persistence, and absence of mnemonic,
   private-key, recovery-phrase, and raw PIN data.
+- Added the Phase 4.1 WaveX Home shell with responsive mobile-first layout,
+  public account/network presentation, preview-only development banner,
+  explicit portfolio loading/empty/available/unavailable/error states, and
+  user-triggered refresh.
+- Integrated Home with `PortfolioReadModelService` and the existing app runtime
+  boundary without adding UI-side RPC, balance, price, persistence, or
+  transaction logic.
+- Added Home, Assets, Swap, Activity, and Settings navigation destinations.
+  Home and Assets are implemented; the remaining destinations and
+  Send/Receive/Scan are controlled placeholders.
+- Added application-contract tests for navigation, safe public address display,
+  portfolio/asset states, metadata fallbacks, and sanitized errors.
+- Added the Phase 4.2 Assets screen using the same `PortfolioReadModelService`
+  result as Home.
+- Added deterministic local search by asset name, symbol, contract address,
+  and asset ID, with All, Visible, and Hidden visibility filters.
+- Added polished asset loading, empty, unavailable, error, metadata,
+  verification, availability, balance, icon fallback, and controlled-detail
+  presentation states.
+- Added Home → Assets “View all” navigation and retained the shared account
+  and network query context.
+- Applied the attached WAVEX visual reference direction through the existing
+  dark/cyan/violet theme without copying example balances, names, addresses,
+  or transaction behavior.
+- Added focused filter/search contract coverage and retained the full offline
+  suite and Preview Test Mode security coverage.
+- Added a public account panel with account label/index, shortened and full
+  public address, explicit copy confirmation, unlocked status, and lock action.
+- Added the registry-backed network selector using the actual registered network
+  list, with configured, unconfigured, disabled, and selected states.
+- Kept active-network selection behind `NetworkRegistry.selectActiveNetwork`;
+  unconfigured and disabled networks show controlled messages and never become
+  active for blockchain operations.
+- Wired network changes through the shared portfolio read-model boundary so Home
+  and Assets reload under the new account/network context and do not retain
+  stale results as the new context loads.
+- Kept Preview Test Mode public identity, lock, and refresh behavior isolated
+  from SecureStore, native wallet security, biometrics, signing, broadcasting,
+  backend services, and persistence.
+- Added the receive-only screen using the authoritative public account address
+  and selected registry network context.
+- Added deterministic public-address QR generation with a clean QR surface,
+  explicit quiet zone, contrast, and accessible textual address alternative.
+- Added public-address copy and platform share actions with sanitized,
+  controlled success, cancellation, and unavailable states.
+- Added the selected-network safety warning and honest configured,
+  unconfigured, and disabled network presentation on Receive.
+- Added focused Receive tests for QR payload determinism, QR configuration,
+  network state, and public-only share content.
+- Added the Send screen with selected-network context, native/ERC-20 asset
+  selection, exact available balances, recipient paste, local EVM
+  normalization, exact decimal amount validation, deterministic MAX behavior,
+  and controlled review placeholder state.
+- Added Home → Send and Assets → Send handoffs, preserving network-scoped
+  selected asset identity and clearing ambiguous recipient/amount drafts when
+  the network changes.
+- Added public-only draft preparation containing account, sender, network,
+  asset, recipient, amount, and optional token contract data only.
+- Added focused Send tests for initial state, native/token selection,
+  network isolation, recipient states, paste boundary, exact amounts, MAX,
+  validation gating, public-only drafts, and deferred scanning.
+- Added the transaction review screen consuming only the Phase 4.5 public
+  draft.
+- Connected review preparation to the existing Phase 2.5 construction engine
+  and Phase 2.4 gas/fee boundary without duplicating transaction logic.
+- Added native/ERC-20 intent preparation, exact fee display, native fee
+  currency distinction, balance preflight checks, unverified-token warnings,
+  and recipient verification wording.
+- Added stale review invalidation for account, recipient, amount, asset,
+  network, chain, fee model, and canonical unsigned transaction changes.
+- Added explicit public-only `confirmed-for-signing` state. Phase 4.6 never
+  authenticates, unlocks, signs, broadcasts, or mutates blockchain state.
+- Added focused review tests for public draft validation, construction and
+  fee delegation, EIP-1559/Legacy display, fee fallback, balance safety,
+  stale state, sanitized errors, and confirmation isolation.
+- Connected explicit Phase 4.6 confirmation to the existing wallet access
+  authentication boundary with PIN and configured biometric paths.
+- Added exact transaction-bound signing authorization using the existing Phase
+  2.6 `TransactionSigningEngine` and one-time capability model.
+- Added signed-state UI showing the public transaction hash and a disabled
+  `Ready to Broadcast` deferred state.
+- Added Preview Test Mode fail-closed behavior with no fake signatures or
+  transaction hashes.
+- Added focused authorization binding coverage and preserved the hard
+  no-broadcast boundary.
+- Connected the signed transaction screen to the existing Phase 2.7 broadcast
+  and confirmation engine.
+- Added explicit `Broadcast Transaction` confirmation with exact-byte
+  submission, network/account guards, bounded monitoring, and reconciliation.
+- Added honest broadcast, confirmation, reverted, failed, and unknown states.
+- Added public hash copy and validated configured-network explorer links.
 
 ## Pending work
 
@@ -199,6 +299,8 @@ UI testing; it is not a real wallet and does not alter the native boundary.
   pricing, transaction history, transfers, approvals, permits, swaps, DApps,
   backend asset APIs, notifications, and full wallet UI remain outside this
   controlled increment.
+- Phase 4.8 placeholders remain for account switching, asset detail, QR
+  scanning, Swap, Activity, and Settings functionality.
 - Preview Test Mode is intentionally limited to web UI state testing and is not
   native wallet or security validation.
 - Balance preflight validation is intentionally not implemented because it is
@@ -221,6 +323,9 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 - No automatic network switching, aggressive RPC failover, health-check
   scheduler, indexer, price service, database, notification service, or DApp
   connection.
+- QR scanning, camera permissions, recipient parsing, and native device share
+  validation remain deferred. Web Preview reports when native sharing is
+  unavailable rather than claiming it was tested.
 - The PrimeWave Chain entry has null chain and endpoint values by design.
 - Built-in public RPC metadata is not a live connectivity guarantee and does
   not contain credentials.
@@ -232,7 +337,7 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 
 ## Phase boundary
 
-Phase 3.4 is complete. Stop here. Later phases may separately define external
+Phase 4.8 is complete. Stop here. Later phases may separately define external
 verification, token state-changing operations, NFTs, portfolio valuation, fiat
 pricing, transaction history, UI activity, swaps, DApps, WalletConnect,
 notifications, backend indexing, replacement, speed-up, cancellation,

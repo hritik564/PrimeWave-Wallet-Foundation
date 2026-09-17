@@ -146,6 +146,24 @@ does not accept automatic switching requests from DApps or other untrusted
 callers. The ordered endpoint list is a future seam for health checks and
 failover; this increment performs no RPC calls.
 
+The WAVEX Home and Assets surfaces consume the same registry instance. The
+network selector displays the registry's complete public list, including
+disabled and intentionally unconfigured entries, but only calls
+`selectActiveNetwork` for a requested activation. A placeholder or disabled
+entry remains visible as a controlled state and cannot become the active
+blockchain context.
+
+The public account panel is limited to account label/index, public address,
+unlocked status, and lock. Copying is an explicit one-way write to the
+platform clipboard; the UI never reads clipboard contents and never exposes
+mnemonics, private keys, PINs, secure-vault data, or signing capabilities.
+
+On a successful configured-network selection, the shared portfolio
+read-model query changes with the account/network identity. Home and Assets
+therefore reload from the same source of truth, while the loading boundary
+prevents a prior network's balances from being presented as the new network's
+data.
+
 ## RPC provider engine
 
 Phase 2.2 adds the typed provider engine in `src/core/blockchain/rpc`. It is
@@ -496,6 +514,36 @@ Network and chain changes fail closed. No portfolio balance persistence,
 SecureStore access, wallet-secret access, signing, broadcasting, backend
 indexing, background polling, or automatic network switching is introduced.
 
+### Phase 3.5 portfolio read model and asset presentation layer
+
+Phase 3.5 adds `PortfolioReadModelService` under `src/core/portfolio`. It
+consumes one explicit account and one explicit network through the existing
+`PortfolioAggregationService`:
+
+```text
+Blockchain / Asset Services
+        ↓
+PortfolioAggregationService
+        ↓
+PortfolioReadModelService
+        ↓
+Future Wallet UI
+```
+
+The service returns a stable `PortfolioReadModel` with account/network
+context, generation time, deterministic asset ordering, visible and total
+counts, warnings, and an explicit read state. Each
+`PortfolioAssetViewModel` preserves authoritative identity, token contract
+address, exact `bigint` balance, deterministic formatted balance, visibility,
+verification, metadata, provenance, and the existing icon/fallback model.
+
+Read-model ordering is deterministic: visible assets first, then available
+assets, then positive balances, then native assets, followed by identity-key
+ordering for ties. Hidden, unverified, unavailable, zero-balance, and
+metadata-incomplete states remain independent. The read model does not add
+portfolio UI, prices, fiat values, trust scoring, persistence, or another
+blockchain read engine.
+
 ### Development-only Replit web preview test mode
 
 The Replit web preview has a separate `src/core/development` preview test mode.
@@ -518,9 +566,241 @@ missing, blocked, or cleared preview state returns to onboarding, and reset is
 idempotent. Native builds do not use this repository. Production builds cannot
 activate Preview Test Mode because the `__DEV__` boundary is required.
 
+### Phase 4.1 WaveX Home shell and navigation
+
+Phase 4.1 adds the first authenticated WaveX wallet interface in
+`src/components/WalletHomeShell.tsx`:
+
+```text
+Wallet unlock
+      ↓
+Authenticated public wallet state
+      ↓
+WaveX Home shell
+      ↓
+PortfolioReadModelService
+      ↓
+Asset presentation
+```
+
+The Home shell displays the public account label, shortened address, selected
+network metadata, explicit portfolio state, exact read-model balances, icon
+fallbacks, and asset availability/verification states. It does not implement
+RPC calls, token discovery, pricing, fiat conversion, transaction construction,
+signing, broadcasting, network switching, persistence, or backend services.
+
+Home has explicit loading, empty, available, unavailable, and sanitized error
+states. Refresh is user initiated and calls the existing read-model service;
+there is no background polling or UI-side balance cache. The current primary
+PrimeWave network remains visibly unconfigured because its registry entry is
+still a placeholder.
+
+The bottom navigation establishes Home, Assets, Swap, Activity, and Settings
+destinations. Home, Assets, and Receive are implemented; the remaining
+destinations and Send/Scan controls show controlled placeholder states and do
+not perform wallet operations.
+
+### Phase 4.2 WaveX Assets screen
+
+Phase 4.2 extends the same shell with a real Assets destination:
+
+```text
+WaveX Home
+      ↓
+Assets
+      ↓
+PortfolioReadModelService
+      ↓
+PortfolioAssetViewModel
+```
+
+Home and Assets share the same in-memory read-model result, account query, and
+network context. Assets performs only deterministic local filtering by public
+name, symbol, contract address, or asset ID, with independent All, Visible, and
+Hidden visibility filters. It does not create a second asset engine or make
+network requests for search.
+
+The Assets screen preserves balance, availability, metadata, verification, and
+visibility as separate presentation concepts. Asset rows use the existing icon
+and fallback model and expose a controlled “Asset details coming soon” entry
+point. No prices, fiat values, external token lists, logo providers, or
+transaction functionality were added.
+
+### Phase 4.4 WaveX Receive and QR
+
+Phase 4.4 adds the receive-only public address flow:
+
+```text
+WaveX Home
+      ↓
+Receive
+      ↓
+Public account + selected EvmNetwork
+      ↓
+Address / QR / Copy / Share
+```
+
+Receive reads the same public wallet account and selected network context as
+Home and Assets. The QR payload is exactly the trimmed public EVM address and
+uses a clean, high-contrast QR presentation with a reserved quiet zone. The
+screen displays the full selectable address, shortened address, account index,
+network status, and a concise warning that senders must use the selected
+network. An unconfigured network remains visibly unconfigured; it does not
+cause balances or blockchain activity to be invented.
+
+Copy uses the existing public-address clipboard boundary. Share uses only the
+public address plus the selected network name; Web Preview uses the Web Share
+API when available and otherwise reports a controlled unavailable state. Receive
+has no transaction-signing authority and does not implement QR scanning,
+camera permissions, transfers, or recipient parsing.
+
+### Phase 4.5 WaveX Send UI and public draft preparation
+
+Phase 4.5 adds a send-only preparation flow using the same selected-network
+portfolio read model:
+
+```text
+WaveX Home / Assets
+      ↓
+Send
+      ↓
+Selected network + native/ERC-20 portfolio asset
+      ↓
+Local recipient and exact amount validation
+      ↓
+Public transaction draft / controlled review placeholder
+```
+
+`WalletSendScreen.logic.ts` is a pure public-data boundary. It uses the
+existing EVM address normalization and exact bigint asset amount utilities.
+Asset identity remains network-scoped, and the screen rejects cross-network
+assets, unavailable balances, malformed amounts, excessive precision, zero
+amounts, and amounts above the represented available balance. Native MAX
+copies the current exact balance and explicitly does not claim to be the
+maximum spendable amount after gas.
+
+The review placeholder can contain only the account ID, sender public address,
+network ID, selected asset identity, normalized recipient, amount, and token
+contract address when applicable. Phase 4.5 does not construct transactions,
+estimate gas, retrieve nonces, sign, broadcast, mutate blockchain state, call
+backend services, or access wallet secrets. Recipient validation is local
+syntax/checksum normalization only; it does not verify safety, ownership,
+contract type, or trust. Clipboard paste stays behind the existing clipboard
+boundary and is not persisted, logged, or transmitted. QR scanning remains a
+controlled Coming Soon action with no camera permission or dependency.
+
+### Phase 4.6 WaveX transaction review and pre-send safety checkpoint
+
+Phase 4.6 consumes the public draft from Phase 4.5 and performs the first
+review-only handoff into the existing Phase 2.4 and Phase 2.5 boundaries:
+
+```text
+PublicSendDraft
+      ↓
+Network / chain / asset / balance validation
+      ↓
+Phase 2.5 TransactionConstructionEngine
+      ↓
+Unsigned TransactionPreview + exact fee data
+      ↓
+Explicit public confirmation result
+      ↓
+STOP before authentication, signing, or broadcast
+```
+
+`TransactionReviewScreen.logic.ts` creates only the intent required for the
+existing construction engine. Native transfers use the exact parsed native
+amount; ERC-20 transfers use a network-bound contract address, zero native
+value, and an encoded `transfer` call. The construction engine remains
+authoritative for nonce, gas limit, fee model, chain ID, and canonical unsigned
+transaction identity. No transaction-construction logic is duplicated in the
+screen.
+
+The review validates that the network is still registered, enabled, configured,
+active, and chain-consistent; that the asset identity remains network-scoped;
+that token and native balances cover the requested operation; and that a
+native fee remains denominated in the network's native currency. Legacy fee
+fallbacks, unverified tokens, and syntactically valid but independently
+unverified recipients remain explicit warnings.
+
+Confirmation rechecks the public context and reconstructs read-only review
+data to detect changed fee models or unsigned transaction identity. A changed
+recipient, amount, asset, account, network, chain, fee model, or canonical
+unsigned transaction invalidates the review. Confirmation returns only a
+public `confirmed-for-signing` result and never unlocks, authenticates, signs,
+broadcasts, or mutates blockchain state. Phase 4.7 owns the later secure
+authorization and signing handoff.
+
+### Phase 4.7 WaveX secure authorization and local signing
+
+Phase 4.7 connects the public review checkpoint to the existing local
+authentication and Phase 2.6 signing boundaries:
+
+```text
+Reviewed transaction
+      ↓
+Explicit public confirmation
+      ↓
+PIN or configured biometric authentication
+      ↓
+Transaction-bound signing authorization
+      ↓
+Existing TransactionSigningEngine
+      ↓
+SignedTransaction
+      ↓
+STOP before broadcast
+```
+
+The UI requests explicit PIN or biometric authentication after the review is
+confirmed. A successful authentication is followed by a fresh public review
+context check and comparison of the unsigned transaction's canonical identity
+and fee model. The existing `createTransactionSigningAuthorization` function
+then binds the exact unsigned transaction to the account and confirmation
+request. `TransactionSigningEngine` remains responsible for the one-time
+opaque capability, local HD-account derivation, signature validation, and
+sanitized errors.
+
+The signed UI state displays only public transaction information, including the
+local transaction hash and a clear `Ready to Broadcast` deferred state. It
+never calls the broadcast engine or `eth_sendRawTransaction`. Browser Preview
+Test Mode does not create fake signatures or hashes and remains explicitly
+unable to authenticate or sign.
+
+### Phase 4.8 WaveX broadcast and confirmation lifecycle
+
+Phase 4.8 connects the public `SignedTransaction` to the existing Phase 2.7
+`TransactionBroadcastEngine` through an app dependency. The signed raw bytes
+are passed unchanged; the UI never constructs JSON-RPC requests, reserializes
+the transaction, changes fees, or signs again.
+
+Broadcast is available only from an explicit `Broadcast Transaction` action
+on the signed screen. Before calling the engine, the UI verifies the active
+network, chain, sender, transaction type, and signed transaction context. A
+network or account change blocks submission and requires returning to the
+transaction flow.
+
+The lifecycle remains honest and distinct:
+
+```text
+Ready to Broadcast
+      ↓ explicit user action
+Broadcasting
+      ↓
+Broadcasted
+      ↓ bounded Phase 2.7 confirmation monitoring
+Confirming → Confirmed / Reverted / Unknown
+```
+
+Timeouts and uncertain submission outcomes remain `Unknown`; the UI never
+automatically retries or rebroadcasts. Explicit reconciliation uses the
+existing transaction lookup method. Explorer links are created only from
+validated configured-network transaction URL templates. Preview Test Mode
+cannot broadcast or monitor transactions.
+
 ## Design system
 
-PrimeWave Wallet uses a centralized dark foundation with blue, cyan, and violet
+WAVEX uses a centralized dark foundation with blue, cyan, and violet
 brand accents, technical typography, gradient surfaces, restrained glow, shared
 spacing, radius, shadow, and component-state tokens. It is inspired by
 PrimeWave's technology language without copying another wallet or reproducing a
@@ -562,6 +842,16 @@ website layout.
     broadcasting, chain/network protection, in-memory duplicate prevention,
     bounded receipt polling, revert handling, unknown-result handling, and
     read-only transaction lookup. No automatic retry or transaction mutation.
+12. **Phase 4.6 — transaction review and safety checkpoint:** public-draft
+    validation, read-only Phase 2.5 construction and Phase 2.4 fee display,
+    exact balance preflight, stale-review invalidation, and explicit
+    public-only confirmation. No authentication, signing, or broadcasting.
+13. **Phase 4.7 — secure authorization and local signing:** explicit PIN or
+    biometric authentication, exact transaction-bound Phase 2.6 signing,
+    public signed state, and a hard stop before broadcast.
+14. **Phase 4.8 — broadcast and confirmation lifecycle:** explicit broadcast
+    confirmation, exact-byte Phase 2.7 submission, bounded monitoring,
+    reconciliation, explorer links, and honest unknown/reverted states.
   12. **Phase 3.1 — asset abstraction and native balance engine:** network-scoped
       native asset identities, exact bigint amount utilities, and read-only
       native balance retrieval. Complete.
@@ -576,6 +866,14 @@ website layout.
        account/network-scoped native and ERC-20 aggregation, identity
        deduplication, provenance/visibility preservation, exact balances,
        deterministic icon fallbacks, safe errors, and offline tests. Complete.
-   16. **Future ecosystem capabilities:** external token verification,
-       state-changing token operations, NFTs, portfolio, swaps, DApp
-      connectivity, and PrimeWave integrations remain deferred.
+    16. **Phase 3.5 — portfolio read model and asset presentation:** stable
+        account/network-scoped presentation models, explicit balance and
+        availability states, deterministic ordering, and no-secret/no-
+        persistence boundaries. Complete.
+     17. **Phase 4.1 — WaveX Home shell and navigation:** authenticated mobile
+         Home, public account/network display, PortfolioReadModel integration,
+         explicit asset states, refresh, placeholder destinations, and preview
+         integration. Complete.
+     18. **Future ecosystem capabilities:** external token verification,
+         state-changing token operations, NFTs, portfolio valuation, swaps, DApp
+       connectivity, and PrimeWave integrations remain deferred.

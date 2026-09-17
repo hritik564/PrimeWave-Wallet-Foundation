@@ -1,0 +1,811 @@
+PHASE 4.4 — WAVEX RECEIVE & QR EXPERIENCE
+
+IMPORTANT:
+This is a controlled UI/application phase.
+
+PRODUCT NAME:
+WAVEX
+
+Do NOT display “PrimeWave Wallet” as the product name.
+Do NOT display “by PrimeWave” in the WaveX product branding.
+
+PrimeWave remains the ecosystem/network name where applicable.
+
+==================================================
+OBJECTIVE
+==================================================
+
+Implement the real WAVEX Receive experience.
+
+The Receive flow must allow the user to:
+
+- view their public wallet address
+- view a QR code representing that public address
+- copy the public address
+- share the public address
+- clearly see the currently selected network
+- understand that the sender must use the correct network
+
+Architecture:
+
+WaveX Home
+    ↓
+Receive
+    ↓
+Public Account + Active Network
+    ↓
+Address / QR / Copy / Share
+
+This is a receive-only/read-only feature.
+
+==================================================
+VISUAL REFERENCE
+==================================================
+
+Continue using the attached WAVEX Wallet UI reference image as the primary visual reference.
+
+Follow its:
+
+- dark futuristic aesthetic
+- cyan / electric blue / violet accents
+- premium cards
+- subtle glow
+- rounded surfaces
+- thin borders
+- typography hierarchy
+- clean spacing
+- polished mobile interaction
+
+Use the existing centralized WaveX theme.
+
+The reference is a VISUAL DESIGN REFERENCE only.
+
+Do NOT copy example addresses, balances, token names, or fake functionality from it.
+
+==================================================
+1. RECEIVE SCREEN
+==================================================
+
+Create a dedicated Receive screen consistent with the WaveX design.
+
+Suggested hierarchy:
+
+Header
+    WAVEX / Receive
+    Back
+
+Network context
+    Current network
+
+Main receive card
+    QR code
+    Account identity
+    Public address
+
+Actions
+    Copy Address
+    Share Address
+
+Safety information
+    Correct network warning
+
+The screen should feel polished and production-ready.
+
+==================================================
+2. ACCOUNT CONTEXT
+==================================================
+
+Receive must use the currently authenticated/public account.
+
+Display:
+
+- account name where available
+- account index
+- shortened public address
+- full public address
+
+Example:
+
+Account 1
+
+0xf39F…2266
+
+The underlying address must be the authoritative wallet address.
+
+Do NOT hardcode an address.
+
+Do NOT create another address-generation implementation.
+
+==================================================
+3. NETWORK CONTEXT
+==================================================
+
+Receive must clearly display the currently selected network.
+
+Use the existing EvmNetwork model.
+
+Display:
+
+- network name
+- native currency symbol where useful
+- network status where appropriate
+
+Example:
+
+Ethereum
+ETH
+
+or:
+
+PrimeWave Chain
+Not configured
+
+Do NOT invent PrimeWave production configuration.
+
+==================================================
+4. NETWORK SAFETY WARNING
+==================================================
+
+Include a clear warning that the sender must send using the correct network.
+
+The wording should communicate:
+
+“Only send assets using the selected network.”
+
+Do not claim that all tokens can be safely received on every network.
+
+Explain that an address may look identical across EVM networks, but the network still matters.
+
+Keep the warning concise and understandable.
+
+==================================================
+5. QR CODE
+==================================================
+
+Implement actual QR code generation.
+
+The QR must represent the PUBLIC wallet address.
+
+It must NOT contain:
+
+- private key
+- mnemonic
+- seed phrase
+- PIN
+- authentication credential
+- signing capability
+- secret data
+
+Prefer a standard QR encoding containing the public EVM address.
+
+Do NOT encode arbitrary sensitive wallet state.
+
+==================================================
+6. QR DEPENDENCY
+==================================================
+
+If a QR library is required:
+
+- use a well-maintained library compatible with the current Expo/React Native environment
+- pin the dependency to a compatible version
+- avoid unnecessary native modules
+- do not introduce a dependency that requires a native rebuild unless necessary
+- document why the dependency is required
+
+Before adding a dependency, inspect the existing package configuration and avoid duplicates.
+
+Do not replace existing cryptographic dependencies.
+
+Do not modify wallet cryptography.
+
+==================================================
+7. QR VISUAL QUALITY
+==================================================
+
+The QR code must:
+
+- have sufficient contrast
+- have adequate quiet-zone/margin
+- remain square
+- remain scannable at common mobile sizes
+- not be obscured by decorative glow
+- not place decorative elements inside the QR unless verified safe
+
+The futuristic WaveX visual treatment must never reduce QR scan reliability.
+
+Keep the QR itself clean and functional.
+
+==================================================
+8. COPY ADDRESS
+==================================================
+
+Implement:
+
+“Copy Address”
+
+Behavior:
+
+1. Copy ONLY the public address.
+2. Show clear confirmation.
+3. Do not read clipboard contents.
+4. Do not log clipboard contents.
+5. Do not store clipboard contents.
+
+Use the existing clipboard dependency/pattern introduced in Phase 4.3.
+
+Do not duplicate clipboard architecture.
+
+==================================================
+9. SHARE ADDRESS
+==================================================
+
+Implement public-address sharing using the appropriate platform-compatible sharing mechanism.
+
+Share only:
+
+- public wallet address
+- optionally a concise non-sensitive message containing the network name
+
+Do NOT share:
+
+- private key
+- mnemonic
+- seed
+- PIN
+- authentication state
+- signing capability
+- secrets
+
+Example share content:
+
+“WaveX address — Ethereum:
+0x…”
+
+Keep the shared content deterministic and user-controlled.
+
+If native sharing is unavailable in Web Preview, provide a controlled fallback rather than claiming native sharing was tested.
+
+==================================================
+10. NETWORK + ADDRESS CONSISTENCY
+==================================================
+
+The Receive screen must use the same:
+
+account + network
+
+context as Home and Assets.
+
+Do not generate a different address.
+
+Do not create another account context.
+
+Do not silently change networks.
+
+If the network changes before or while Receive is open:
+
+- update the displayed network
+- ensure the warning reflects the new network
+- ensure QR/address data remains consistent
+- do not display stale network information
+
+Because EVM addresses can remain the same across networks, the network label is still essential.
+
+==================================================
+11. UNCONFIGURED NETWORK
+==================================================
+
+If the selected network is unconfigured:
+
+do NOT pretend the network is live.
+
+Display its actual configured/unconfigured state.
+
+The public EVM address may still be displayed because it is derived from the wallet account, but the UI must clearly communicate that the network itself is not configured for blockchain operations.
+
+Do not invent balances or blockchain activity.
+
+==================================================
+12. DISABLED / INVALID NETWORK
+==================================================
+
+Handle:
+
+- disabled network
+- unavailable network
+- invalid network context
+
+using the existing network/error abstractions.
+
+Do not silently fall back to another network.
+
+Do not automatically switch networks.
+
+==================================================
+13. HOME INTEGRATION
+==================================================
+
+Wire the existing Home “Receive” action to the real Receive screen.
+
+Do not leave Receive as “Coming Soon”.
+
+Home → Receive must work.
+
+Back → Home must work.
+
+The bottom navigation may remain visible/hidden according to the established app shell, but do not redesign unrelated navigation.
+
+==================================================
+14. ASSETS INTEGRATION
+==================================================
+
+Do not create token-specific receive addresses.
+
+Receive represents the current wallet account/address and selected network.
+
+The screen should clearly communicate that the wallet address is the account's public EVM address.
+
+Do not imply that a token has its own wallet address.
+
+==================================================
+15. QR SCANNER
+==================================================
+
+IMPORTANT:
+
+DO NOT implement QR SCANNING in this phase.
+
+This phase implements:
+
+QR DISPLAY / GENERATION
+
+only.
+
+The existing Scan button may continue to show “Coming soon”.
+
+QR scanning will be handled separately because it requires camera/native permissions and recipient parsing/security review.
+
+==================================================
+16. NO TRANSACTION LOGIC
+==================================================
+
+Do NOT implement:
+
+- transaction construction
+- gas estimation
+- signing
+- broadcasting
+- transfers
+- approvals
+- permits
+- transaction history
+
+Receive is read-only.
+
+Do not call:
+
+- TransactionBuilder
+- LocalSigner
+- TransactionBroadcastEngine
+
+==================================================
+17. NO SECRET ACCESS
+==================================================
+
+The Receive UI MUST NOT access:
+
+- mnemonic
+- seed phrase
+- private key
+- PIN
+- SecureStore
+- SecureVault
+- Keychain
+- Keystore
+- WalletAuthenticator
+- LocalWalletEngine secret APIs
+- signing capabilities
+- authorization secrets
+
+Only public account/network data may be consumed.
+
+==================================================
+18. CLIPBOARD SECURITY
+==================================================
+
+Only the public address may enter the clipboard.
+
+The app must never:
+
+- read clipboard contents
+- log clipboard contents
+- persist clipboard contents
+
+Reuse the existing public-address copy implementation.
+
+==================================================
+19. PREVIEW TEST MODE
+==================================================
+
+Preserve Preview Test Mode.
+
+Verify:
+
+Preview onboarding
+    ↓
+PIN
+    ↓
+WaveX Home
+    ↓
+Receive
+    ↓
+Public preview address
+    ↓
+QR
+
+Preview mode must remain isolated from:
+
+- SecureStore
+- SecureVault
+- WalletAccessManager
+- WalletAuthenticator
+- LocalWalletEngine secret APIs
+- native biometrics
+- signing
+- broadcasting
+- backend
+
+The Preview Test Mode fixed public development identity may be used.
+
+It must be clearly marked as development-only.
+
+Do not use real secret material.
+
+==================================================
+20. WEB PREVIEW
+==================================================
+
+The Receive screen must work in Web Preview.
+
+Verify:
+
+- address display
+- QR rendering
+- copy address
+- network display
+- navigation
+- warning
+
+For native Share functionality:
+
+if Web Preview does not support the native API, show an honest controlled fallback.
+
+Do not claim native sharing was tested.
+
+==================================================
+21. RESPONSIVE DESIGN
+==================================================
+
+Primary:
+
+390 × 844
+
+Also validate:
+
+402 × 874
+
+Ensure:
+
+- QR remains large enough to scan
+- address wraps safely
+- copy/share buttons remain accessible
+- network warning remains readable
+- content scrolls correctly
+- Safe Area is respected
+- bottom navigation does not overlap content
+
+Do not allow long addresses to cause horizontal overflow.
+
+==================================================
+22. VISUAL DESIGN DETAILS
+==================================================
+
+Use the WaveX visual reference.
+
+Receive card should feel premium:
+
+- dark layered surface
+- subtle cyan/blue/violet accent
+- restrained glow
+- rounded corners
+- thin border
+- clean QR presentation
+- clear address hierarchy
+
+The QR itself must remain visually clean.
+
+Do not put glow effects over the QR modules.
+
+Do not sacrifice scan reliability for aesthetics.
+
+==================================================
+23. ACCESSIBILITY
+==================================================
+
+Add appropriate accessibility labels for:
+
+- Receive screen
+- QR code
+- account/address
+- copy button
+- share button
+- network indicator
+- back button
+
+For the QR code, provide an accessible textual alternative:
+
+“QR code for wallet address [shortened address]”
+
+The public address must remain available as selectable/readable text.
+
+Do not rely solely on the QR.
+
+==================================================
+24. ERROR HANDLING
+==================================================
+
+Use sanitized application errors.
+
+Handle:
+
+- invalid account
+- missing public address
+- invalid network
+- unavailable network context
+- QR generation failure
+- clipboard failure
+- share failure
+
+Do not display:
+
+- stack traces
+- raw native errors
+- raw RPC errors
+- internal paths
+- secrets
+
+==================================================
+25. TESTING
+==================================================
+
+Add focused tests for:
+
+1. Receive screen renders.
+2. Correct public account address is displayed.
+3. Account name/index are displayed safely.
+4. Shortened address is deterministic.
+5. Full address is available.
+6. QR is generated from the public address.
+7. QR does not contain secret material.
+8. QR payload is deterministic.
+9. QR configuration provides sufficient margin/quiet zone.
+10. Current network is displayed.
+11. Network status is displayed correctly.
+12. Unconfigured PrimeWave state is honest.
+13. No silent network fallback.
+14. Correct network warning is displayed.
+15. Copy address copies only public address.
+16. Clipboard contents are never read.
+17. Share contains only public information.
+18. Share failure is sanitized.
+19. Invalid address handling.
+20. Invalid network handling.
+21. Network/address context remains consistent.
+22. Home → Receive navigation works.
+23. Receive → Home navigation works.
+24. Preview Test Mode reaches Receive.
+25. Preview mode does not invoke SecureStore.
+26. Preview mode does not invoke WalletAuthenticator.
+27. Preview mode does not invoke LocalWalletEngine secrets.
+28. Preview mode does not invoke signing/broadcasting.
+29. No transaction services are called.
+30. Long address layout behavior.
+31. Accessibility labels exist.
+32. QR generation failure is handled safely.
+
+Avoid brittle screenshot-only tests.
+
+==================================================
+26. SECURITY REGRESSION SEARCH
+==================================================
+
+Search all newly created/modified Receive code for accidental references to:
+
+- privateKey
+- mnemonic
+- seed
+- PIN
+- SecureStore
+- SecureVault
+- WalletAuthenticator
+- LocalWalletEngine secret APIs
+- signing secrets
+- authorization secrets
+
+Remove any actual secret access.
+
+Explanatory copy/documentation is allowed.
+
+==================================================
+27. DEPENDENCY AUDIT
+==================================================
+
+If adding a QR or sharing dependency:
+
+- inspect package compatibility
+- avoid duplicate libraries
+- avoid unnecessary native modules
+- document dependency purpose
+- run the existing dependency/type checks
+- do not modify cryptographic packages unless absolutely required
+
+If a package requires native configuration, document that native device testing will be required later.
+
+==================================================
+28. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+
+Document:
+
+Home
+ ↓
+Receive
+ ↓
+Public Account Address
+ ↓
+QR / Copy / Share
+
+Document that Receive has no transaction-signing authority.
+
+Update:
+
+docs/SECURITY_ARCHITECTURE.md
+
+Document:
+
+- Receive exposes public information only
+- QR contains public information only
+- clipboard receives only public address
+- share receives only public address/network information
+- no secret material enters Receive
+- no transaction authority exists in Receive
+
+Update:
+
+docs/DEVELOPMENT_STATE.md
+
+Record:
+
+- Phase 4.4 implemented
+- Receive screen
+- QR generation
+- copy address
+- share address
+- network warning
+- Preview Test Mode
+- tests
+- validation
+- native testing limitations
+- deferred QR scanning
+
+==================================================
+29. QUALITY GATE
+==================================================
+
+Before reporting completion, run:
+
+- Phase 4.4 focused tests
+- full existing test suite
+- TypeScript
+- git diff --check
+- Expo/Metro validation
+- web bundle validation
+
+Then manually verify Web Preview:
+
+1. Open Preview.
+2. Create preview wallet.
+3. Enter correct PIN.
+4. Confirm WaveX Home.
+5. Tap Receive.
+6. Confirm Receive screen opens.
+7. Confirm public address is shown.
+8. Confirm shortened address is shown.
+9. Confirm QR renders.
+10. Confirm QR corresponds to the displayed public address.
+11. Confirm network is shown.
+12. Confirm network warning is shown.
+13. Tap Copy Address.
+14. Confirm copy feedback.
+15. Do not claim clipboard contents were read.
+16. Tap Share.
+17. If Web Share is supported, verify the public share payload.
+18. If unavailable, verify the controlled fallback.
+19. Return Home.
+20. Reopen Receive.
+21. Lock wallet.
+22. Unlock.
+23. Open Receive again.
+24. Verify account/network context remains correct.
+25. Test invalid/unavailable states where reproducible.
+
+Native camera/QR scanning is NOT part of this phase.
+
+Native biometric testing is NOT part of this phase.
+
+==================================================
+30. HARD SCOPE LIMIT
+==================================================
+
+DO NOT implement in Phase 4.4:
+
+- QR scanning
+- camera permissions
+- recipient scanning
+- Send
+- token transfers
+- transaction construction
+- gas estimation
+- signing
+- broadcasting
+- transaction history
+- Swap
+- DApps
+- WalletConnect
+- price feeds
+- fiat values
+- external token lists
+- external logo providers
+- token verification providers
+- account creation
+- account import
+- account switching
+- cloud backup
+- backend services
+- push notifications
+- biometric changes
+
+Those remain future controlled phases.
+
+==================================================
+FINAL REPORT
+==================================================
+
+Report:
+
+1. Files created/changed
+2. Receive screen architecture
+3. QR implementation and dependency
+4. QR payload format
+5. Public address handling
+6. Copy behavior
+7. Share behavior
+8. Network context
+9. Network safety warning
+10. Preview Test Mode behavior
+11. Security boundary
+12. Clipboard boundary
+13. Dependency audit
+14. Tests and results
+15. TypeScript result
+16. Expo/Metro result
+17. Web bundle result
+18. Manual Web Preview verification
+19. Native testing limitations
+20. Warnings
+21. Deferred functionality
+
+Do not make architectural changes outside Phase 4.4.

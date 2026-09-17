@@ -1,0 +1,420 @@
+PHASE 4.5 — WAVEX SEND SCREEN & RECIPIENT EXPERIENCE
+
+We have completed and approved:
+- Phase 4.1 Wallet Home Shell
+- Phase 4.2 Assets Screen
+- Phase 4.3 Account & Network Experience
+- Phase 4.4 Receive & QR Experience
+
+Current verified state:
+- Full test suite: 173/173 passing
+- TypeScript passing
+- Expo/Metro workflow passing
+- Static iOS and Android Expo builds passing
+- Preview Test Mode working correctly
+- Wallet remains strictly non-custodial
+- Phase 2.5 transaction construction exists but must NOT be exposed as a live send flow yet
+- Phase 2.6 signing exists but must NOT be called by this phase
+- Phase 2.7 broadcasting exists but must NOT be called by this phase
+
+OBJECTIVE
+
+Build the dedicated WAVEX Send screen and recipient-entry experience.
+
+This phase is UI + public-data preparation only.
+
+DO NOT implement actual transaction sending, signing, broadcasting, gas estimation, transaction construction, or blockchain mutation in this phase.
+
+The goal is to create a polished, production-quality Send screen that is ready to connect to the transaction pipeline in the next phase.
+
+VISUAL DIRECTION
+
+Continue the established WAVEX visual language from the attached wallet UI reference:
+
+- dark futuristic wallet
+- deep navy/black background
+- cyan/electric blue/violet accents
+- subtle restrained glow
+- premium rounded surfaces
+- clean typography
+- strong visual hierarchy
+- compact controls
+- polished input states
+- avoid excessive gradients or visual noise
+- mobile-first
+- feel like a serious modern self-custodial wallet, not a generic finance app
+
+Reuse the existing theme tokens and components instead of creating a second design system.
+
+SCREEN STRUCTURE
+
+Create:
+
+src/components/WalletSendScreen.tsx
+src/components/WalletSendScreen.logic.ts
+appropriate tests
+
+The Send screen should include:
+
+1. Header
+- Back button
+- "Send" title
+- current selected network indicator
+
+2. Asset selector
+- Allow the user to choose an asset from the currently selected network
+- Use the existing PortfolioReadModel / asset presentation architecture
+- Initially support:
+  - native asset
+  - ERC-20 fungible tokens already represented by the portfolio
+- Do not add new blockchain reads directly from the UI
+- Do not invent balances
+
+3. Available balance
+- Display the selected asset's available balance
+- Reuse existing exact formatted balance
+- Clearly identify the asset symbol
+- Preserve unavailable/stale/invalid states honestly
+
+4. Recipient field
+- Label: "Recipient Address"
+- EVM address input
+- Full address should remain editable/selectable
+- Validate syntactic EVM address format locally
+- Normalize/checksum where appropriate using existing utilities
+- Do NOT send anything to the blockchain merely to validate an address
+- Do NOT attempt to determine whether the recipient is an EOA or contract in this phase
+
+5. Address states
+
+Support clear visual states:
+
+- empty
+- typing
+- valid
+- invalid
+- normalized
+- cleared
+
+Do not show "wallet verified", "safe address", "trusted address", or similar claims.
+
+A syntactically valid address is NOT proof that the destination is safe.
+
+6. Paste action
+
+Provide a clear Paste action using the existing expo-clipboard boundary.
+
+Important:
+- The app may write the public recipient address to clipboard through the existing boundary.
+- Do not persist clipboard contents.
+- Do not log clipboard contents.
+- Do not create a clipboard history.
+- Do not transmit clipboard contents anywhere.
+
+7. QR / Scan action
+
+Add a "Scan" action in the recipient field area if it fits the existing design.
+
+However:
+
+DO NOT implement QR scanning in Phase 4.5.
+
+It should remain a controlled "Coming Soon" / deferred capability.
+
+Do not add camera permissions or camera dependencies.
+
+8. Amount field
+
+Add an amount input for the selected asset.
+
+Requirements:
+- decimal input appropriate for token decimals
+- no negative values
+- no exponent notation
+- no malformed decimal values
+- reject excessive decimal precision
+- preserve exact user-entered value while editing
+- do not convert financial amounts through floating-point arithmetic
+- use the existing exact amount parsing/formatting utilities
+- no hidden rounding
+- no hidden fee deduction
+- no automatic "max" behavior yet unless it can be implemented purely as a deterministic UI helper
+
+9. MAX button
+
+Add a visible MAX control.
+
+For this phase:
+- MAX should populate the selected asset's exact available balance as the amount
+- Do not subtract gas automatically
+- Do not estimate gas
+- Do not calculate transaction fees
+- For native assets, explicitly make it clear that this is the current balance, not "maximum spendable after gas"
+- For ERC-20, simply use the available token balance
+
+10. Network safety
+
+The Send screen must always be scoped to the currently selected network.
+
+Display the selected network clearly.
+
+Do not allow the Send screen to silently switch networks.
+
+If the selected network is:
+- configured → normal UI
+- unconfigured → controlled unavailable state
+- disabled → controlled unavailable state
+
+If the network context changes while the screen is open:
+- invalidate recipient/amount draft as appropriate
+- refresh the presentation state
+- do not carry a draft silently across networks if that could cause ambiguity
+
+11. Asset/network mismatch protection
+
+A token from one network must never accidentally appear as a sendable asset on another network.
+
+Use the existing network-scoped AssetIdentity.
+
+Contract address + network must remain the authoritative token identity.
+
+12. Navigation
+
+Implement:
+
+Home → Send
+Assets → Send
+Send → Home / Back
+
+The selected asset should be able to flow into Send when the user starts Send from an asset row/detail context.
+
+If no asset is supplied:
+- default to the currently selected network's native asset where appropriate
+- do not invent an asset
+
+13. Form validation
+
+Build UI-level validation for:
+
+- missing recipient
+- invalid recipient
+- missing amount
+- malformed amount
+- excessive decimal precision
+- zero amount
+- amount greater than available balance
+- unavailable asset
+- unavailable network
+
+Use clear human-readable messages.
+
+Do NOT perform:
+- balance refreshes
+- gas estimation
+- nonce retrieval
+- transaction construction
+- signing
+- broadcasting
+
+Those belong to later transaction-flow phases.
+
+14. Continue button
+
+Add a primary CTA such as:
+
+"Review Transaction"
+
+It should only become enabled when the local UI prerequisites are satisfied.
+
+When pressed in this phase:
+- do NOT build a real transaction
+- do NOT estimate gas
+- do NOT sign
+- do NOT broadcast
+- transition only to a controlled placeholder/review state indicating that transaction review will be connected in the next phase
+
+Prefer creating a reusable draft model for the future transaction flow, containing only public/non-secret information:
+
+- accountId
+- sender public address
+- networkId
+- selected asset identity
+- recipient
+- amount
+- token contract address if applicable
+
+Do NOT include:
+- mnemonic
+- private key
+- signing capability
+- PIN
+- biometric state
+- SecureStore data
+- encryption keys
+
+15. Security boundary
+
+This phase must NOT import or access:
+
+- SecureStore
+- SecureVault
+- SecretManager
+- KeyManager
+- LocalWalletEngine secret APIs
+- mnemonic data
+- private keys
+- WalletAuthenticator unlock APIs
+- signing capability
+- LocalSigner
+- TransactionSigningFlow
+- TransactionBroadcastEngine
+
+Only public wallet/account/asset/network presentation data may be used.
+
+16. Preview Test Mode
+
+Maintain complete Preview Test Mode isolation.
+
+In browser Preview:
+- do not invoke native SecureStore
+- do not invoke native biometric APIs
+- do not invoke LocalWalletEngine secret APIs
+- do not invoke signing
+- do not invoke broadcasting
+- do not invoke backend services
+
+The Send UI must work with the existing fixed Preview Test Mode public wallet context.
+
+17. Error handling
+
+Do not expose raw exceptions, stack traces, RPC URLs, credentials, or internal implementation details.
+
+Use existing safe UI error patterns.
+
+18. Accessibility
+
+Ensure:
+- accessible labels
+- sufficient contrast
+- touch targets appropriate for mobile
+- keyboard-friendly recipient and amount entry
+- numeric/decimal keyboard for amount
+- address field remains easy to select/copy
+- errors are visually and semantically associated with their fields
+
+19. Responsive behavior
+
+Verify at minimum:
+- 390x844
+- 402x874
+
+Ensure keyboard opening does not hide the primary CTA or recipient/amount fields.
+
+20. Testing
+
+Add focused tests covering at minimum:
+
+- Send screen initial state
+- network context
+- asset selection
+- native asset selection
+- ERC-20 asset selection
+- recipient empty
+- recipient valid
+- recipient invalid
+- address normalization
+- paste boundary
+- amount empty
+- amount valid
+- amount invalid
+- excessive decimal precision
+- zero amount
+- insufficient balance
+- MAX behavior
+- network change invalidation
+- asset/network isolation
+- unavailable network
+- unavailable asset
+- review CTA gating
+- draft contains only public/non-secret data
+- forbidden secret dependencies are absent
+- QR scan remains deferred
+- Preview Test Mode isolation
+- Home → Send
+- Assets → Send
+- Send → Home
+
+Run the full test suite and ensure all existing tests continue passing.
+
+21. Documentation
+
+Update:
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- relevant transaction/send documentation
+
+Document clearly:
+
+Phase 4.5 implements Send UI and a public transaction draft only.
+
+It does NOT yet execute:
+- transaction construction
+- gas estimation
+- nonce retrieval
+- signing
+- broadcasting
+
+Also document that QR scanning remains intentionally deferred.
+
+22. Verification
+
+Before reporting completion, verify:
+
+- TypeScript
+- full test suite
+- Expo/Metro
+- static Expo build checks
+- git diff / security regression inspection
+- 390x844 Preview
+- 402x874 Preview
+
+Manually test:
+
+1. Home
+2. tap Send
+3. select native asset
+4. enter a valid EVM address
+5. enter a valid amount
+6. observe Review Transaction enabling
+7. press Review Transaction
+8. confirm only controlled placeholder/review state appears
+9. return to Send
+10. test invalid address
+11. test excessive decimals
+12. test insufficient balance
+13. test MAX
+14. test network selection/change
+15. enter Send from Assets
+16. verify selected asset context
+17. refresh Preview
+18. lock/unlock
+19. confirm no secret or transaction APIs were invoked
+
+FINAL REPORT
+
+Report:
+- files created/changed
+- architecture used
+- validation implemented
+- security boundaries preserved
+- test count
+- TypeScript result
+- Expo/build result
+- Preview result
+- known warnings
+- anything deferred
+
+STOP after Phase 4.5.
+
+Do not automatically implement Phase 4.6.

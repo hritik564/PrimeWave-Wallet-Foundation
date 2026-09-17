@@ -1,0 +1,855 @@
+PHASE 4.2 — WAVEX ASSETS SCREEN & ASSET PRESENTATION UI
+
+IMPORTANT:
+This is a controlled UI implementation phase.
+
+PRODUCT NAME:
+WAVEX
+
+Do NOT display “PrimeWave Wallet” as the product name.
+Do NOT display “by PrimeWave” in the WaveX product branding.
+
+PrimeWave remains the ecosystem/network name where applicable.
+
+==================================================
+PRIMARY VISUAL REFERENCE — IMPORTANT
+==================================================
+
+The attached image is the PRIMARY VISUAL DESIGN REFERENCE for this phase.
+
+Use the attached WaveX Wallet UI reference image to guide:
+
+- visual hierarchy
+- screen composition
+- spacing
+- typography hierarchy
+- card treatment
+- rounded surfaces
+- dark background
+- cyan / electric blue / violet accents
+- subtle glow effects
+- icon treatment
+- asset rows
+- navigation styling
+- buttons
+- borders
+- gradients
+- overall premium futuristic Web3 aesthetic
+
+The reference image represents the intended WaveX design language.
+
+IMPORTANT:
+
+Do NOT blindly copy example balances, token names, addresses, text, or functionality shown in the image.
+
+Use the existing real application data and architecture.
+
+The image is a VISUAL DESIGN REFERENCE, not a functional specification.
+
+Existing application architecture and security rules take priority over the visual reference.
+
+Do not introduce functionality merely because it appears in the image.
+
+==================================================
+OBJECTIVE
+==================================================
+
+Build the real WAVEX Assets screen.
+
+The Assets screen must consume the existing:
+
+PortfolioReadModelService
+        ↓
+PortfolioAssetViewModel
+        ↓
+Assets UI
+
+Do NOT duplicate blockchain logic.
+
+Do NOT implement a second asset engine.
+
+Do NOT make direct RPC calls from UI components.
+
+==================================================
+1. ASSETS SCREEN
+==================================================
+
+Create the production-style Assets screen shown conceptually in the attached reference.
+
+The screen should include:
+
+HEADER
+
+- back/home navigation where appropriate
+- WAVEX branding
+- appropriate account/network context
+- clean futuristic styling
+
+TITLE
+
+“Assets”
+
+Provide a concise portfolio/asset summary.
+
+Do not introduce fiat valuation.
+
+==================================================
+2. SEARCH
+==================================================
+
+Add an asset search field.
+
+Search should operate on the existing read-model asset collection.
+
+Allow searching by appropriate public presentation fields such as:
+
+- asset name
+- symbol
+- contract address where applicable
+
+Search must be:
+
+- case-insensitive
+- deterministic
+- local/in-memory
+- UI-only filtering
+
+Do NOT make network requests for search.
+
+Do NOT call external token-list services.
+
+Do NOT call price APIs.
+
+==================================================
+3. ASSET FILTERS
+==================================================
+
+Add a clean filter/segmentation treatment consistent with the reference.
+
+At minimum support:
+
+- All
+- Visible
+- Hidden
+
+Use the existing visibility state.
+
+Do NOT redefine visibility semantics.
+
+Do NOT treat:
+
+hidden
+as
+unverified
+or
+unavailable.
+
+These are separate concepts.
+
+If verification filtering is later added, it must remain independent.
+
+==================================================
+4. ASSET LIST
+==================================================
+
+Render assets from PortfolioReadModel.
+
+Each asset row should be visually polished and may include:
+
+- token/native icon
+- asset name
+- symbol
+- formatted balance
+- availability state
+- verification indicator where appropriate
+- metadata state where appropriate
+- navigation affordance for future asset details
+
+Use existing AssetIcon / TokenLogo abstraction.
+
+Do NOT invent token logos.
+
+Do NOT infer trust from logos.
+
+Do NOT infer verification from logos.
+
+==================================================
+5. NATIVE ASSET
+==================================================
+
+Native assets should have a visually distinct but consistent presentation.
+
+Use the existing network/native currency metadata.
+
+Do NOT hardcode:
+
+- ETH
+- BNB
+- MATIC
+- PrimeWave currency
+
+when the active network model already provides the information.
+
+The UI should consume the existing network/asset models.
+
+==================================================
+6. ERC-20 ASSETS
+==================================================
+
+ERC-20 assets must use the existing PortfolioAssetViewModel.
+
+Display:
+
+- name
+- symbol
+- formatted balance
+- icon/fallback
+- verification status where appropriate
+
+Preserve exact balance formatting.
+
+Do not perform floating-point conversion of raw token balances.
+
+Do not calculate fiat values.
+
+==================================================
+7. ASSET STATES
+==================================================
+
+Clearly represent the existing states.
+
+Balance:
+
+- positive
+- zero
+- unavailable
+
+Availability:
+
+- available
+- unavailable
+- stale
+- invalid
+
+Metadata:
+
+- complete
+- partial
+- unavailable
+- invalid
+
+Verification:
+
+- verified
+- unverified
+- unknown
+
+Visibility:
+
+- visible
+- hidden
+
+Do NOT collapse these concepts into one generic status.
+
+For example:
+
+An unverified token can still have an available balance.
+
+A token with zero balance is not necessarily unavailable.
+
+A hidden token is not necessarily unverified.
+
+==================================================
+8. VERIFICATION PRESENTATION
+==================================================
+
+If the read model reports:
+
+verified
+
+the UI may show a clear verification indicator.
+
+If:
+
+unverified
+or
+unknown
+
+do not present the asset as verified.
+
+Do NOT use:
+
+- token logo
+- token name
+- symbol
+- discovery
+- transfer history
+- popularity
+- balance
+
+as verification evidence.
+
+Do not label a token “scam” or “malicious”.
+
+==================================================
+9. ICON / LOGO BEHAVIOR
+==================================================
+
+Use the existing AssetIcon / TokenLogo architecture.
+
+The visual hierarchy should support:
+
+1. trusted logo if a future trusted source exists
+2. deterministic asset fallback
+3. native asset fallback
+4. initials/placeholder fallback
+
+Do NOT add an external logo API.
+
+Do NOT add token-list providers.
+
+Do NOT use logo presence as a trust signal.
+
+The implementation should make future logo providers possible without changing the Assets UI contract.
+
+==================================================
+10. EMPTY STATE
+==================================================
+
+If there are no visible assets:
+
+Show a polished empty state.
+
+Explain that assets will appear when available.
+
+Do not invent balances.
+
+Do not show fake demo tokens in production/native mode.
+
+Preview Test Mode may continue using its existing fixed public development display model where already supported.
+
+==================================================
+11. UNAVAILABLE STATE
+==================================================
+
+If blockchain data is unavailable:
+
+Show an honest unavailable state.
+
+Do NOT display:
+
+0.00
+
+as a substitute for unavailable blockchain data.
+
+Do not imply the wallet has zero assets when the actual state is unavailable.
+
+==================================================
+12. LOADING STATE
+==================================================
+
+Create a polished loading/skeleton state consistent with the attached reference.
+
+Do not use an excessive spinner-only experience.
+
+The loading state should visually resemble the final Assets screen structure.
+
+==================================================
+13. ERROR STATE
+==================================================
+
+Use sanitized application errors.
+
+Do not display:
+
+- raw RPC errors
+- stack traces
+- internal file paths
+- RPC credentials
+- private URLs
+
+Provide a clear retry/refresh affordance where appropriate.
+
+==================================================
+14. REFRESH
+==================================================
+
+Provide an explicit refresh action.
+
+Use the existing read-model/portfolio runtime.
+
+Do NOT introduce:
+
+- background polling
+- new caching
+- persistence
+- automatic retry loops
+
+Do not duplicate blockchain requests.
+
+==================================================
+15. ASSET DETAIL ENTRY POINT
+==================================================
+
+Asset rows may be tappable/clickable to prepare for a future Asset Detail screen.
+
+However:
+
+DO NOT build the full Asset Detail screen in this phase.
+
+If necessary, use a controlled placeholder such as:
+
+“Asset details coming soon.”
+
+Do not create fake transaction or price information.
+
+==================================================
+16. NAVIGATION
+==================================================
+
+Integrate Assets into the existing bottom navigation.
+
+Existing destinations:
+
+- Home
+- Assets
+- Swap
+- Activity
+- Settings
+
+Assets becomes the second fully implemented destination.
+
+Home remains functional.
+
+Other destinations remain controlled placeholders.
+
+Do not redesign their functionality in this phase.
+
+==================================================
+17. HOME → ASSETS
+==================================================
+
+The Home screen's:
+
+“View All”
+
+or equivalent asset navigation should open the real Assets screen.
+
+The Assets screen must use the same underlying portfolio/read-model architecture.
+
+Do not create separate asset data for Home and Assets.
+
+Both should consume the same source of truth.
+
+==================================================
+18. NETWORK CONTEXT
+==================================================
+
+Assets are always scoped to:
+
+account + network.
+
+Do not merge assets from multiple networks.
+
+Do not silently switch networks.
+
+If the active network is:
+
+unconfigured
+or
+unavailable
+
+display the appropriate existing state.
+
+Do not invent PrimeWave Mainnet configuration.
+
+==================================================
+19. ACCOUNT CONTEXT
+==================================================
+
+Assets must remain scoped to the authenticated/public account context.
+
+Do not display another account's assets.
+
+Do not implement account switching in this phase.
+
+Do not implement account import or creation.
+
+==================================================
+20. RESPONSIVE MOBILE DESIGN
+==================================================
+
+Primary target:
+
+390 × 844
+
+Also validate:
+
+402 × 874
+
+and common Android dimensions.
+
+Use Safe Area handling.
+
+Ensure:
+
+- search field is usable
+- filter controls fit
+- asset rows remain readable
+- bottom navigation does not overlap content
+- long token names do not break layout
+- long symbols do not break layout
+- large balances remain readable
+- accessibility text scales reasonably
+
+==================================================
+21. VISUAL DETAILS
+==================================================
+
+Follow the attached reference for:
+
+- dark futuristic background
+- cyan/blue/violet accent treatment
+- premium asset cards
+- subtle gradients
+- restrained glow
+- clean iconography
+- thin borders
+- rounded surfaces
+- clear typography
+- polished spacing
+- modern wallet navigation
+
+Use existing centralized theme tokens wherever possible.
+
+If a visual token does not exist, extend the centralized theme rather than creating one-off colors inside components.
+
+Do NOT use excessive neon.
+
+Do NOT add random gradients to every element.
+
+Do NOT create unrelated visual styles.
+
+==================================================
+22. ACCESSIBILITY
+==================================================
+
+Add:
+
+- accessibility labels
+- meaningful button names
+- accessible touch targets
+- readable contrast
+- screen-reader-friendly asset descriptions
+
+Do not rely solely on color to communicate:
+
+- verification
+- availability
+- errors
+- selection
+
+==================================================
+23. SECURITY BOUNDARY
+==================================================
+
+The Assets UI MUST NOT access:
+
+- mnemonic
+- seed phrase
+- private key
+- PIN
+- SecureStore
+- SecureVault
+- Keychain
+- Keystore
+- WalletAuthenticator
+- LocalWalletEngine secret APIs
+- signing capabilities
+- transaction authorization secrets
+
+Only public/read-model information may be rendered.
+
+Do not log secrets.
+
+==================================================
+24. NO FINANCIAL DATA
+==================================================
+
+DO NOT add:
+
+- token prices
+- USD values
+- INR values
+- portfolio fiat totals
+- price charts
+- market cap
+- external market data
+
+We will implement price architecture separately.
+
+==================================================
+25. NO TRANSACTION FUNCTIONALITY
+==================================================
+
+Do NOT implement:
+
+- token transfer
+- approval
+- permit
+- Send
+- transaction construction
+- signing
+- broadcasting
+
+Asset rows are display/navigation only.
+
+==================================================
+26. NO EXTERNAL SERVICES
+==================================================
+
+Do NOT add:
+
+- CoinGecko
+- CoinMarketCap
+- DexScreener
+- external token lists
+- external logo providers
+- backend APIs
+- analytics
+- push notifications
+
+==================================================
+27. PREVIEW TEST MODE
+==================================================
+
+Preserve the existing Preview Test Mode.
+
+Verify:
+
+Preview onboarding
+    ↓
+PIN
+    ↓
+WaveX Home
+    ↓
+Assets
+
+Preview mode must continue to avoid:
+
+- SecureStore
+- WalletAccessManager
+- WalletAuthenticator
+- LocalWalletEngine secret APIs
+- native biometrics
+- signing
+- broadcasting
+- backend
+
+Do not modify the native security path.
+
+==================================================
+28. TESTING
+==================================================
+
+Add focused tests for:
+
+1. Assets screen renders.
+2. Assets uses PortfolioReadModel.
+3. No direct RPC calls from Assets UI.
+4. Search by asset name.
+5. Search by symbol.
+6. Search by contract address where applicable.
+7. Case-insensitive search.
+8. All filter.
+9. Visible filter.
+10. Hidden filter.
+11. Positive balance.
+12. Zero balance.
+13. Unavailable balance.
+14. Stale state.
+15. Invalid state.
+16. Metadata states.
+17. Verification states.
+18. Verification is not inferred.
+19. Icon fallback.
+20. Native asset rendering.
+21. ERC-20 rendering.
+22. Empty state.
+23. Unavailable state.
+24. Error state.
+25. Refresh behavior.
+26. Home → Assets navigation.
+27. Asset row controlled detail placeholder.
+28. Account isolation.
+29. Network isolation.
+30. No fiat/pricing data.
+31. No secret access.
+32. Preview Test Mode Assets navigation.
+33. Long token names.
+34. Large balance formatting.
+35. Accessibility labels.
+
+Avoid brittle screenshot-only tests.
+
+==================================================
+29. SECURITY REGRESSION SEARCH
+==================================================
+
+Search all newly created/modified Assets UI code for accidental references to:
+
+- privateKey
+- mnemonic
+- seed
+- PIN
+- SecureStore
+- SecureVault
+- WalletAuthenticator
+- signing
+- authorization secrets
+
+Any such access must be removed unless it is purely explanatory documentation text.
+
+==================================================
+30. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+
+Document:
+
+WaveX Home
+    ↓
+Assets
+    ↓
+PortfolioReadModelService
+    ↓
+PortfolioAssetViewModel
+
+Document that Home and Assets consume the same read-model source.
+
+Update:
+
+docs/SECURITY_ARCHITECTURE.md
+
+Document that Assets UI:
+
+- receives public/read-only asset information
+- has no secret access
+- has no signing authority
+- has no transaction broadcast authority
+- does not determine token trust
+
+Update:
+
+docs/DEVELOPMENT_STATE.md
+
+Record:
+
+- Phase 4.2 implemented
+- Assets screen
+- search
+- visibility filters
+- asset states
+- read-model integration
+- visual reference used
+- tests
+- validation
+- deferred functionality
+
+==================================================
+31. QUALITY GATE
+==================================================
+
+Before reporting completion, run:
+
+- Phase 4.2 focused tests
+- full existing test suite
+- TypeScript
+- git diff --check
+- Expo/Metro validation
+- web bundle validation
+
+Then manually test the running Web Preview:
+
+1. Open Preview.
+2. Create/restore Preview Test Mode wallet as applicable.
+3. Enter correct PIN.
+4. Confirm WaveX Home appears.
+5. Open Assets.
+6. Confirm Assets screen matches the attached visual direction.
+7. Confirm search works.
+8. Confirm All/Visible/Hidden filters work.
+9. Confirm unavailable state remains honest.
+10. Return Home.
+11. Open Assets again.
+12. Lock.
+13. Unlock.
+14. Confirm Assets remains accessible after unlocking.
+15. Test wrong PIN.
+16. Confirm wrong PIN remains locked.
+
+Do not claim native biometric testing.
+
+==================================================
+32. SCOPE CONTROL
+==================================================
+
+DO NOT implement in Phase 4.2:
+
+- Send
+- Receive
+- QR scanning
+- QR generation
+- token transfers
+- approvals
+- transaction history
+- Swap logic
+- DApps
+- WalletConnect
+- price feeds
+- fiat values
+- external token lists
+- external logo APIs
+- external verification providers
+- backend services
+- account switching
+- account import
+- account creation
+- network switching
+- biometric changes
+- cloud backup
+
+Those remain future controlled phases.
+
+==================================================
+FINAL REPORT
+==================================================
+
+Report:
+
+1. Files created/changed
+2. Assets screen architecture
+3. Attached visual reference implementation
+4. PortfolioReadModel integration
+5. Search implementation
+6. Visibility filters
+7. Asset states
+8. Native/ERC-20 rendering
+9. Icon/logo fallback
+10. Account/network isolation
+11. Loading/empty/unavailable/error states
+12. Navigation integration
+13. Preview Test Mode behavior
+14. Security boundary
+15. Tests and results
+16. TypeScript result
+17. Expo/Metro result
+18. Web bundle result
+19. Manual Web Preview verification
+20. Warnings
+21. Deferred functionality
+
+Do not make architectural changes outside Phase 4.2.

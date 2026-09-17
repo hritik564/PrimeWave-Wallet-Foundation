@@ -1,0 +1,628 @@
+PHASE 4.6 — WAVEX TRANSACTION REVIEW & PRE-SEND SAFETY SCREEN
+
+We have completed and approved:
+- Phase 4.1 Wallet Home Shell
+- Phase 4.2 Assets Screen
+- Phase 4.3 Account & Network Experience
+- Phase 4.4 Receive & QR Experience
+- Phase 4.5 Send Screen & Public Recipient Experience
+
+Current verified state:
+- Full test suite: 180/180 passing
+- TypeScript passing
+- Expo/Metro workflow passing
+- Static iOS and Android Expo bundle checks passing
+- Preview Test Mode working
+- Wallet remains strictly non-custodial
+- Phase 2.4 Gas/Fee Engine exists and is read-only
+- Phase 2.5 Transaction Construction exists and is UI-independent
+- Phase 2.6 Secure Local Signing exists
+- Phase 2.7 Broadcasting exists
+- Signing and broadcasting MUST NOT be invoked by this phase
+
+OBJECTIVE
+
+Implement the WAVEX Transaction Review screen.
+
+The user flow should now be:
+
+Send
+  ↓
+Review Transaction
+  ↓
+Transaction Review Screen
+  ↓
+Explicit user confirmation
+  ↓
+Return a review/confirmation result to the caller
+  ↓
+STOP
+
+This phase may use:
+- Phase 2.4 Gas/Fee Engine
+- Phase 2.5 Transaction Construction
+
+This phase must NOT use:
+- Phase 2.6 signing
+- Phase 2.7 broadcasting
+
+The review screen is a safety checkpoint, not an execution screen.
+
+==================================================
+1. NEW FILES / STRUCTURE
+==================================================
+
+Create an appropriately isolated review module, for example:
+
+src/components/TransactionReviewScreen.tsx
+src/components/TransactionReviewScreen.logic.ts
+src/components/tests/transaction-review-screen.test.ts
+
+If a better existing architecture location is clearly appropriate, keep the same separation of UI and logic.
+
+Do not duplicate transaction-engine logic.
+
+==================================================
+2. INPUT
+==================================================
+
+The review screen must consume the public-only draft produced by Phase 4.5.
+
+Expected public draft information:
+
+- accountId
+- sender public address
+- networkId
+- selected asset identity
+- recipient
+- amount
+- optional token contract address
+
+Do not expand this public draft with secrets.
+
+Do not accept:
+- mnemonic
+- private key
+- PIN
+- biometric credentials
+- signing capability
+- SecureStore values
+- encryption keys
+
+==================================================
+3. NETWORK VALIDATION
+==================================================
+
+Before constructing anything:
+
+Validate that:
+
+- the network still exists
+- network is enabled
+- network is configured
+- selected network remains the active network
+- network identity has not changed
+- remote chain ID matches the configured chain ID
+
+If any of these fail:
+
+- do not construct
+- do not estimate gas
+- do not proceed
+- show a controlled network error
+- require returning to Send
+
+Never silently switch networks.
+
+PrimeWave placeholder/unconfigured network must remain unavailable until real configuration exists.
+
+==================================================
+4. ASSET VALIDATION
+==================================================
+
+Validate the asset identity against the current network.
+
+For native asset:
+
+- use the network's authoritative native currency metadata
+
+For ERC-20:
+
+- use network-scoped contract address
+- reuse existing token metadata/read architecture
+- do not infer trust from symbol/name/decimals
+- verification status remains independent
+
+Never allow:
+
+token from Network A
+to become
+token on Network B
+
+Contract address + network remains authoritative identity.
+
+==================================================
+5. TRANSACTION CONSTRUCTION
+==================================================
+
+Use the existing Phase 2.5 Transaction Construction service.
+
+Do NOT duplicate transaction construction logic inside the UI.
+
+For native asset:
+
+construct a native transfer intent.
+
+For ERC-20:
+
+construct the appropriate ERC-20 transfer contract call.
+
+Use the existing exact amount parsing.
+
+The transaction construction layer should remain authoritative for:
+
+- normalized amount
+- recipient
+- calldata
+- nonce
+- gas
+- fee model
+- chain ID
+- transaction type
+
+Do not introduce hidden gas padding or fee multipliers.
+
+==================================================
+6. GAS / FEE ESTIMATION
+==================================================
+
+Use the existing Phase 2.4 Gas/Fee Engine.
+
+Show the user the actual fee model returned by the engine:
+
+- EIP-1559
+OR
+- Legacy
+
+Do not silently represent one as the other.
+
+Display, where available:
+
+- gas limit
+- fee per gas
+- estimated network fee
+- maximum network fee where applicable
+- native currency symbol
+
+Use bigint/exact arithmetic.
+
+Never use floating-point arithmetic for blockchain amounts or fees.
+
+If EIP-1559 is unavailable and the existing engine falls back to Legacy, clearly identify that the transaction is using Legacy fees.
+
+Do not add:
+- hidden buffer
+- hidden multiplier
+- hidden markup
+- priority-fee manipulation
+- automatic fee bumping
+
+==================================================
+7. REVIEW SCREEN UI
+==================================================
+
+Use the existing WAVEX visual language and attached reference.
+
+Dark futuristic interface.
+
+Premium rounded cards.
+
+Cyan/electric-blue/violet accents.
+
+Restrained glow.
+
+Clear hierarchy.
+
+The screen should feel like a serious security checkpoint.
+
+Suggested structure:
+
+HEADER
+
+- Back
+- "Review Transaction"
+
+NETWORK CARD
+
+- Network name
+- chain ID where useful
+- configured status
+- native currency
+
+FROM
+
+- account label/index
+- shortened sender address
+- ability to view/copy public address if already supported
+
+TO
+
+- shortened recipient
+- full address accessible
+- copy action
+- NO "trusted" or "safe" claim
+
+ASSET / AMOUNT
+
+- asset icon
+- asset name
+- symbol
+- exact amount
+- token contract address for ERC-20 where appropriate
+
+FEE
+
+- fee model: EIP-1559 / Legacy
+- gas limit
+- estimated network fee
+- maximum network fee if available
+- native currency
+
+TOTAL
+
+For native transfer:
+- transfer amount
+- network fee
+- maximum total required
+
+For ERC-20:
+- token amount
+- network fee in native currency
+
+Do not misleadingly add token amount + native gas fee as though they are the same currency.
+
+WARNINGS
+
+Show relevant warnings such as:
+
+- Network mismatch
+- Insufficient native gas balance
+- Insufficient token balance
+- Fee estimation unavailable
+- Fee model fallback
+- Unverified token where applicable
+- Recipient is syntactically valid but has not been independently verified
+
+Do not call an address safe/unsafe based only on syntax.
+
+Do not call a token a scam/malicious token without trusted evidence.
+
+==================================================
+8. EXPLICIT USER CONFIRMATION
+==================================================
+
+Add a clear final action:
+
+"Confirm Transaction"
+
+However:
+
+IMPORTANT:
+Pressing Confirm Transaction in Phase 4.6 MUST NOT:
+
+- access private keys
+- access mnemonic
+- unlock wallet
+- request PIN
+- request biometrics
+- create signing capability
+- sign
+- broadcast
+- send RPC mutation
+- call eth_sendRawTransaction
+
+Instead:
+
+- validate that the reviewed transaction still matches the original public draft
+- return an explicit public confirmation result/state
+- transition to a controlled placeholder indicating:
+
+"Transaction confirmed for signing"
+
+or equivalent.
+
+The next phase will connect this confirmation checkpoint to secure local authorization/signing.
+
+==================================================
+9. STALE / CHANGED STATE PROTECTION
+==================================================
+
+A transaction review must never blindly survive a changed blockchain context.
+
+Before confirmation, verify that the review context still matches:
+
+- account
+- sender
+- network
+- chain ID
+- recipient
+- asset identity
+- amount
+- fee model
+- constructed transaction identity
+
+If relevant state changed:
+
+- invalidate the review
+- show a clear message
+- require returning/reviewing again
+
+Do not silently rebuild and continue without making the user aware.
+
+==================================================
+10. BALANCE SAFETY
+==================================================
+
+Ensure the review screen does not approve a transaction that obviously exceeds available balance.
+
+For native transfers:
+
+available native balance must account for the required network fee.
+
+The user must not be presented with a misleading "sufficient balance" state if:
+
+transfer amount + required maximum fee > native balance.
+
+For ERC-20:
+
+validate token balance for the transfer amount.
+
+Also validate that the native balance can cover the network fee.
+
+Do not use stale UI values if the transaction engine has authoritative current reads available.
+
+If current state cannot be established, show an unavailable/unknown state rather than claiming sufficient funds.
+
+==================================================
+11. NO SILENT RETRIES / NO HIDDEN MUTATION
+==================================================
+
+Review may perform read-only RPC operations required by existing Phase 2.4 / 2.5 architecture.
+
+It must not:
+
+- send transactions
+- mutate blockchain state
+- retry broadcasts
+- create replacement transactions
+- bump fees
+- speed up
+- cancel
+
+==================================================
+12. SECURITY BOUNDARY
+==================================================
+
+Allowed:
+
+- public wallet address
+- account metadata
+- selected network
+- token metadata
+- public balances
+- fee data
+- transaction intent
+- unsigned transaction data
+
+Forbidden in this phase:
+
+- mnemonic
+- private key
+- SecureStore secret values
+- encryption keys
+- PIN
+- biometric credential
+- signing capability
+- LocalSigner
+- TransactionSigningFlow
+- TransactionBroadcastEngine
+
+The review screen may consume the unsigned transaction produced by Phase 2.5.
+
+It must never expose secret material.
+
+==================================================
+13. PREVIEW TEST MODE
+==================================================
+
+Preview Test Mode must remain completely isolated.
+
+Do not invoke:
+
+- SecureStore
+- SecureVault
+- LocalWalletEngine secret APIs
+- biometrics
+- signing
+- broadcasting
+- backend
+
+If the Preview network is not configured for real RPC:
+
+show a controlled fee/network unavailable state.
+
+Do NOT fabricate a real gas estimate and present it as blockchain data.
+
+The preview may still demonstrate the visual review flow using clearly identified development/test data if necessary, but do not confuse simulated values with live network values.
+
+==================================================
+14. ERROR STATES
+==================================================
+
+Handle:
+
+- network unavailable
+- network changed
+- chain ID mismatch
+- asset mismatch
+- invalid recipient
+- invalid amount
+- insufficient token balance
+- insufficient native balance
+- fee estimation unavailable
+- transaction construction failure
+- stale review
+- unsupported transaction state
+
+Errors must be sanitized.
+
+Never expose:
+- RPC URLs
+- credentials
+- raw stack traces
+- internal secrets
+
+==================================================
+15. ACCESSIBILITY
+==================================================
+
+Ensure:
+
+- accessible labels
+- sufficient contrast
+- touch targets
+- readable addresses
+- clear amount typography
+- warnings are associated with their relevant sections
+- primary confirmation action remains visible when keyboard is closed
+
+==================================================
+16. TESTS
+==================================================
+
+Add focused tests covering at minimum:
+
+- public draft input
+- network validation
+- configured/unconfigured network
+- chain ID mismatch
+- asset/network isolation
+- native asset review
+- ERC-20 asset review
+- transaction construction delegation
+- fee engine delegation
+- EIP-1559 display
+- Legacy display
+- fee fallback display
+- exact amount handling
+- insufficient native balance
+- insufficient token balance
+- unavailable balance
+- network fee display
+- maximum total calculation
+- ERC-20 fee currency distinction
+- unverified token warning
+- recipient verification wording
+- stale review invalidation
+- recipient mutation detection
+- amount mutation detection
+- asset mutation detection
+- network mutation detection
+- Confirm Transaction gating
+- confirm does not sign
+- confirm does not broadcast
+- no SecureStore access
+- no secret APIs
+- Preview isolation
+- sanitized errors
+
+Run the complete existing test suite.
+
+==================================================
+17. DOCUMENTATION
+==================================================
+
+Update:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- src/core/transactions/README.md
+
+Document clearly:
+
+Phase 4.6 is the transaction review and safety checkpoint.
+
+It may construct an unsigned transaction and perform read-only fee/balance operations.
+
+It does NOT:
+- sign
+- authenticate
+- unlock
+- broadcast
+- mutate blockchain state
+
+Phase 4.7 will be responsible for connecting explicit review confirmation to secure local signing authorization.
+
+==================================================
+18. VERIFICATION
+==================================================
+
+Run:
+
+- TypeScript
+- full test suite
+- git diff --check
+- Expo/Metro
+- static iOS bundle/manifest build
+- static Android bundle/manifest build
+- security regression search
+
+Preview verification:
+
+- 390x844
+- 402x874
+
+Manually verify:
+
+1. Home
+2. Send
+3. select asset
+4. recipient
+5. amount
+6. Review Transaction
+7. Review screen renders
+8. network information visible
+9. recipient visible
+10. amount visible
+11. fee section behaves honestly
+12. balance warnings behave correctly
+13. changing network invalidates review
+14. changing recipient invalidates review
+15. changing amount invalidates review
+16. Confirm Transaction produces ONLY the controlled post-review state
+17. no PIN/biometric prompt appears
+18. no signing occurs
+19. no broadcast occurs
+20. return safely to Send/Home
+
+FINAL REPORT
+
+Report:
+
+- files created/changed
+- transaction construction integration
+- fee engine integration
+- balance validation
+- stale-state protection
+- security boundary
+- test count
+- TypeScript result
+- Expo/build result
+- Preview result
+- known warnings
+- anything deferred
+
+STOP after Phase 4.6.
+
+Do not implement Phase 4.7 automatically.

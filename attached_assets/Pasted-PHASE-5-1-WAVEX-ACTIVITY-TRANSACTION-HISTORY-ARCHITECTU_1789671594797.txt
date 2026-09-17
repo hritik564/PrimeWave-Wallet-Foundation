@@ -1,0 +1,835 @@
+PHASE 5.1 — WAVEX ACTIVITY / TRANSACTION HISTORY ARCHITECTURE
+
+We have completed and approved:
+
+- Phase 4.1 Wallet Home Shell
+- Phase 4.2 Assets Screen
+- Phase 4.3 Account & Network Experience
+- Phase 4.4 Receive & QR Experience
+- Phase 4.5 Send Screen & Public Recipient Experience
+- Phase 4.6 Transaction Review & Pre-Send Safety Screen
+- Phase 4.7 Secure Local Authorization & Signing
+- Phase 4.8 Transaction Broadcast & Confirmation Lifecycle
+
+Current verified state:
+
+- Full wallet suite: 191/191 tests passing
+- TypeScript passing
+- Expo/Metro workflow passing
+- Static iOS and Android Expo bundle checks passing
+- Strictly non-custodial architecture
+- Secure local wallet/signing architecture approved
+- Transaction construction approved
+- Broadcasting/confirmation engine approved
+
+OBJECTIVE
+
+Build the foundational WAVEX Transaction Activity / History architecture.
+
+This phase is ARCHITECTURE + READ MODEL ONLY.
+
+Do NOT build the polished Activity UI yet.
+
+Do NOT build backend indexing yet.
+
+Do NOT add external blockchain indexing providers.
+
+Do NOT add price APIs.
+
+Do NOT add notifications.
+
+Do NOT add Swap.
+
+Do NOT add DApps / WalletConnect.
+
+The objective is to establish a clean, deterministic, account/network-scoped transaction history architecture that later phases can safely consume.
+
+==================================================
+1. CORE PRINCIPLE
+==================================================
+
+Transaction history must distinguish between:
+
+A. Local transaction observations
+B. Blockchain transaction observations
+C. Broadcast results
+D. Confirmation results
+
+Do not treat these as interchangeable.
+
+A transaction being signed locally does NOT mean it exists on-chain.
+
+A transaction being broadcasted does NOT mean it is confirmed.
+
+A transaction being confirmed does NOT automatically mean all token-transfer details are known.
+
+==================================================
+2. NEW MODULE
+==================================================
+
+Create a dedicated transaction history/activity core module.
+
+Suggested structure:
+
+src/core/activity/
+
+including appropriate files such as:
+
+- models.ts
+- repository.ts
+- service.ts
+- read-model.ts
+- tests/
+
+Use the existing project architecture and naming conventions if an equivalent structure already exists.
+
+Do not duplicate existing transaction/broadcast models unnecessarily.
+
+==================================================
+3. TRANSACTION IDENTITY
+==================================================
+
+Define a deterministic transaction identity.
+
+For EVM transactions, transaction hash is the primary blockchain transaction identifier once available.
+
+However, a locally created transaction may exist before a transaction hash is known.
+
+Therefore distinguish:
+
+LOCAL TRANSACTION ID
+
+from:
+
+BLOCKCHAIN TRANSACTION HASH
+
+A local transaction record may contain a generated local identifier.
+
+Once broadcast produces a transaction hash, associate the blockchain hash with that local record.
+
+Do not use timestamps alone as transaction identity.
+
+Do not use array indexes as identity.
+
+==================================================
+4. ACCOUNT + NETWORK SCOPING
+==================================================
+
+Every activity record MUST be scoped to:
+
+- accountId
+- sender address
+- networkId
+- chainId
+
+Never display a transaction from:
+
+Account A
+
+inside:
+
+Account B
+
+Never display:
+
+Ethereum transaction
+
+inside:
+
+Polygon network activity
+
+unless the record is explicitly scoped to that network.
+
+Account + network isolation must be enforced by the architecture, not merely by UI filtering.
+
+==================================================
+5. TRANSACTION RECORD MODEL
+==================================================
+
+Design a typed transaction activity model.
+
+At minimum support:
+
+- localTransactionId
+- transactionHash when known
+- accountId
+- senderAddress
+- networkId
+- chainId
+- transaction type
+- direction
+- asset identity where known
+- recipient when known
+- amount when known
+- native value where applicable
+- token contract address where applicable
+- nonce when known
+- gas limit when known
+- fee model when known
+- fee amount when known
+- createdAt
+- broadcastAt when known
+- confirmedAt when known
+- status
+- confirmation information where known
+- explorer URL information where available
+- provenance/source
+
+Use exact bigint/string representations for blockchain quantities.
+
+Never use JavaScript floating-point numbers for:
+
+- token amounts
+- native amounts
+- gas
+- fees
+- nonce where represented numerically
+- block numbers where exactness matters
+
+==================================================
+6. TRANSACTION TYPES
+==================================================
+
+The architecture should support at minimum:
+
+- native transfer
+- ERC-20 transfer
+- contract interaction
+- unknown transaction
+
+Do not pretend every contract interaction is a simple transfer.
+
+Future transaction types may include:
+
+- approval
+- swap
+- NFT transfer
+- DApp transaction
+- contract deployment
+
+But do NOT implement those features now.
+
+==================================================
+7. DIRECTION
+==================================================
+
+Support:
+
+- outgoing
+- incoming
+- self-transfer
+- unknown
+
+For locally-created transactions:
+
+direction can be known from the sender.
+
+For externally discovered transactions:
+
+direction must be determined from the account/network context.
+
+Do not infer direction solely from UI assumptions.
+
+==================================================
+8. STATUS MODEL
+==================================================
+
+Create a precise status model.
+
+At minimum:
+
+- draft
+- signed
+- broadcasting
+- broadcasted
+- confirming
+- confirmed
+- reverted
+- failed
+- unknown
+
+Be careful with terminology.
+
+Definitions:
+
+DRAFT
+Local transaction intent exists but no signed transaction exists.
+
+SIGNED
+Transaction has been signed locally but not necessarily broadcast.
+
+BROADCASTING
+Explicit broadcast operation is in progress.
+
+BROADCASTED
+Network/RPC accepted the transaction submission and transaction hash is known.
+
+CONFIRMING
+Transaction is known and confirmation is being monitored.
+
+CONFIRMED
+Transaction receipt confirms successful execution.
+
+REVERTED
+Transaction was mined but execution reverted/failed on-chain.
+
+FAILED
+A known local/RPC operation failed before a successful broadcast.
+
+UNKNOWN
+The final state cannot currently be established.
+
+Do not collapse these into "success/failure".
+
+==================================================
+9. PROVENANCE
+==================================================
+
+Every transaction observation should preserve its source/provenance.
+
+Possible provenance categories:
+
+- local_wallet
+- broadcast_engine
+- confirmation_engine
+- blockchain_read
+- external_indexer_future
+
+Do not implement an external indexer now.
+
+Do not invent provenance.
+
+This will later allow the Activity UI to distinguish:
+
+"Created by WAVEX"
+
+from:
+
+"Discovered on-chain"
+
+without making unsupported claims.
+
+==================================================
+10. REPOSITORY ABSTRACTION
+==================================================
+
+Create a repository interface for activity records.
+
+The interface should support operations such as:
+
+- add
+- upsert
+- getById
+- getByHash
+- listByAccountAndNetwork
+- updateStatus
+- remove/clear where appropriate
+
+Enforce account/network scoping inside repository/service logic.
+
+Do not make the UI responsible for filtering security-sensitive scope.
+
+==================================================
+11. PERSISTENCE DECISION
+==================================================
+
+For this phase, prefer an in-memory/session repository unless the existing architecture already has an approved persistence abstraction.
+
+DO NOT introduce AsyncStorage/localStorage for transaction history.
+
+DO NOT put transaction history into SecureStore.
+
+Transaction history is NOT secret material, but it may contain sensitive financial metadata.
+
+Document the persistence decision.
+
+A future phase may introduce an approved local database/persistence layer.
+
+Do not silently introduce cloud persistence.
+
+==================================================
+12. NO BACKEND
+==================================================
+
+This phase must not add:
+
+- backend transaction APIs
+- cloud transaction history
+- analytics submission
+- user tracking
+- external indexers
+- third-party portfolio APIs
+
+All current activity data should remain local/in-memory and/or originate from existing public blockchain reads.
+
+==================================================
+13. INTEGRATION WITH BROADCAST ENGINE
+==================================================
+
+Integrate with the existing Phase 2.7 / Phase 4.8 lifecycle carefully.
+
+When an application-level transaction is:
+
+SIGNED
+
+the activity architecture may record:
+
+SIGNED
+
+When it becomes:
+
+BROADCASTED
+
+associate the transaction hash.
+
+When confirmation occurs:
+
+update the existing record.
+
+Do not create a second broadcast engine.
+
+Do not duplicate receipt polling.
+
+The Activity architecture consumes lifecycle results from the existing transaction engine.
+
+==================================================
+14. UNKNOWN STATE
+==================================================
+
+Preserve UNKNOWN as a first-class state.
+
+Example:
+
+Broadcast request may time out after the signed transaction potentially reached the network.
+
+The activity record must NOT immediately become:
+
+FAILED
+
+if the broadcast outcome is uncertain.
+
+Instead:
+
+UNKNOWN
+
+and later reconciliation can update it.
+
+Do not automatically rebroadcast.
+
+==================================================
+15. RECONCILIATION PREPARATION
+==================================================
+
+Prepare the architecture for future reconciliation.
+
+A record should be able to associate:
+
+- localTransactionId
+- transactionHash
+- network
+- account
+- sender
+- nonce
+- status
+
+Future reconciliation can then use:
+
+- transaction hash
+- transaction lookup
+- receipt
+- blockchain reads
+
+Do NOT implement background reconciliation in this phase.
+
+Do NOT implement polling loops here.
+
+==================================================
+16. EXTERNAL TRANSACTIONS
+==================================================
+
+Prepare for a future scenario where a transaction was made outside WAVEX.
+
+Examples:
+
+- another wallet using the same address
+- a DApp
+- an exchange withdrawal
+- an incoming transfer
+
+The architecture should permit blockchain-discovered activity to be represented without requiring a local WAVEX transaction ID.
+
+For such transactions:
+
+- transactionHash may be the primary known identity
+- localTransactionId may be null/absent
+- provenance should identify blockchain discovery
+
+Do NOT implement full historical indexing now.
+
+==================================================
+17. DUPLICATE PROTECTION
+==================================================
+
+Prevent duplicate records for the same scoped transaction.
+
+For known blockchain transactions:
+
+identity should incorporate:
+
+- network
+- chain ID
+- transaction hash
+
+Do not treat the same transaction hash on different networks as the same transaction.
+
+For locally-created records before broadcast:
+
+use localTransactionId.
+
+Once a transaction hash becomes known:
+
+associate it deterministically.
+
+==================================================
+18. ORDERING
+==================================================
+
+Define deterministic activity ordering.
+
+Preferred ordering:
+
+1. confirmed/broadcast activity with known blockchain timestamp/block context
+2. pending/unconfirmed activity
+3. local-only activity
+
+Where exact blockchain time is unavailable:
+
+use known observation timestamps only as secondary ordering.
+
+Do not claim blockchain timestamp when it is not known.
+
+Document the ordering rules.
+
+==================================================
+19. PAGINATION / BOUNDS
+==================================================
+
+The activity service must be bounded.
+
+Support a read model that can later support:
+
+- limit
+- cursor/offset or equivalent deterministic pagination
+- newest-first ordering
+
+Do not load unbounded transaction history.
+
+Do not implement infinite polling.
+
+==================================================
+20. READ MODEL
+==================================================
+
+Create a UI-independent ActivityReadModel.
+
+It should provide presentation-ready public data such as:
+
+- transaction ID
+- hash
+- account
+- network
+- direction
+- asset
+- amount
+- recipient/sender
+- status
+- fee
+- timestamp/observation time
+- explorer availability
+- provenance
+
+Do not put UI components inside the core.
+
+Do not put secrets inside the read model.
+
+==================================================
+21. EXACT DATA RULES
+==================================================
+
+Amounts must preserve exact values.
+
+For example:
+
+raw blockchain amount:
+bigint/string-safe representation
+
+formatted amount:
+existing exact formatter
+
+Never:
+
+Number(rawAmount)
+
+Never:
+
+parseFloat()
+
+Never:
+
+toFixed() for blockchain quantity calculation.
+
+UI formatting may use existing exact formatting utilities.
+
+==================================================
+22. SECURITY BOUNDARY
+==================================================
+
+Activity architecture must NEVER access:
+
+- mnemonic
+- private key
+- SecureStore secret values
+- PIN
+- biometric credentials
+- signing capability
+
+Activity may access:
+
+- public wallet address
+- account metadata
+- network metadata
+- transaction public data
+- public blockchain reads
+- broadcast lifecycle results
+- confirmation lifecycle results
+
+Do not log sensitive transaction metadata unnecessarily.
+
+Do not send activity data to analytics.
+
+==================================================
+23. PREVIEW TEST MODE
+==================================================
+
+Preview Test Mode must remain isolated.
+
+Do not create fake production transaction history.
+
+If tests require transaction records:
+
+use clearly identified deterministic test fixtures.
+
+Do not create fake transaction hashes and present them as real blockchain transactions.
+
+Do not claim that Preview transactions were broadcast or confirmed.
+
+==================================================
+24. TESTS
+==================================================
+
+Add focused tests covering at minimum:
+
+MODEL
+
+- transaction identity
+- local transaction ID
+- blockchain transaction hash
+- account scoping
+- network scoping
+- chain ID
+- transaction types
+- direction
+- status
+- provenance
+
+STATUS
+
+- draft
+- signed
+- broadcasting
+- broadcasted
+- confirming
+- confirmed
+- reverted
+- failed
+- unknown
+
+REPOSITORY
+
+- add
+- upsert
+- getById
+- getByHash
+- list by account
+- list by network
+- account isolation
+- network isolation
+- duplicate prevention
+- deterministic ordering
+- bounded reads
+
+EXACT DATA
+
+- bigint amounts
+- exact fees
+- exact gas
+- exact nonce
+- no floating-point conversion
+
+BROADCAST INTEGRATION
+
+- signed record
+- broadcasted record
+- transaction hash association
+- confirmation update
+- reverted update
+- unknown state
+- no automatic rebroadcast
+
+EXTERNAL TRANSACTION PREPARATION
+
+- blockchain transaction without local ID
+- provenance handling
+- hash-based identity
+
+READ MODEL
+
+- presentation mapping
+- status mapping
+- public-only fields
+- explorer availability
+- missing metadata states
+
+SECURITY
+
+- no SecureStore
+- no mnemonic
+- no private key
+- no PIN
+- no biometric credential
+- no signing capability
+- no backend
+- no analytics
+- no secret logging
+
+PREVIEW
+
+- deterministic fixtures
+- no fake production state
+- no real broadcast
+- no fake confirmation
+
+Run the complete existing test suite.
+
+==================================================
+25. DOCUMENTATION
+==================================================
+
+Update:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- src/core/transactions/README.md
+
+Add an Activity/Transaction History architecture section explaining:
+
+- transaction identity
+- account/network scope
+- lifecycle states
+- provenance
+- local vs blockchain observations
+- UNKNOWN state
+- repository abstraction
+- read model
+- exact amount handling
+- persistence decision
+- future reconciliation
+- future external transaction discovery
+
+Explicitly document that:
+
+Phase 5.1 does NOT implement the Activity UI.
+
+Phase 5.1 does NOT implement external indexing.
+
+Phase 5.1 does NOT implement backend persistence.
+
+Phase 5.1 does NOT implement notifications.
+
+==================================================
+26. VERIFICATION
+==================================================
+
+Run:
+
+- TypeScript
+- complete test suite
+- git diff --check
+- Expo/Metro
+- static iOS bundle/manifest build
+- static Android bundle/manifest build
+- security regression inspection
+
+Inspect the diff for:
+
+- accidental SecureStore access
+- accidental secret access
+- accidental backend calls
+- accidental analytics
+- accidental direct RPC mutation
+- accidental broadcast duplication
+- floating-point blockchain arithmetic
+
+==================================================
+27. IMPORTANT SCOPE LIMIT
+==================================================
+
+STOP after Phase 5.1.
+
+Do NOT implement:
+
+- Activity UI
+- Transaction detail UI
+- external indexing
+- backend history
+- notifications
+- Swap
+- DApps
+- WalletConnect
+- replacement transactions
+- speed-up
+- cancel
+- fee bumping
+
+The next phase will build the WAVEX Activity UI on top of this architecture.
+
+==================================================
+28. FINAL REPORT
+==================================================
+
+Report:
+
+- files created/changed
+- transaction model
+- identity model
+- lifecycle states
+- repository architecture
+- read model
+- broadcast lifecycle integration
+- account/network isolation
+- provenance model
+- exact-data handling
+- persistence decision
+- reconciliation preparation
+- external transaction preparation
+- security regression results
+- test count
+- TypeScript result
+- Expo/build result
+- known warnings
+- anything deferred
+
+STOP after Phase 5.1.
+
+Do not automatically implement Phase 5.2.

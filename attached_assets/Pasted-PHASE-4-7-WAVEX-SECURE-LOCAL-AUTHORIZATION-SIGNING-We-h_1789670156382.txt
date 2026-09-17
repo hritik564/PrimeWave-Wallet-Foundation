@@ -1,0 +1,654 @@
+PHASE 4.7 — WAVEX SECURE LOCAL AUTHORIZATION & SIGNING
+
+We have completed and approved:
+
+- Phase 4.1 Wallet Home Shell
+- Phase 4.2 Assets Screen
+- Phase 4.3 Account & Network Experience
+- Phase 4.4 Receive & QR Experience
+- Phase 4.5 Send Screen & Public Recipient Experience
+- Phase 4.6 Transaction Review & Pre-Send Safety Screen
+
+Current verified state:
+
+- Full test suite: 188/188 passing
+- TypeScript passing
+- Expo/Metro workflow passing
+- Static iOS and Android Expo bundle checks passing
+- Transaction construction exists and is authoritative
+- Gas/Fee Engine exists and is authoritative
+- Secure local wallet/vault exists
+- Wallet authentication/locking exists
+- Secure local signing exists from Phase 2.6
+- Broadcasting exists from Phase 2.7
+
+IMPORTANT:
+
+This phase connects the approved transaction-review confirmation checkpoint to secure local authentication and signing.
+
+DO NOT implement broadcasting in this phase.
+
+The final output of this phase is a locally signed transaction.
+
+The signed transaction must STOP before any broadcast occurs.
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Implement the secure execution step:
+
+Review
+  ↓
+Confirm Transaction
+  ↓
+Authenticate wallet
+  ↓
+Authorize exact transaction
+  ↓
+Local signing
+  ↓
+SignedTransaction
+  ↓
+STOP
+
+There must be NO:
+
+- eth_sendRawTransaction
+- broadcasting
+- transaction submission
+- automatic retry
+- background sending
+
+==================================================
+2. USE EXISTING SECURITY ARCHITECTURE
+==================================================
+
+Do NOT create a second wallet/signing system.
+
+Reuse the existing:
+
+- WalletAuthenticator
+- SecureVault
+- LocalWalletEngine
+- TransactionSigningFlow
+- LocalSigner
+- Phase 2.6 signing authorization model
+
+Do not duplicate cryptographic logic.
+
+Do not introduce another mnemonic derivation implementation.
+
+Do not introduce another private-key storage mechanism.
+
+Do not introduce another PIN system.
+
+==================================================
+3. TRANSACTION BINDING
+==================================================
+
+The signing authorization MUST be cryptographically/structurally bound to the exact transaction reviewed by the user.
+
+Bind authorization to:
+
+- accountId
+- sender address
+- networkId
+- chainId
+- transaction type
+- recipient
+- value
+- calldata
+- nonce
+- gas limit
+- fee model
+- fee fields
+- canonical unsigned transaction digest
+
+The signing step must refuse to proceed if any of these values differ from the reviewed transaction.
+
+Do not silently rebuild a different transaction after confirmation.
+
+If reconstruction is required because of stale blockchain state:
+
+- invalidate the previous review
+- return the user to review
+- require explicit re-review
+
+==================================================
+4. AUTHENTICATION
+==================================================
+
+After the user confirms the reviewed transaction:
+
+Request wallet authentication using the existing WalletAuthenticator.
+
+Supported authentication:
+
+- existing wallet PIN
+- existing biometric authentication where supported
+
+Do NOT invent another authentication flow.
+
+The authentication must establish explicit authorization for this transaction.
+
+Authentication of the wallet alone is NOT sufficient.
+
+The resulting signing authorization must also be bound to the exact transaction digest.
+
+==================================================
+5. BIOMETRIC BEHAVIOR
+==================================================
+
+Reuse the existing biometric architecture and timeout/error handling.
+
+Remember:
+
+- Expo Go cannot fully validate native iOS Face ID behavior
+- development builds are required for native biometric testing
+
+Do not weaken the security boundary merely to make browser Preview work.
+
+If biometrics are unavailable:
+
+- use the existing PIN fallback where configured
+
+If authentication fails:
+
+- do not sign
+- do not retry silently
+- return a sanitized authentication error
+
+If the native biometric operation times out:
+
+- return a controlled authentication failure
+- never leave the UI stuck in an "unlocking" state
+
+==================================================
+6. PRE-SIGNING VALIDATION
+==================================================
+
+Before signing:
+
+Revalidate:
+
+- account
+- sender
+- network
+- active network
+- chain ID
+- recipient
+- asset identity
+- amount
+- nonce
+- gas
+- fee fields
+- canonical unsigned transaction digest
+
+The wallet must never sign a transaction different from the one explicitly reviewed.
+
+If any mismatch occurs:
+
+STOP.
+
+Require a fresh review.
+
+==================================================
+7. LOCAL SIGNING
+==================================================
+
+Use the existing Phase 2.6 LocalSigner / TransactionSigningFlow.
+
+The private key must remain entirely within the local wallet security boundary.
+
+The mnemonic/private key must NEVER:
+
+- enter React component state
+- enter UI props
+- enter navigation params
+- enter Redux/context/global state
+- enter logs
+- enter analytics
+- enter API requests
+- enter backend requests
+- enter persistent application storage outside the approved SecureVault
+- be returned to the UI
+
+The signing result should expose only public transaction information, for example:
+
+- signed raw transaction
+- transaction hash
+- sender address
+- network ID
+- chain ID
+- transaction type
+
+Do not expose the private key.
+
+==================================================
+8. SECRET LIFECYCLE
+==================================================
+
+Follow the existing best-effort secret lifecycle controls.
+
+Temporary derived-account/private-key references must be released after signing.
+
+Do not retain signing material longer than required.
+
+Do not cache signing material.
+
+Do not persist signing material.
+
+Do not put secret material into error objects.
+
+Document the existing JavaScript memory limitation honestly:
+
+JavaScript cannot guarantee cryptographic memory zeroization.
+
+Do not claim guaranteed memory wiping if the runtime cannot guarantee it.
+
+==================================================
+9. ONE-TIME SIGNING AUTHORIZATION
+==================================================
+
+The signing capability must be:
+
+- opaque
+- one-time
+- transaction-bound
+- account-bound
+- digest-bound
+
+It must not be reusable for another transaction.
+
+After successful signing:
+
+- invalidate/release the authorization capability
+
+After failed signing:
+
+- release/invalidate it where appropriate
+
+Concurrent signing attempts for the same account must be rejected according to the existing Phase 2.6 architecture.
+
+==================================================
+10. SIGNED TRANSACTION VALIDATION
+==================================================
+
+After signing:
+
+Validate the signed result using the existing Phase 2.6 validation.
+
+Verify:
+
+- transaction decodes correctly
+- sender recovery matches expected sender
+- transaction fields correspond to the authorized unsigned transaction
+- transaction hash is deterministically produced
+- signature is valid
+
+If validation fails:
+
+- do not broadcast
+- do not retry signing automatically
+- return sanitized error
+
+==================================================
+11. UI FLOW
+==================================================
+
+Create/update the transaction execution UI as appropriate.
+
+Suggested flow:
+
+Transaction Review
+      ↓
+"Confirm Transaction"
+      ↓
+Authentication screen/modal
+      ↓
+PIN or biometric
+      ↓
+"Signing Transaction…"
+      ↓
+"Transaction Signed"
+
+After successful signing:
+
+Show a controlled signed-state screen.
+
+Example information:
+
+- "Transaction Signed"
+- transaction hash
+- network
+- recipient
+- amount
+- asset
+- "Ready to Broadcast"
+
+IMPORTANT:
+
+Do NOT actually broadcast.
+
+The final CTA/state may say:
+
+"Ready to Broadcast"
+
+but there must be no broadcast action in this phase.
+
+If a button is shown, it must be a disabled/deferred action or return to the previous flow.
+
+Do not imply that funds have been sent.
+
+A signed transaction is NOT a broadcast transaction.
+
+==================================================
+12. IMPORTANT STATUS DISTINCTION
+==================================================
+
+The UI must clearly distinguish:
+
+- Reviewed
+- Confirmed for signing
+- Authenticating
+- Signing
+- Signed
+- Broadcasted
+- Confirmed on-chain
+
+This phase ends at:
+
+SIGNED
+
+Never show:
+
+- Sent
+- Broadcasted
+- Confirmed
+- Successful transfer
+
+unless an actual later broadcast/confirmation phase has occurred.
+
+==================================================
+13. SECURITY UI
+==================================================
+
+Before authentication, remind the user that:
+
+- they are authorizing a blockchain transaction
+- the recipient address should be checked carefully
+- network selection matters
+- blockchain transactions may be irreversible
+
+Do not use fear-based or sensational language.
+
+For the recipient:
+
+- display enough of the full address to allow verification
+- provide copy functionality where appropriate
+- do not label it "safe" or "trusted"
+
+==================================================
+14. PREVIEW TEST MODE
+==================================================
+
+Preview Test Mode MUST remain isolated.
+
+Browser Preview must NOT:
+
+- access SecureStore
+- access native biometrics
+- access private keys
+- access mnemonic
+- perform real signing
+- broadcast
+- call backend services
+
+However, the Preview may exercise the UI state machine with clearly labeled development/test behavior if real native signing is unavailable.
+
+Do NOT generate fake transaction hashes and present them as real blockchain transactions.
+
+If a simulated signing state is required:
+
+label it explicitly as:
+
+"Preview Test Mode — simulated signing"
+
+Never present simulated signing as a real signed transaction.
+
+==================================================
+15. NATIVE DEVICE TESTING
+==================================================
+
+Do not claim physical biometric validation from Expo Web Preview.
+
+Document that:
+
+- iOS Face ID requires a development build
+- Android biometric behavior requires appropriate native testing
+- native SecureStore behavior requires a development/native build
+
+Keep automated tests independent from physical hardware.
+
+==================================================
+16. NO BROADCASTING
+==================================================
+
+This is a HARD SECURITY GATE.
+
+Phase 4.7 MUST NOT import or invoke:
+
+- TransactionBroadcastEngine
+- eth_sendRawTransaction
+- broadcast()
+- sendRawTransaction()
+- transaction submission APIs
+
+Do not add broadcast as a hidden follow-up.
+
+Do not automatically broadcast after signing.
+
+Do not implement:
+
+- retry broadcast
+- replacement
+- speed-up
+- cancellation
+- fee bump
+
+Those belong to Phase 4.8 or a later explicitly approved phase.
+
+==================================================
+17. SECURITY REGRESSION SEARCH
+==================================================
+
+Before completion, inspect the implementation for:
+
+- mnemonic references
+- private key references
+- secret logging
+- SecureStore misuse
+- backend requests
+- analytics calls
+- broadcast calls
+- eth_sendRawTransaction
+- accidental signing from UI initialization
+- automatic signing
+- automatic broadcasting
+
+Confirm that signing occurs ONLY after:
+
+1. explicit user confirmation
+2. successful wallet authentication
+3. transaction-bound signing authorization
+4. exact transaction validation
+
+==================================================
+18. TESTS
+==================================================
+
+Add focused tests covering at minimum:
+
+AUTHENTICATION
+
+- PIN authentication
+- biometric authentication boundary
+- authentication failure
+- biometric timeout
+- PIN fallback
+- no stuck authentication state
+
+TRANSACTION BINDING
+
+- account binding
+- sender binding
+- network binding
+- chain ID binding
+- recipient binding
+- amount binding
+- asset binding
+- nonce binding
+- gas binding
+- fee binding
+- canonical digest binding
+
+SIGNING
+
+- successful local signing
+- sender recovery
+- signature validation
+- signed transaction hash
+- malformed signed result
+- signing failure
+- concurrent signing rejection
+- authorization is one-time
+- authorization cannot be reused
+- secret material absent from public results
+
+SECURITY
+
+- no mnemonic in UI
+- no private key in UI
+- no mnemonic in navigation
+- no private key in navigation
+- no secret logging
+- no backend request
+- no SecureStore misuse
+- no broadcast import
+- no eth_sendRawTransaction
+- no TransactionBroadcastEngine
+
+STATE
+
+- review confirmed
+- authenticating
+- signing
+- signed
+- signed ≠ broadcasted
+- no false "sent" state
+- stale transaction rejection
+- network change rejection
+- account change rejection
+
+PREVIEW
+
+- Preview Test Mode isolation
+- no native SecureStore
+- no real signing
+- no broadcast
+- simulated behavior explicitly labeled
+
+Run the entire test suite and ensure all existing tests continue passing.
+
+==================================================
+19. DOCUMENTATION
+==================================================
+
+Update:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- src/core/transactions/README.md
+
+Document:
+
+Phase 4.7 connects explicit transaction review confirmation to secure local authentication and signing.
+
+The resulting transaction is SIGNED but NOT BROADCAST.
+
+Document the exact security boundary.
+
+Document native-device biometric testing requirements.
+
+Document that signed does not mean broadcasted or confirmed on-chain.
+
+==================================================
+20. VERIFICATION
+==================================================
+
+Run:
+
+- TypeScript
+- full test suite
+- git diff --check
+- Expo/Metro
+- static iOS bundle/manifest build
+- static Android bundle/manifest build
+- security regression inspection
+
+Preview:
+
+- 390x844
+- 402x874
+
+Manual flow where environment permits:
+
+1. Open Home
+2. Send
+3. select asset
+4. enter recipient
+5. enter amount
+6. Review Transaction
+7. Confirm Transaction
+8. authentication state appears
+9. Preview mode must NOT access real secrets
+10. verify no broadcast
+11. verify signed/broadcast distinction
+12. verify return navigation
+13. verify network-change invalidation
+14. verify stale transaction protection
+
+If real native signing cannot be exercised in Preview:
+
+DO NOT fake it.
+
+Document the limitation and rely on focused architecture/unit tests.
+
+==================================================
+21. FINAL REPORT
+==================================================
+
+Report:
+
+- files created/changed
+- authentication integration
+- signing integration
+- transaction-binding mechanism
+- secret lifecycle
+- signed transaction validation
+- security regression results
+- test count
+- TypeScript result
+- Expo/build result
+- Preview result
+- native testing limitations
+- known warnings
+- anything deferred
+
+STOP after Phase 4.7.
+
+DO NOT implement broadcasting.
+
+DO NOT implement Phase 4.8 automatically.

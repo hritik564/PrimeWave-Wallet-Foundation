@@ -447,6 +447,10 @@ export class NetworkRegistry {
     return this.networks.filter((network) => network.enabled);
   }
 
+  listNetworks(): readonly EvmNetwork[] {
+    return this.networks;
+  }
+
   getById(id: string): EvmNetwork | undefined {
     return this.networks.find((network) => network.id === id);
   }

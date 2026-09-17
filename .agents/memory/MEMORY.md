@@ -10,3 +10,6 @@
 - [ERC-20 read boundary](erc20-read-boundary.md) — token identity is network plus contract address; metadata is untrusted and reads stay strictly read-only.
 - [Token discovery boundary](token-discovery-boundary.md) — discovery is bounded Transfer-log observation or explicit user intent; provenance never implies verification, and public preferences stay separate from SecureStore.
 - [Expo workflow DevTools warning](expo-workflow-devtools-warning.md) — missing system glib may prevent React Native DevTools installation while Metro and the web bundle still run normally.
+- [Workspace package installs](workspace-package-installs.md) — in this pnpm monorepo, target mobile dependencies with the workspace filter rather than the root package helper.
+- [Expo static build port](expo-static-build-port.md) — the static Expo build script assumes port 8081, so stop competing Metro workflows before running it and restart them afterward.
+- [Expo preview timing](expo-preview-timing.md) — retry screenshots after Metro emits the web bundle if the first post-restart capture is blank.

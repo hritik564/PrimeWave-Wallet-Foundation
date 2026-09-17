@@ -9,6 +9,13 @@ import {
 import { LocalWalletEngine } from '@/src/core/wallet/local-wallet-engine';
 import type { WalletSetupResult } from '@/src/core/wallet/contracts';
 import type { Wallet } from '@/src/core/wallet/models';
+import type { NetworkRegistry } from '@/src/core/networks/registry';
+import {
+  TransactionSigningEngine,
+  type SignedTransaction,
+  type TransactionSigningAuthorization,
+} from '@/src/core/transactions/signing';
+import type { UnsignedTransaction } from '@/src/core/transactions/construction';
 
 export type WalletAccessStatus =
   | 'loading'
@@ -156,6 +163,22 @@ export class WalletAccessManager {
 
   async getBiometricAvailability(): Promise<BiometricAvailability> {
     return this.authenticator.determineBiometricAvailability();
+  }
+
+  async signTransaction(
+    registry: NetworkRegistry,
+    transaction: UnsignedTransaction,
+    authorization: TransactionSigningAuthorization,
+  ): Promise<SignedTransaction> {
+    if (this.status !== 'unlocked' || !this.currentWallet) {
+      throw new Error('Wallet authentication is required before signing.');
+    }
+
+    const signingEngine = new TransactionSigningEngine(registry, this.engine, {
+      authenticator: this.authenticator,
+      accounts: this.currentWallet.accounts,
+    });
+    return signingEngine.sign(transaction, authorization);
   }
 
   async revealRecoveryPhrase(currentPin: string): Promise<string> {

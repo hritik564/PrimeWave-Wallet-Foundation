@@ -2,13 +2,33 @@ import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/src/theme';
+import {
+  WalletHomeShell,
+  type NetworkSelectionResult,
+} from '@/src/components/WalletHomeShell';
 import {
   isPreviewTestModeAvailable,
   PreviewTestMode,
 } from '@/src/core/development';
+import {
+  createAppPortfolioReadModelService,
+} from '@/src/core/portfolio';
+import {
+  defaultNetworkRegistry,
+  NetworkRegistryError,
+} from '@/src/core/networks';
+import type { EvmNetwork } from '@/src/core/networks';
+import { createEvmRpcProvider } from '@/src/core/blockchain/rpc';
+import { createTransactionConstructionEngine } from '@/src/core/transactions/construction';
+import { TransactionBroadcastEngine } from '@/src/core/transactions/broadcast';
+import type {
+  TransactionBroadcastDependency,
+  TransactionConstructionDependency,
+  TransactionSigningDependency,
+} from '@/src/components/TransactionReviewScreen.logic';
 import {
   AuthenticationError,
   getWalletAccessManager,
@@ -46,6 +66,15 @@ function safeMessage(error: unknown): string {
     return error.message;
   }
   return sanitizeError(error).message;
+}
+
+function safeNetworkSelectionMessage(error: unknown): string {
+  if (error instanceof NetworkRegistryError) {
+    if (error.code === 'NETWORK_NOT_CONFIGURED') return 'Network not configured yet.';
+    if (error.code === 'NETWORK_DISABLED') return 'This network is currently disabled.';
+    if (error.code === 'NETWORK_NOT_FOUND') return 'That network is no longer registered.';
+  }
+  return 'This network could not be selected.';
 }
 
 function shortAddress(address: string): string {
@@ -136,7 +165,7 @@ function Header({ onBack }: { onBack?: () => void }) {
           <Image source={iconSource} style={styles.brandIcon} />
         </View>
         <View>
-          <Text style={styles.brandName}>PRIMEWAVE</Text>
+          <Text style={styles.brandName}>WAVEX</Text>
           <Text style={styles.brandProduct}>WALLET</Text>
         </View>
       </View>
@@ -224,7 +253,7 @@ function Welcome({
         <Text style={styles.body}>
           {previewMode
             ? 'This web preview uses a simulated public test identity for UI testing. It is not a real wallet and cannot sign transactions.'
-            : 'PrimeWave Wallet gives you a private, device-local foundation for managing your own recovery material.'}
+            : 'WAVEX gives you a private, device-local foundation for managing your own recovery material.'}
         </Text>
       </View>
       {previewMode ? (
@@ -248,7 +277,7 @@ function Welcome({
         <AppButton icon="add" label={previewMode ? 'Create test wallet' : 'Create new wallet'} onPress={onCreate} />
         {!previewMode ? <AppButton icon="download-outline" label="Import existing wallet" onPress={onImport} secondary /> : null}
       </View>
-      <Text style={styles.footerNote}>{previewMode ? 'Public test identity only • excluded from production builds' : 'PrimeWave cannot recover a lost recovery phrase.'}</Text>
+       <Text style={styles.footerNote}>{previewMode ? 'Public test identity only • excluded from production builds' : 'WAVEX cannot recover a lost recovery phrase.'}</Text>
     </Screen>
   );
 }
@@ -424,7 +453,7 @@ function Locked({ biometricEnabled, previewMode = false, onUnlock, onBiometric, 
     <Screen>
       <View style={styles.lockHero}>
         <View style={styles.lockIcon}><Ionicons name="lock-closed-outline" size={34} color={theme.colors.accent} /></View>
-        <Text style={styles.eyebrow}>PRIMEWAVE WALLET</Text>
+         <Text style={styles.eyebrow}>WAVEX WALLET</Text>
         <Text style={styles.title}>Wallet locked</Text>
         <Text style={styles.body}>{previewMode ? 'Enter your development-only Preview Test PIN to continue. No native vault or biometric APIs are used.' : 'Authenticate to access your local wallet. Sensitive material stays hidden while locked.'}</Text>
       </View>
@@ -573,16 +602,109 @@ function Unavailable() {
       <View style={styles.loading}>
         <View style={styles.lockIcon}><Ionicons name="phone-portrait-outline" size={34} color={theme.colors.accent} /></View>
         <Text style={styles.title}>Native storage required</Text>
-        <Text style={styles.body}>PrimeWave Wallet does not use browser storage for wallet secrets. Open the native iOS or Android app with platform-secure storage and authentication enabled.</Text>
+         <Text style={styles.body}>WAVEX does not use browser storage for wallet secrets. Open the native iOS or Android app with platform-secure storage and authentication enabled.</Text>
       </View>
     </Screen>
   );
 }
 
 export default function FoundationScreen() {
-  const access = useMemo<WalletAccessManager>(() => getWalletAccessManager(), []);
-  const previewTestMode = useMemo(() => new PreviewTestMode(), []);
   const previewMode = isPreviewTestModeAvailable();
+  const access = useMemo<WalletAccessManager | null>(
+    () => (previewMode ? null : getWalletAccessManager()),
+    [previewMode],
+  );
+  const previewTestMode = useMemo(() => new PreviewTestMode(), []);
+  const portfolioReadModelService = useMemo(
+    () => createAppPortfolioReadModelService(),
+    [],
+  );
+  const createConstructionEngine = useCallback(
+    async (wallet: Wallet, networkId: string): Promise<TransactionConstructionDependency | null> => {
+      const activeNetwork = defaultNetworkRegistry.getActiveNetwork();
+      if (
+        !activeNetwork ||
+        activeNetwork.id !== networkId ||
+        activeNetwork.configurationStatus !== 'configured' ||
+        activeNetwork.chainId === null
+      ) {
+        return null;
+      }
+      try {
+        const provider = await createEvmRpcProvider(defaultNetworkRegistry);
+        return await createTransactionConstructionEngine(
+          defaultNetworkRegistry,
+          provider,
+          wallet.accounts.map((account) => ({
+            accountId: account.accountId,
+            address: account.address,
+          })),
+        );
+      } catch {
+        return null;
+      }
+    },
+    [],
+  );
+  const createSigningDependency = useCallback(
+    async (wallet: Wallet, networkId: string): Promise<TransactionSigningDependency | null> => {
+      if (previewMode || !access) return null;
+      const activeNetwork = defaultNetworkRegistry.getActiveNetwork();
+      if (
+        !activeNetwork ||
+        activeNetwork.id !== networkId ||
+        activeNetwork.configurationStatus !== 'configured' ||
+        activeNetwork.chainId === null ||
+        access.getStatus() !== 'unlocked'
+      ) {
+        return null;
+      }
+      const activeAccountId = access.getWallet().accounts[0]?.accountId;
+      if (!wallet.accounts.some((account) => account.accountId === activeAccountId)) {
+        return null;
+      }
+      return {
+        getBiometricAvailability: () => access.getBiometricAvailability(),
+        authenticateWithPin: (pin) => access.unlockWithPin(pin),
+        authenticateWithBiometrics: () => access.unlockWithBiometrics(),
+        sign: (transaction, authorization) =>
+          access.signTransaction(defaultNetworkRegistry, transaction, authorization),
+      };
+    },
+    [access, previewMode],
+  );
+  const createBroadcastDependency = useCallback(
+    async (networkId: string): Promise<TransactionBroadcastDependency | null> => {
+      if (previewMode) return null;
+      const activeNetwork = defaultNetworkRegistry.getActiveNetwork();
+      if (
+        !activeNetwork ||
+        activeNetwork.id !== networkId ||
+        activeNetwork.configurationStatus !== 'configured' ||
+        activeNetwork.chainId === null
+      ) {
+        return null;
+      }
+      try {
+        const provider = await createEvmRpcProvider(defaultNetworkRegistry);
+        const engine = new TransactionBroadcastEngine(
+          defaultNetworkRegistry,
+          provider,
+        );
+        return {
+          broadcast: (signed) => engine.broadcast(signed),
+          confirm: (broadcast) => engine.confirm(broadcast),
+          lookup: (broadcast) => engine.lookupTransaction(broadcast),
+        };
+      } catch {
+        return null;
+      }
+    },
+    [previewMode],
+  );
+  const [selectedNetwork, setSelectedNetwork] = useState<EvmNetwork>(
+    () => defaultNetworkRegistry.getPrimaryNetwork(),
+  );
   const [view, setView] = useState<ViewName>('loading');
   const [draft, setDraft] = useState<WalletSetupResult | null>(null);
   const [importedWallet, setImportedWallet] = useState<Wallet | null>(null);
@@ -611,6 +733,7 @@ export default function FoundationScreen() {
       return;
     }
     try {
+      if (!access) return;
       setSettings(await access.getAuthenticationSettings());
       setBiometricAvailability(await access.getBiometricAvailability());
     } catch (operationError) {
@@ -632,6 +755,7 @@ export default function FoundationScreen() {
         pinConfigured: previewState.pinConfigured,
       });
     } else {
+      if (!access) return;
       void access.initialize().then(async (status) => {
         if (!mounted) return;
         if (status === 'onboarding') setView('welcome');
@@ -652,6 +776,7 @@ export default function FoundationScreen() {
             setView('locked');
           }
         } else {
+          if (!access) return;
           void access.handleAppStateChange(nextState).then(() => {
             if (access.getStatus() === 'locked') setView('locked');
           });
@@ -661,7 +786,7 @@ export default function FoundationScreen() {
         void screenPrivacyController.restoreSensitiveContent();
         if (previewMode) {
           if (wasBackground && previewTestMode.getState().phase === 'locked') setView('locked');
-        } else if (wasBackground && access.getStatus() === 'locked') {
+        } else if (access && wasBackground && access.getStatus() === 'locked') {
           setView('locked');
         }
       }
@@ -680,11 +805,26 @@ export default function FoundationScreen() {
     try { await operation(); } catch (operationError) { setError(safeMessage(operationError)); }
   };
 
+  const nativeAccess = (): WalletAccessManager => {
+    if (!access) throw new Error('Native wallet access is unavailable in Preview Test Mode.');
+    return access;
+  };
+
   const currentWallet = previewMode
-    ? previewTestMode.getWallet()
-    : access.getStatus() === 'unlocked'
-      ? (() => { try { return access.getWallet(); } catch { return null; } })()
+    ? previewTestMode.getDisplayWallet()
+    : access?.getStatus() === 'unlocked'
+      ? (() => { try { return nativeAccess().getWallet(); } catch { return null; } })()
       : null;
+
+  const handleNetworkSelect = (networkId: string): NetworkSelectionResult => {
+    try {
+      const nextNetwork = defaultNetworkRegistry.selectActiveNetwork(networkId);
+      setSelectedNetwork(nextNetwork);
+      return { ok: true, network: nextNetwork };
+    } catch (selectionError) {
+      return { ok: false, message: safeNetworkSelectionMessage(selectionError) };
+    }
+  };
 
   let content: React.ReactNode;
   if (view === 'loading') content = <Loading />;
@@ -697,17 +837,17 @@ export default function FoundationScreen() {
     }
     setView('warning');
   })} onImport={() => { setError(''); setView('import'); }} />;
-  else if (view === 'warning') content = <Warning onContinue={() => void run(async () => { setDraft(await access.prepareNewWallet()); setView('phrase'); })} />;
+  else if (view === 'warning') content = <Warning onContinue={() => void run(async () => { setDraft(await nativeAccess().prepareNewWallet()); setView('phrase'); })} />;
   else if (view === 'phrase' && draft) content = <PhraseDisplay draft={draft} onContinue={() => setView('phrase-confirm')} />;
   else if (view === 'phrase-confirm' && draft) content = <PhraseConfirm draft={draft} values={confirmWords} onChange={(index, value) => setConfirmWords((current) => current.map((entry, i) => i === index ? value : entry))} onConfirm={() => void run(async () => {
     const words = draft.recoveryPhrase.split(' ');
     const matches = confirmationPositions.every((position, index) => words[position - 1] === confirmWords[index].trim().toLowerCase());
     if (!matches) { setError('The selected words do not match your backup.'); return; }
-    await access.persistPreparedWallet();
+    await nativeAccess().persistPreparedWallet();
     setDraft(null); setConfirmWords(['', '', '']); setView('pin');
   })} />;
-  else if (view === 'import') content = <ImportScreen value={importPhrase} onChange={setImportPhrase} onContinue={() => void run(async () => { const wallet = await access.prepareImportWallet(importPhrase); setImportedWallet(wallet); setImportPhrase(''); setView('import-confirm'); })} />;
-  else if (view === 'import-confirm' && importedWallet) content = <ImportConfirm wallet={importedWallet} onConfirm={() => void run(async () => { await access.persistPreparedWallet(); setImportedWallet(null); setView('pin'); })} />;
+  else if (view === 'import') content = <ImportScreen value={importPhrase} onChange={setImportPhrase} onContinue={() => void run(async () => { const wallet = await nativeAccess().prepareImportWallet(importPhrase); setImportedWallet(wallet); setImportPhrase(''); setView('import-confirm'); })} />;
+  else if (view === 'import-confirm' && importedWallet) content = <ImportConfirm wallet={importedWallet} onConfirm={() => void run(async () => { await nativeAccess().persistPreparedWallet(); setImportedWallet(null); setView('pin'); })} />;
   else if (view === 'pin') content = <PinSetup existing={!draft && !importedWallet && !previewMode} pin={pin} confirmPin={confirmPin} setPin={setPin} setConfirmPin={setConfirmPin} onContinue={() => void run(async () => {
     if (pin.length !== 6 || !/^\d{6}$/.test(pin)) { setError('Choose exactly 6 digits for your PIN.'); return; }
     if (pin !== confirmPin) { setError('PIN entries do not match.'); return; }
@@ -719,48 +859,53 @@ export default function FoundationScreen() {
       setView('wallet');
       return;
     }
-    await access.configurePin(pin);
+    await nativeAccess().configurePin(pin);
     setPinForBiometric(pin); setPin(''); setConfirmPin(''); await refreshSettings(); setView('biometric');
   })} />;
-  else if (view === 'biometric') content = <BiometricSetup availability={biometricAvailability} onEnable={() => void run(async () => { await access.enableBiometricUnlock(true, pinForBiometric); setPinForBiometric(''); await refreshSettings(); setView('wallet'); })} onSkip={() => { setPinForBiometric(''); setView('wallet'); }} />;
+  else if (view === 'biometric') content = <BiometricSetup availability={biometricAvailability} onEnable={() => void run(async () => { await nativeAccess().enableBiometricUnlock(true, pinForBiometric); setPinForBiometric(''); await refreshSettings(); setView('wallet'); })} onSkip={() => { setPinForBiometric(''); setView('wallet'); }} />;
   else if (view === 'locked') content = <Locked previewMode={previewMode} biometricEnabled={previewMode ? false : settings.biometricEnabled} onUnlock={(value) => void run(async () => {
     if (previewMode) {
-      if (!previewTestMode.verifyPreviewPin(value)) {
+      const verified = previewTestMode.verifyPreviewPin(value);
+      if (!verified) {
         setError('Preview PIN was not accepted.');
         return;
       }
       setView('wallet');
       return;
     }
-    const result = await access.unlockWithPin(value);
+    if (!access) return;
+    const result = await nativeAccess().unlockWithPin(value);
     if (!result.authenticated) { setError('Authentication failed. Try again or use your PIN fallback.'); return; }
     await refreshSettings();
     setView('wallet');
   })} onBiometric={() => void run(async () => {
     if (previewMode) return;
-    const result = await access.unlockWithBiometrics();
+    if (!access) return;
+    const result = await nativeAccess().unlockWithBiometrics();
     if (!result.authenticated) { setError(result.reason === 'cancelled' ? 'Biometric authentication was cancelled. Use your PIN.' : 'Biometric authentication was not available. Use your PIN.'); return; }
     setView('wallet');
   })} onReset={() => void run(async () => {
     if (previewMode) {
       previewTestMode.resetPreviewWallet();
     } else {
-      await access.resetLocalWallet();
+      if (!access) return;
+      await nativeAccess().resetLocalWallet();
     }
     setSettings({ biometricEnabled: false, autoLockPolicy: 0, pinConfigured: false });
     setPin('');
     setConfirmPin('');
     setView('welcome');
   })} />;
-  else if (view === 'wallet' && currentWallet) content = <WalletHome previewMode={previewMode} wallet={currentWallet} onSecurity={() => { setError(''); setView('security'); }} onLock={() => void run(async () => {
+  else if (view === 'wallet' && currentWallet) content = <WalletHomeShell createConstructionEngine={createConstructionEngine} createSigningDependency={createSigningDependency} createBroadcastDependency={createBroadcastDependency} previewMode={previewMode} wallet={currentWallet} network={selectedNetwork} networkRegistry={defaultNetworkRegistry} readModelService={portfolioReadModelService} onNetworkSelect={handleNetworkSelect} onComingSoon={(message) => setError(message)} onLock={() => void run(async () => {
     if (previewMode) {
       previewTestMode.lockPreviewWallet();
     } else {
-      await access.lockWallet();
+      if (!access) return;
+      await nativeAccess().lockWallet();
     }
     setView('locked');
   })} />;
-  else if (view === 'security') content = <Security settings={settings} biometricAvailability={biometricAvailability} securityPin={securityPin} setSecurityPin={setSecurityPin} newPin={newPin} setNewPin={setNewPin} onChangePin={() => void run(async () => { if (newPin.length !== 6 || !/^\d{6}$/.test(newPin)) { setError('Choose exactly 6 digits for your new PIN.'); return; } const result = await access.changePin(securityPin, newPin); if (!result.authenticated) { setError('Current PIN was not accepted.'); return; } setSecurityPin(''); setNewPin(''); await refreshSettings(); setError('PIN updated.'); })} onToggleBiometric={() => void run(async () => { const result = await access.enableBiometricUnlock(!settings.biometricEnabled, securityPin); if (!result.authenticated) { setError('Current PIN was not accepted.'); return; } setSecurityPin(''); await refreshSettings(); })} onAutoLock={(policy) => void run(async () => { await access.setAutoLockPolicy(policy); await refreshSettings(); if (policy === 0) setView('locked'); })} onReveal={() => void run(async () => { if (!securityPin) { setError('Enter your current PIN first.'); return; } setRevealedPhrase(await access.revealRecoveryPhrase(securityPin)); setSecurityPin(''); setView('recovery'); })} onLock={() => void run(async () => { await access.lockWallet(); setView('locked'); })} onBack={() => { setError(''); setView('wallet'); }} />;
+  else if (view === 'security') content = <Security settings={settings} biometricAvailability={biometricAvailability} securityPin={securityPin} setSecurityPin={setSecurityPin} newPin={newPin} setNewPin={setNewPin} onChangePin={() => void run(async () => { if (newPin.length !== 6 || !/^\d{6}$/.test(newPin)) { setError('Choose exactly 6 digits for your new PIN.'); return; } const result = await nativeAccess().changePin(securityPin, newPin); if (!result.authenticated) { setError('Current PIN was not accepted.'); return; } setSecurityPin(''); setNewPin(''); await refreshSettings(); setError('PIN updated.'); })} onToggleBiometric={() => void run(async () => { const result = await nativeAccess().enableBiometricUnlock(!settings.biometricEnabled, securityPin); if (!result.authenticated) { setError('Current PIN was not accepted.'); return; } setSecurityPin(''); await refreshSettings(); })} onAutoLock={(policy) => void run(async () => { await nativeAccess().setAutoLockPolicy(policy); await refreshSettings(); if (policy === 0) setView('locked'); })} onReveal={() => void run(async () => { if (!securityPin) { setError('Enter your current PIN first.'); return; } setRevealedPhrase(await nativeAccess().revealRecoveryPhrase(securityPin)); setSecurityPin(''); setView('recovery'); })} onLock={() => void run(async () => { await nativeAccess().lockWallet(); setView('locked'); })} onBack={() => { setError(''); setView('wallet'); }} />;
   else if (view === 'recovery' && revealedPhrase) content = <Recovery phrase={revealedPhrase} onClose={() => { setRevealedPhrase(''); setView('security'); }} />;
   else content = <Loading />;
 
@@ -768,7 +913,7 @@ export default function FoundationScreen() {
     <>
       {content}
       {error ? <View accessibilityRole="alert" style={styles.errorToast}><Ionicons name="alert-circle-outline" size={17} color={theme.colors.destructive} /><Text style={styles.errorText}>{error}</Text><Pressable onPress={() => setError('')}><Ionicons name="close" size={18} color={theme.colors.mutedForeground} /></Pressable></View> : null}
-      {backgrounded ? <View pointerEvents="auto" style={styles.privacyOverlay}><Ionicons name="lock-closed" size={30} color={theme.colors.accent} /><Text style={styles.privacyTitle}>PrimeWave Wallet</Text><Text style={styles.privacyBody}>Wallet content hidden</Text></View> : null}
+       {backgrounded ? <View pointerEvents="auto" style={styles.privacyOverlay}><Ionicons name="lock-closed" size={30} color={theme.colors.accent} /><Text style={styles.privacyTitle}>WAVEX</Text><Text style={styles.privacyBody}>Wallet content hidden</Text></View> : null}
     </>
   );
 }

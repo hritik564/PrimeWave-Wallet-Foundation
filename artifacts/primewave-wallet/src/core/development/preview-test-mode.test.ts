@@ -106,6 +106,7 @@ test('uses only public simulated state for create, PIN, lock, unlock, and reset'
     preview.lockPreviewWallet();
     assert.equal(preview.getState().phase, 'locked');
     assert.equal(preview.getWallet(), null);
+    assert.equal(preview.getDisplayWallet().accounts[0].address, '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266');
     assert.equal(preview.verifyPreviewPin('482913'), true);
 
     preview.resetPreviewWallet();

@@ -460,10 +460,14 @@ export class TransactionConstructionEngine {
           gasLimit,
           feeData,
         );
-        const warnings =
-          normalized.data === '0x'
+        const warnings = [
+          ...(normalized.data === '0x'
             ? []
-            : ['Contract interaction: review the transaction details carefully.'];
+            : ['Contract interaction: review the transaction details carefully.']),
+          ...(normalized.feePreference === 'auto' && feeData.model === 'legacy'
+            ? ['Legacy fee fallback: EIP-1559 fee data was unavailable.']
+            : []),
+        ];
         const common = {
           networkName: this.network.displayName,
           networkId: this.network.id,

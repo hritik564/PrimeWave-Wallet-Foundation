@@ -1,0 +1,796 @@
+PHASE 4.8 — WAVEX TRANSACTION BROADCAST & CONFIRMATION LIFECYCLE
+
+We have completed and approved:
+
+- Phase 4.1 Wallet Home Shell
+- Phase 4.2 Assets Screen
+- Phase 4.3 Account & Network Experience
+- Phase 4.4 Receive & QR Experience
+- Phase 4.5 Send Screen & Public Recipient Experience
+- Phase 4.6 Transaction Review & Pre-Send Safety Screen
+- Phase 4.7 Secure Local Authorization & Signing
+
+Current verified state:
+
+- Full wallet suite: 189/189 passing
+- TypeScript passing
+- Expo/Metro workflow passing
+- Static iOS and Android Expo builds passing
+- Phase 2.7 TransactionBroadcastEngine already exists and has been tested
+- Phase 4.7 produces a locally signed transaction
+- Phase 4.7 explicitly stops before broadcasting
+
+OBJECTIVE
+
+Connect the Phase 4.7 SignedTransaction to the existing Phase 2.7 TransactionBroadcastEngine.
+
+The final transaction flow should become:
+
+Send
+  ↓
+Review
+  ↓
+Confirm Transaction
+  ↓
+Authenticate
+  ↓
+Local Sign
+  ↓
+Signed Transaction
+  ↓
+Explicit "Broadcast Transaction"
+  ↓
+Broadcast
+  ↓
+Confirmation Monitoring
+  ↓
+Confirmed / Reverted / Unknown
+
+IMPORTANT:
+
+This phase is allowed to broadcast ONLY after an explicit user action.
+
+Signing must NEVER automatically broadcast.
+
+==================================================
+1. REUSE EXISTING BROADCAST ENGINE
+==================================================
+
+Do NOT create a second broadcasting implementation.
+
+Reuse:
+
+- TransactionBroadcastEngine
+- existing EvmRpcProvider
+- existing Phase 2.7 broadcast result/state models
+- existing confirmation logic
+
+The UI must not implement raw JSON-RPC broadcasting itself.
+
+Do not duplicate:
+
+- eth_sendRawTransaction
+- receipt polling
+- transaction lookup
+- confirmation logic
+- timeout logic
+- RPC error normalization
+
+==================================================
+2. EXPLICIT BROADCAST AUTHORIZATION
+==================================================
+
+The broadcast operation must require a clear explicit user action.
+
+The sequence must be:
+
+SIGNED
+  ↓
+User sees transaction details
+  ↓
+User presses "Broadcast Transaction"
+  ↓
+Broadcast begins
+
+Do NOT broadcast:
+
+- automatically after signing
+- automatically after authentication
+- automatically when entering the signed screen
+- automatically on app resume
+- automatically after network refresh
+- automatically after a timeout
+
+There must be no hidden broadcast path.
+
+==================================================
+3. SIGNED TRANSACTION SCREEN
+==================================================
+
+Create/update the signed transaction UI as appropriate.
+
+Display:
+
+- Transaction Signed
+- Network
+- Asset
+- Amount
+- Recipient
+- Transaction hash
+- signed status
+
+Clearly communicate:
+
+"Signed locally. Not yet broadcast."
+
+Primary CTA:
+
+"Broadcast Transaction"
+
+Secondary action:
+
+"Back" / "Cancel"
+
+Do NOT label the transaction:
+
+- Sent
+- Broadcasted
+- Confirmed
+- Successful
+
+until those states actually occur.
+
+==================================================
+4. FINAL BROADCAST CONFIRMATION
+==================================================
+
+Before the user presses Broadcast Transaction, show a concise final checkpoint.
+
+Display:
+
+- network
+- recipient
+- asset
+- amount
+- transaction hash
+
+Clearly warn that:
+
+- broadcasting submits the already-signed transaction to the selected network
+- blockchain transactions may be irreversible
+
+The user must explicitly press:
+
+"Broadcast Transaction"
+
+Do not require PIN/biometric again merely to broadcast unless the existing security architecture explicitly requires it.
+
+Phase 4.7 already authenticated and authorized the exact transaction for signing.
+
+Do not create a second unrelated authorization system.
+
+==================================================
+5. PRE-BROADCAST VALIDATION
+==================================================
+
+Before calling the broadcast engine, validate:
+
+- SignedTransaction exists
+- signed transaction is structurally valid
+- expected sender matches signed transaction
+- expected network matches signed transaction
+- expected chain ID matches signed transaction
+- transaction hash is consistent
+- current active network matches the signed transaction context
+
+If the network has changed:
+
+STOP.
+
+Do not broadcast.
+
+Show:
+
+"Network changed. Review this transaction again."
+
+If the signed transaction no longer matches its original transaction context:
+
+STOP.
+
+Do not broadcast.
+
+==================================================
+6. BROADCAST
+==================================================
+
+Call only the existing:
+
+TransactionBroadcastEngine.broadcast()
+
+The engine must ultimately use:
+
+eth_sendRawTransaction
+
+through the existing RPC abstraction.
+
+Do not:
+
+- call fetch directly from the UI
+- call RPC directly from the UI
+- duplicate JSON-RPC
+- modify raw transaction bytes
+- re-sign
+- alter gas
+- alter fee fields
+- alter nonce
+- alter recipient
+- alter amount
+
+The exact signed raw transaction produced in Phase 4.7 must be preserved byte-for-byte.
+
+==================================================
+7. BROADCAST STATES
+==================================================
+
+Expose honest lifecycle states:
+
+READY_TO_BROADCAST
+  ↓
+BROADCASTING
+  ↓
+BROADCASTED
+  ↓
+CONFIRMING
+  ↓
+CONFIRMED
+
+Failure states:
+
+FAILED
+REVERTED
+UNKNOWN
+
+Do not collapse these into one generic "success" state.
+
+==================================================
+8. BROADCASTING STATE
+==================================================
+
+While broadcasting:
+
+- disable duplicate broadcast action
+- prevent concurrent broadcast attempts for the same transaction
+- show clear progress
+- do not allow accidental double submission
+
+Use the existing Phase 2.7 idempotency/concurrency behavior.
+
+Do not add another retry loop in the UI.
+
+==================================================
+9. BROADCAST SUCCESS
+==================================================
+
+When the RPC accepts the signed transaction:
+
+Show:
+
+"Transaction Broadcasted"
+
+Display:
+
+- transaction hash
+- network
+- recipient
+- amount
+- asset
+
+Provide:
+
+"View on Explorer"
+
+ONLY if the current network has a valid configured explorer.
+
+Do not invent an explorer URL.
+
+Do not show a fake link for placeholder/unconfigured networks.
+
+==================================================
+10. CONFIRMATION MONITORING
+==================================================
+
+After successful broadcast:
+
+Use the existing Phase 2.7 confirmation mechanism.
+
+Do NOT implement a second receipt polling engine.
+
+Display:
+
+"Waiting for confirmation"
+
+Then:
+
+CONFIRMED
+
+or:
+
+REVERTED
+
+or:
+
+UNKNOWN
+
+Respect the existing bounded confirmation behavior.
+
+If confirmation times out:
+
+show "Confirmation status unknown"
+
+Do NOT claim failure if the transaction may still be pending on-chain.
+
+Do NOT automatically rebroadcast.
+
+==================================================
+11. TRANSACTION HASH
+==================================================
+
+Use the authoritative transaction hash from the signed/broadcast result.
+
+Display it consistently.
+
+Allow copy using the existing public clipboard boundary.
+
+Never put:
+
+- private key
+- mnemonic
+- signing capability
+- authentication credentials
+
+into clipboard operations.
+
+==================================================
+12. EXPLORER LINK
+==================================================
+
+Construct explorer transaction URLs only from the configured network explorer metadata.
+
+Validate that:
+
+- explorer exists
+- explorer is configured
+- URL is valid
+
+For configured networks:
+
+provide a transaction explorer action.
+
+For unconfigured/placeholder networks:
+
+do not create an explorer link.
+
+==================================================
+13. ERROR HANDLING
+==================================================
+
+Handle and sanitize:
+
+- network unavailable
+- RPC unavailable
+- chain mismatch
+- invalid signed transaction
+- sender mismatch
+- broadcast rejection
+- timeout after broadcast
+- confirmation timeout
+- reverted transaction
+- unknown transaction state
+- duplicate broadcast attempt
+
+Never expose:
+
+- raw RPC URLs
+- credentials
+- raw stack traces
+- private keys
+- mnemonic
+- internal secret material
+
+Use the existing Phase 2.7 normalized error model.
+
+==================================================
+14. IMPORTANT TIMEOUT SEMANTICS
+==================================================
+
+Preserve the Phase 2.7 behavior:
+
+If the RPC request times out AFTER the request may have reached the network:
+
+DO NOT automatically retry.
+
+The transaction status may be UNKNOWN.
+
+Use transaction lookup/reconciliation through the existing broadcast engine where supported.
+
+Never tell the user:
+
+"Transaction failed"
+
+solely because the client timed out after submission may have occurred.
+
+==================================================
+15. NO AUTOMATIC REBROADCAST
+==================================================
+
+This phase must NOT implement:
+
+- automatic rebroadcast
+- fee bumping
+- replacement transactions
+- speed-up
+- cancellation
+- nonce replacement
+- automatic retry after uncertain submission
+
+If broadcast outcome is uncertain:
+
+show UNKNOWN / reconciliation state.
+
+==================================================
+16. APP LIFECYCLE
+==================================================
+
+Handle app background/foreground safely.
+
+Do not automatically broadcast when the app returns to foreground.
+
+For an already-broadcast transaction:
+
+it may continue confirmation monitoring according to the existing architecture.
+
+If confirmation state is lost:
+
+use the existing transaction lookup/reconciliation mechanism.
+
+Do not submit the signed transaction again automatically.
+
+==================================================
+17. NETWORK CHANGE PROTECTION
+==================================================
+
+A signed transaction is bound to:
+
+- network
+- chain ID
+- sender
+- transaction fields
+
+If the active network changes after signing but before broadcast:
+
+broadcast MUST be blocked.
+
+Require the user to return to the appropriate transaction flow.
+
+Never silently switch the network back.
+
+==================================================
+18. ACCOUNT CHANGE PROTECTION
+==================================================
+
+If the active account changes after signing:
+
+broadcast MUST be blocked.
+
+A signed transaction from Account A must never be presented as a transaction belonging to Account B.
+
+==================================================
+19. UI NAVIGATION
+==================================================
+
+Implement the transaction lifecycle navigation:
+
+Review
+ ↓
+Authentication
+ ↓
+Signing
+ ↓
+Signed
+ ↓
+Broadcast Confirmation
+ ↓
+Broadcasting
+ ↓
+Broadcasted
+ ↓
+Confirming
+ ↓
+Confirmed/Reverted/Unknown
+
+Allow safe navigation back where appropriate.
+
+Do not allow navigation to accidentally create a second signing or broadcast operation.
+
+After terminal state:
+
+- Home
+- Activity (placeholder if Activity phase is not yet implemented)
+
+can be offered.
+
+Do not automatically restart the Send flow.
+
+==================================================
+20. TRANSACTION DATA SEPARATION
+==================================================
+
+Maintain the distinction between:
+
+TRANSACTION INTENT
+UNSIGNED TRANSACTION
+SIGNED TRANSACTION
+BROADCAST RESULT
+CONFIRMATION RESULT
+
+Do not overwrite one with another.
+
+Do not treat:
+
+signed == broadcasted
+
+or:
+
+broadcasted == confirmed
+
+The UI must preserve these semantic distinctions.
+
+==================================================
+21. PREVIEW TEST MODE
+==================================================
+
+Preview Test Mode must remain safe.
+
+Browser Preview must NOT broadcast to a real blockchain.
+
+Do not:
+
+- use fake production broadcast results
+- fabricate a real transaction hash
+- pretend a transaction was accepted by a network
+- claim confirmation
+
+If Preview needs to demonstrate the lifecycle:
+
+use clearly labeled simulated states such as:
+
+"Preview Test Mode — simulated broadcast"
+
+"Preview Test Mode — simulated confirmation"
+
+Never present simulated state as real blockchain state.
+
+No private key or mnemonic should exist in Preview Test Mode.
+
+==================================================
+22. SECURITY REGRESSION
+==================================================
+
+Inspect the implementation for accidental:
+
+- automatic broadcasting
+- broadcast on component mount
+- broadcast after signing callback
+- broadcast on app resume
+- broadcast on network selection
+- duplicate broadcast
+- direct fetch to RPC
+- direct eth_sendRawTransaction from UI
+- secret logging
+- private-key exposure
+- mnemonic exposure
+- backend transmission
+
+Confirm that the ONLY route to broadcasting is:
+
+explicit user action
+→ validation
+→ TransactionBroadcastEngine.broadcast()
+
+==================================================
+23. TESTS
+==================================================
+
+Add focused tests covering at minimum:
+
+SIGNED STATE
+
+- signed transaction displayed correctly
+- signed != broadcasted
+- transaction hash displayed
+- public data only
+
+PRE-BROADCAST
+
+- valid signed transaction
+- invalid signed transaction
+- sender mismatch
+- network mismatch
+- chain mismatch
+- account mismatch
+- transaction identity mismatch
+- active network changed
+- broadcast blocked on mismatch
+
+EXPLICIT ACTION
+
+- no broadcast on component mount
+- no broadcast after signing automatically
+- no broadcast after authentication
+- broadcast only after explicit user action
+- duplicate broadcast prevented
+
+BROADCAST
+
+- TransactionBroadcastEngine delegation
+- eth_sendRawTransaction reached only through existing engine
+- raw signed bytes preserved
+- successful broadcast
+- broadcast rejection
+- broadcast timeout
+- unknown state
+- sanitized errors
+
+CONFIRMATION
+
+- broadcasted
+- confirming
+- confirmed
+- reverted
+- confirmation timeout
+- unknown confirmation
+- lookup/reconciliation
+
+NETWORK
+
+- explorer URL generation
+- unconfigured explorer
+- network change blocked
+- chain mismatch blocked
+
+LIFECYCLE
+
+- background/foreground
+- no automatic rebroadcast
+- terminal states
+- safe navigation
+
+SECURITY
+
+- no mnemonic
+- no private key
+- no signing capability leakage
+- no SecureStore misuse
+- no backend transmission
+- no direct RPC from UI
+- no direct eth_sendRawTransaction from UI
+
+PREVIEW
+
+- Preview isolation
+- simulated states explicitly labeled
+- no real broadcast
+- no fake real transaction hash
+- no real confirmation claim
+
+Run the entire existing test suite.
+
+==================================================
+24. DOCUMENTATION
+==================================================
+
+Update:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- src/core/transactions/README.md
+
+Document:
+
+Phase 4.8 connects the signed transaction to explicit user-authorized broadcast and confirmation monitoring.
+
+The exact sequence is:
+
+SIGNED
+→ EXPLICIT BROADCAST
+→ BROADCASTED
+→ CONFIRMING
+→ CONFIRMED / REVERTED / UNKNOWN
+
+Document that:
+
+- signed does not mean broadcasted
+- broadcasted does not mean confirmed
+- timeout after submission may result in UNKNOWN
+- no automatic rebroadcast occurs
+- no fee bump/replacement/speed-up/cancel is implemented
+
+==================================================
+25. VERIFICATION
+==================================================
+
+Run:
+
+- TypeScript
+- full test suite
+- git diff --check
+- Expo/Metro
+- static iOS bundle/manifest build
+- static Android bundle/manifest build
+- security regression inspection
+
+Preview verification:
+
+- 390x844
+- 402x874
+
+Manual verification where environment permits:
+
+1. Send
+2. Review
+3. Authenticate
+4. Sign
+5. Reach Signed state
+6. Verify "Signed — Not Broadcast"
+7. Verify Broadcast button exists
+8. Verify no broadcast occurs without pressing it
+9. Press Broadcast in a safe test environment
+10. Verify broadcasting state
+11. Verify broadcasted state
+12. Verify transaction hash
+13. Verify confirmation monitoring
+14. Verify confirmed/reverted/unknown handling
+15. Change network before broadcast and verify broadcast is blocked
+16. Attempt duplicate broadcast and verify it is prevented
+17. Background/foreground app and verify no automatic rebroadcast
+18. Verify Preview Test Mode never performs real broadcast
+
+IMPORTANT:
+
+Do NOT use mainnet funds for initial testing.
+
+Use an appropriate test network / controlled test environment for real broadcast validation.
+
+==================================================
+26. FINAL REPORT
+==================================================
+
+Report:
+
+- files created/changed
+- broadcast integration
+- confirmation integration
+- explicit broadcast authorization
+- state machine
+- network/account protection
+- timeout semantics
+- duplicate prevention
+- security regression results
+- test count
+- TypeScript result
+- Expo/build result
+- Preview result
+- native testing status
+- known warnings
+- anything deferred
+
+STOP after Phase 4.8.
+
+DO NOT implement Swap.
+DO NOT implement Activity.
+DO NOT implement WalletConnect/DApps.
+DO NOT implement replacement/speed-up/cancel.
+DO NOT implement additional transaction features.
+
+Wait for approval before the next phase.

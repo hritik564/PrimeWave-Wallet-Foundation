@@ -1,5 +1,12 @@
 # Transaction core
 
+## Phase 4.5 and Phase 4.6 UI boundaries
+
+Phase 4.5 stops at public recipient/amount validation and a controlled public
+draft. The Phase 4.6 Transaction Review screen consumes that draft and is the
+first UI surface allowed to request read-only Phase 2.4 fee data and Phase 2.5
+unsigned construction. Neither phase accesses wallet secrets.
+
 `src/core/transactions/construction` contains the Phase 2.5 UI-independent
 unsigned transaction construction engine. It consumes public wallet-account
 metadata, the selected configured network, the existing account-state service,
@@ -30,6 +37,28 @@ decode ABI data or claim that a contract is safe. All blockchain quantities are
 `bigint`, fee selection remains explicitly Legacy or EIP-1559, and canonical
 debug/test serialization converts quantities to decimal strings without losing
 precision.
+
+## Phase 4.6 transaction review
+
+`src/components/TransactionReviewScreen.logic.ts` adapts the public
+`PublicSendDraft` into a native-transfer or ERC-20 contract-call
+`TransactionIntent` and delegates construction to the existing
+`TransactionConstructionEngine`. It does not duplicate nonce, gas, fee, chain,
+or canonical unsigned-transaction logic.
+
+The review boundary requires the selected network to remain active and
+configured, validates network-scoped asset identity, checks exact native and
+token balances, and displays the returned fee model and native fee currency.
+Legacy fallback is labeled explicitly. ERC-20 amounts and native network fees
+are displayed as separate currencies.
+
+Before returning a public confirmation result, the screen revalidates the
+draft and reconstructs the read-only preview. Changes to the account, sender,
+network, chain, recipient, amount, asset, fee model, or unsigned transaction
+identity invalidate the review. The result is only
+`confirmed-for-signing`; this phase does not authenticate, unlock, sign,
+broadcast, call `eth_sendRawTransaction`, or mutate blockchain state. Phase
+4.7 owns the secure signing authorization boundary.
 
 Private keys, recovery phrases, vault handles, PINs, biometric secrets,
 signing capabilities, and secure-storage implementations are outside this
@@ -82,6 +111,46 @@ remains future hardening.
 
 **Phase 2.6 performs local transaction signing only. Broadcasting is
 intentionally deferred to Phase 2.7.**
+
+## Phase 4.7 secure authorization and signing handoff
+
+The Phase 4.7 UI requests explicit authentication after the Phase 4.6
+confirmation checkpoint. It uses the existing wallet access facade for PIN or
+configured biometric authentication, then rechecks the public review context
+and exact unsigned transaction identity before invoking Phase 2.6.
+
+`createTransactionSigningAuthorization` binds the account, sender, network,
+chain, recipient, value, calldata, nonce, gas, fee fields, and canonical
+unsigned transaction digest. `TransactionSigningEngine` issues the existing
+one-time opaque capability and delegates key access only to
+`LocalWalletEngine`. The UI never receives keys, mnemonics, vault handles, or
+signing capabilities.
+
+After successful signing, the UI exposes only public signed transaction data
+and a clear `Ready to Broadcast` deferred state. It does not import or invoke
+the broadcast engine, `broadcast()`, `sendRawTransaction()`, or
+`eth_sendRawTransaction`. Browser Preview Test Mode remains fail-closed and
+does not create fake signatures or hashes.
+
+## Phase 4.8 broadcast and confirmation handoff
+
+The signed transaction screen exposes an explicit final checkpoint before
+submission. `Broadcast Transaction` is the only path that calls the existing
+Phase 2.7 `TransactionBroadcastEngine`; signing, authentication, app resume,
+network refresh, and timeout handling never submit automatically.
+
+Before the call, the UI checks the active configured network, chain, sender,
+transaction type, and original review context. The exact raw signed bytes and
+authoritative hash are passed to the engine unchanged. The engine owns
+validation, `eth_sendRawTransaction`, idempotency, concurrency, RPC error
+normalization, bounded receipt polling, and unknown-result semantics.
+
+The UI exposes separate broadcasting, broadcasted, confirming, confirmed,
+reverted, failed, and unknown states. Unknown outcomes never trigger an
+automatic retry or rebroadcast. Explicit reconciliation calls the engine's
+existing transaction lookup method. Hash copying uses the public clipboard
+boundary, and explorer actions are created only from valid configured-network
+transaction templates.
 
 ## Phase 2.7 broadcast and confirmation
 

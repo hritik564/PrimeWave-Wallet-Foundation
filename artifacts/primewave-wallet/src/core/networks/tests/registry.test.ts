@@ -23,6 +23,18 @@ function expectRegistryError(
 
 test('defines the requested enabled networks and one primary placeholder', () => {
   assert.deepEqual(
+    defaultNetworkRegistry.listNetworks().map((network) => network.id),
+    [
+      'primewave',
+      'ethereum',
+      'bnb-smart-chain',
+      'polygon',
+      'arbitrum',
+      'base',
+      'optimism',
+    ],
+  );
+  assert.deepEqual(
     defaultNetworkRegistry.listEnabledNetworks().map((network) => network.id),
     [
       'primewave',

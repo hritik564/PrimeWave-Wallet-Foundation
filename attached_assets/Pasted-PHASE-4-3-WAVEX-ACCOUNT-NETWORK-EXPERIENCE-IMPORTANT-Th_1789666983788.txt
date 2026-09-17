@@ -1,0 +1,818 @@
+PHASE 4.3 — WAVEX ACCOUNT & NETWORK EXPERIENCE
+
+IMPORTANT:
+This is a controlled UI + application-state phase.
+
+PRODUCT NAME:
+WAVEX
+
+Do NOT display “PrimeWave Wallet” as the product name.
+Do NOT display “by PrimeWave” in the WaveX product branding.
+
+PrimeWave remains the ecosystem/network name where applicable.
+
+==================================================
+OBJECTIVE
+==================================================
+
+Build the WaveX account and network experience.
+
+The goal is to make the wallet's:
+
+- current account
+- public address
+- account identity
+- current network
+- network list
+- network status
+- network selection
+
+feel like a real production wallet.
+
+Use the existing wallet, account, and EVM network architecture.
+
+Do NOT invent blockchain configuration.
+
+Do NOT weaken security.
+
+Do NOT expose secrets.
+
+==================================================
+VISUAL REFERENCE
+==================================================
+
+Continue following the attached WaveX Wallet UI reference image used in Phase 4.2.
+
+Use it as the visual language for:
+
+- dark futuristic interface
+- cyan / electric blue / violet accents
+- premium cards
+- subtle glow
+- rounded surfaces
+- thin borders
+- clean typography
+- compact controls
+- polished mobile interaction
+- professional Web3 wallet aesthetic
+
+Existing centralized WaveX theme tokens take priority.
+
+Do not blindly copy example data from the image.
+
+==================================================
+1. ACCOUNT EXPERIENCE
+==================================================
+
+Create a production-style account control accessible from the WaveX Home header.
+
+The account control should display:
+
+- account name
+- account index
+- shortened public address
+- account status
+
+Example presentation:
+
+Account 1
+0xf39F...2266
+
+Use actual public account state where available.
+
+Do NOT display:
+
+- mnemonic
+- seed phrase
+- private key
+- PIN
+- authentication credentials
+- signing capability
+- SecureStore contents
+
+==================================================
+2. ACCOUNT PANEL
+==================================================
+
+Create an account panel/modal/sheet consistent with the WaveX visual language.
+
+It may contain:
+
+- current account identity
+- full public address
+- copy address
+- account index
+- wallet lock action
+- close action
+
+Copying the public address is allowed.
+
+Do NOT copy or expose any secret material.
+
+Do NOT implement account import.
+
+Do NOT implement account creation.
+
+Do NOT implement account switching yet unless the existing public account architecture already supports safe selection without changing wallet security state.
+
+If account switching is not fully supported, show a controlled future state instead.
+
+==================================================
+3. COPY ADDRESS
+==================================================
+
+Implement copy-to-clipboard for the PUBLIC wallet address only.
+
+Requirements:
+
+- copy only the public address
+- provide visible confirmation
+- sanitize any logging
+- do not copy secrets
+- do not place mnemonic/private keys/PINs into clipboard
+
+If the existing security architecture has sensitive clipboard handling, reuse it where applicable.
+
+==================================================
+4. ACCOUNT ADDRESS DISPLAY
+==================================================
+
+Use a safe address-shortening helper.
+
+Example:
+
+0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+
+→
+
+0xf39F…2266
+
+Ensure:
+
+- deterministic output
+- valid Ethereum addresses
+- sensible behavior for short/invalid input
+- no mutation of the underlying address
+
+==================================================
+5. NETWORK EXPERIENCE
+==================================================
+
+Create a network selector accessible from Home and/or the network card.
+
+It should show the existing registered networks from the EvmNetwork registry.
+
+Current registry includes the existing supported networks such as:
+
+- PrimeWave
+- Ethereum
+- BNB
+- Polygon
+- Arbitrum
+- Base
+- Optimism
+
+Use the actual NetworkRegistry.
+
+Do NOT create a second network list.
+
+==================================================
+6. NETWORK LIST
+==================================================
+
+Create a polished network-selection sheet/modal.
+
+Each network entry may display:
+
+- network name
+- chain ID
+- native currency symbol
+- environment
+- configured/unconfigured status
+- enabled/disabled status
+- selected state
+
+Do not expose internal implementation details unnecessarily.
+
+Use clear visual status indicators.
+
+==================================================
+7. PRIMEWAVE NETWORK
+==================================================
+
+PrimeWave remains the intended primary/default network when properly configured.
+
+IMPORTANT:
+
+Do NOT invent production PrimeWave values.
+
+Do NOT invent:
+
+- chain ID
+- RPC endpoint
+- explorer URL
+- native currency
+- production environment values
+
+If the current registry marks PrimeWave as placeholder/unconfigured:
+
+display it honestly as:
+
+Unconfigured
+or
+Not configured
+
+Do not make it appear production-ready.
+
+==================================================
+8. NETWORK SELECTION RULES
+==================================================
+
+Use the existing EvmNetworkEngine / NetworkRegistry.
+
+Selection must:
+
+1. validate the network exists
+2. validate it is enabled
+3. validate it is configured for the requested environment
+4. validate network identity
+5. update active network state through the existing network abstraction
+6. cause the UI to reflect the selected network
+
+Do NOT bypass the network engine.
+
+Do NOT modify network configuration directly from UI.
+
+Do NOT construct network objects inside UI components.
+
+==================================================
+9. UNCONFIGURED NETWORK BEHAVIOR
+==================================================
+
+An unconfigured network must not become active for blockchain operations.
+
+If the user taps an unconfigured network:
+
+show a controlled state such as:
+
+“Network not configured yet.”
+
+Do not silently select it.
+
+Do not create fake RPC calls.
+
+Do not fabricate balances.
+
+Do not fabricate network activity.
+
+The existing PrimeWave placeholder must remain protected by this rule.
+
+==================================================
+10. NETWORK CHANGE SAFETY
+==================================================
+
+When switching between configured networks:
+
+the active network context must change explicitly.
+
+The UI must not silently retain stale asset data from the previous network.
+
+After network change:
+
+- invalidate/refresh the portfolio view
+- request fresh read-model data for the newly selected network
+- show loading state where necessary
+- show unavailable state when appropriate
+
+Do not merge old and new network balances.
+
+Do not show previous-network balances under the new network.
+
+==================================================
+11. NETWORK + ACCOUNT ISOLATION
+==================================================
+
+All displayed assets remain scoped to:
+
+account + network
+
+Example:
+
+Account 1 + Ethereum
+
+must never be confused with:
+
+Account 1 + BNB
+
+or:
+
+Account 2 + Ethereum
+
+The selected network must always be visible somewhere in the relevant wallet context.
+
+==================================================
+12. NETWORK STATE
+==================================================
+
+Represent network states clearly:
+
+- selected
+- enabled
+- disabled
+- configured
+- unconfigured
+- unavailable
+
+Do not collapse all states into one generic status.
+
+A network being registered does not necessarily mean it is configured.
+
+A network being configured does not necessarily mean it is currently selected.
+
+==================================================
+13. CHAIN ID
+==================================================
+
+Display chain ID where useful in the network selection UI.
+
+Use the existing authoritative EvmNetwork chain ID.
+
+Do not calculate or infer chain IDs.
+
+Do not modify chain IDs from UI.
+
+==================================================
+14. ENVIRONMENT
+==================================================
+
+Respect existing environment handling:
+
+- development
+- testnet
+- mainnet
+
+Do not add new environments.
+
+Do not expose development/testnet as production networks without clear labeling.
+
+Do not change production configuration.
+
+==================================================
+15. HOME INTEGRATION
+==================================================
+
+Update Home so that:
+
+- current account is accessible
+- current network is accessible
+- network selector opens correctly
+- account panel opens correctly
+- selected network is reflected in Home
+- portfolio refreshes after a legitimate network change
+
+Do not duplicate portfolio logic.
+
+Home should continue consuming:
+
+PortfolioReadModelService
+
+==================================================
+16. ASSETS INTEGRATION
+==================================================
+
+Assets must respond correctly to network context.
+
+When network changes:
+
+Assets should:
+
+1. invalidate previous network presentation
+2. request the new account/network read model
+3. show loading
+4. display the new network's assets
+5. never display stale previous-network assets as current
+
+Do not merge assets from different networks.
+
+==================================================
+17. NETWORK SWITCHING AND TRANSACTIONS
+==================================================
+
+This phase does NOT implement transactions.
+
+Do not connect network selection to:
+
+- Send
+- signing
+- broadcasting
+- transaction construction
+- swaps
+- DApps
+
+However, the selected network must be available to future transaction flows through the existing network abstraction.
+
+==================================================
+18. DAPP SAFETY
+==================================================
+
+Do NOT implement DApp network switching.
+
+No external DApp may silently change the active WaveX network.
+
+Future DApp requests must go through an explicit user-controlled approval flow.
+
+Do not add WalletConnect in this phase.
+
+==================================================
+19. ACCOUNT LOCKING
+==================================================
+
+The existing Lock action must continue to work.
+
+When the wallet is locked:
+
+- sensitive wallet state must remain protected by the existing security architecture
+- UI must return to the locked state
+- Preview Test Mode must continue using its isolated preview state
+
+Do not modify native authentication logic.
+
+==================================================
+20. PREVIEW TEST MODE
+==================================================
+
+Preserve Preview Test Mode.
+
+Verify:
+
+Preview onboarding
+    ↓
+PIN
+    ↓
+WaveX Home
+    ↓
+Account panel
+    ↓
+Network selector
+
+Preview mode must NOT invoke:
+
+- SecureStore
+- SecureVault
+- WalletAccessManager
+- WalletAuthenticator
+- LocalWalletEngine secret APIs
+- native biometrics
+- signing
+- broadcasting
+- backend
+
+If a network is unconfigured in Preview Test Mode, display that honestly.
+
+Do not create fake blockchain balances merely to populate the selector.
+
+==================================================
+21. NO SECRET ACCESS
+==================================================
+
+The new UI/application code must NOT access:
+
+- mnemonic
+- seed phrase
+- private key
+- PIN
+- SecureStore
+- SecureVault
+- Keychain
+- Keystore
+- WalletAuthenticator secret APIs
+- signing secrets
+- transaction authorization secrets
+
+Only public account information may be displayed.
+
+==================================================
+22. CLIPBOARD SECURITY
+==================================================
+
+Only public wallet addresses may be copied.
+
+Do not implement generic “copy sensitive wallet data” functionality.
+
+Do not put:
+
+- seed phrase
+- private key
+- PIN
+
+into clipboard.
+
+==================================================
+23. VISUAL DESIGN
+==================================================
+
+Follow the WaveX visual reference.
+
+Account panel:
+
+- premium dark surface
+- subtle cyan/blue/violet accent
+- rounded corners
+- clear public address
+- copy affordance
+- lock affordance
+
+Network selector:
+
+- premium dark sheet/card
+- network icons/initials
+- selected state
+- configured/unconfigured state
+- chain ID where useful
+- clean hierarchy
+
+Avoid excessive neon.
+
+Avoid generic wallet templates.
+
+Avoid unrelated colors.
+
+Use centralized theme tokens.
+
+==================================================
+24. RESPONSIVE DESIGN
+==================================================
+
+Primary:
+
+390 × 844
+
+Also test:
+
+402 × 874
+
+and common Android dimensions.
+
+Ensure:
+
+- account panel fits screen
+- network selector is scrollable
+- long network names do not break layout
+- chain IDs remain readable
+- bottom navigation remains usable
+- Safe Area is respected
+- touch targets are accessible
+
+==================================================
+25. ACCESSIBILITY
+==================================================
+
+Add:
+
+- accessibility labels
+- meaningful control names
+- screen-reader-friendly account information
+- screen-reader-friendly network information
+- adequate touch targets
+- non-color-only status communication
+
+==================================================
+26. ERROR HANDLING
+==================================================
+
+Use sanitized errors.
+
+Do not display:
+
+- raw RPC errors
+- stack traces
+- internal file paths
+- credentials
+- sensitive implementation details
+
+Network selection failures should explain the user-facing reason without exposing internals.
+
+==================================================
+27. TESTING
+==================================================
+
+Add focused tests for:
+
+ACCOUNT
+
+1. Account panel renders.
+2. Public account name renders.
+3. Account index renders.
+4. Short address renders.
+5. Full public address can be displayed safely.
+6. Public address copy works.
+7. Invalid address handling.
+8. No secret material is rendered.
+9. Lock action works.
+
+NETWORK
+
+10. Network selector renders.
+11. Networks come from NetworkRegistry.
+12. No duplicate network registry.
+13. Chain IDs come from EvmNetwork.
+14. Native currency comes from EvmNetwork.
+15. Configured status is displayed.
+16. Unconfigured status is displayed.
+17. Disabled status is displayed.
+18. Selected status is displayed.
+19. Unknown network is rejected.
+20. Unconfigured network cannot become active for blockchain use.
+21. Configured network selection uses existing network abstraction.
+22. Network change updates active network state.
+23. Network change does not merge assets.
+24. Network change invalidates stale portfolio state.
+25. New network requests use new network context.
+26. Account/network isolation remains correct.
+
+PREVIEW
+
+27. Preview Test Mode account panel works.
+28. Preview Test Mode network selector works.
+29. Preview mode never invokes SecureStore.
+30. Preview mode never invokes WalletAccessManager.
+31. Preview mode never invokes native authentication.
+32. Preview mode never invokes signing/broadcasting.
+
+SECURITY
+
+33. No secret access.
+34. Only public address may reach clipboard.
+35. No backend calls.
+36. No persistence introduced.
+
+==================================================
+28. SECURITY REGRESSION SEARCH
+==================================================
+
+Search all newly created/modified account/network UI code for:
+
+- privateKey
+- mnemonic
+- seed
+- PIN
+- SecureStore
+- SecureVault
+- WalletAuthenticator
+- LocalWalletEngine secret APIs
+- signing secrets
+- authorization secrets
+
+Remove any actual secret access.
+
+Explanatory documentation/copy is allowed.
+
+==================================================
+29. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+
+Document:
+
+Account UI
+    ↓
+Public Account State
+
+Network UI
+    ↓
+NetworkRegistry / EvmNetwork
+    ↓
+Active Network
+    ↓
+PortfolioReadModelService
+
+Document that network selection does not directly perform blockchain RPC operations.
+
+Update:
+
+docs/SECURITY_ARCHITECTURE.md
+
+Document:
+
+- account UI exposes public information only
+- public address copying is permitted
+- secret material never enters account UI
+- network selection does not grant transaction authority
+- DApps cannot silently change active network
+
+Update:
+
+docs/DEVELOPMENT_STATE.md
+
+Record:
+
+- Phase 4.3 implemented
+- account experience
+- network experience
+- network selection behavior
+- isolation rules
+- tests
+- validation
+- deferred functionality
+
+==================================================
+30. QUALITY GATE
+==================================================
+
+Before reporting completion, run:
+
+- Phase 4.3 focused tests
+- full existing test suite
+- TypeScript
+- git diff --check
+- Expo/Metro validation
+- web bundle validation
+
+Then manually verify the running Web Preview:
+
+1. Open Preview.
+2. Create preview wallet.
+3. Enter PIN.
+4. Confirm WaveX Home.
+5. Open account panel.
+6. Verify public account/address.
+7. Copy public address.
+8. Verify copy confirmation.
+9. Close account panel.
+10. Open network selector.
+11. Verify registered networks appear from NetworkRegistry.
+12. Verify PrimeWave shows unconfigured if still placeholder.
+13. Attempt selecting unconfigured PrimeWave.
+14. Confirm it does not become active for blockchain use.
+15. Select a configured network if available.
+16. Confirm Home network context updates.
+17. Confirm Assets does not show stale previous-network balances.
+18. Return Home.
+19. Lock wallet.
+20. Unlock.
+21. Confirm account/network context remains correct.
+
+Do not claim native biometric testing.
+
+==================================================
+31. HARD SCOPE LIMIT
+==================================================
+
+DO NOT implement in Phase 4.3:
+
+- account creation
+- account import
+- account recovery UI
+- seed phrase UI
+- private key UI
+- account switching if it requires new secret flows
+- transaction sending
+- transaction receiving
+- QR scanning
+- QR generation
+- token transfers
+- Swap
+- DApps
+- WalletConnect
+- price feeds
+- fiat values
+- external token lists
+- external logo providers
+- backend services
+- push notifications
+- cloud backup
+- biometric changes
+
+Those remain future controlled phases.
+
+==================================================
+FINAL REPORT
+==================================================
+
+Report:
+
+1. Files created/changed
+2. Account UI architecture
+3. Network UI architecture
+4. Public address handling
+5. Clipboard behavior
+6. Network selection behavior
+7. Configured/unconfigured handling
+8. Account/network isolation
+9. Home integration
+10. Assets integration
+11. Preview Test Mode behavior
+12. Security boundary
+13. Persistence/backend boundary
+14. Tests and results
+15. TypeScript result
+16. Expo/Metro result
+17. Web bundle result
+18. Manual Web Preview verification
+19. Warnings
+20. Deferred functionality
+
+Do not make architectural changes outside Phase 4.3.

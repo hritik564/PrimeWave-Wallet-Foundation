@@ -122,23 +122,33 @@ function createPreviewWalletModel(): Wallet {
 }
 
 export class PreviewTestMode {
+  private record: PreviewStateRecord = getBrowserState();
+
+  private save(record: PreviewStateRecord): void {
+    this.record = record;
+    setBrowserState(record);
+  }
+
   getState(): PreviewTestState {
-    const record = getBrowserState();
     return {
-      hasPreviewWallet: record.phase !== 'onboarding',
-      phase: record.phase,
-      pinConfigured: record.pinFingerprint !== null,
+      hasPreviewWallet: this.record.phase !== 'onboarding',
+      phase: this.record.phase,
+      pinConfigured: this.record.pinFingerprint !== null,
     };
   }
 
   getWallet(): Wallet | null {
-    return this.getState().phase === 'unlocked'
+    return this.record.phase === 'unlocked'
       ? createPreviewWalletModel()
       : null;
   }
 
+  getDisplayWallet(): Wallet {
+    return createPreviewWalletModel();
+  }
+
   createPreviewWallet(): Wallet {
-    setBrowserState({
+    this.save({
       version: PREVIEW_STATE_VERSION,
       phase: 'pin-setup',
       pinFingerprint: null,
@@ -150,7 +160,7 @@ export class PreviewTestMode {
     if (!isValidPin(pin)) {
       throw new Error('Preview PIN must contain exactly 6 digits.');
     }
-    setBrowserState({
+    this.save({
       version: PREVIEW_STATE_VERSION,
       phase: 'unlocked',
       pinFingerprint: fingerprintPin(pin),
@@ -158,23 +168,22 @@ export class PreviewTestMode {
   }
 
   verifyPreviewPin(pin: string): boolean {
-    const record = getBrowserState();
-    if (!isValidPin(pin) || !record.pinFingerprint) return false;
-    const matches = fingerprintPin(pin) === record.pinFingerprint;
+    if (!isValidPin(pin) || !this.record.pinFingerprint) return false;
+    const matches = fingerprintPin(pin) === this.record.pinFingerprint;
     if (matches) {
-      setBrowserState({ ...record, phase: 'unlocked' });
+      this.save({ ...this.record, phase: 'unlocked' });
     }
     return matches;
   }
 
   lockPreviewWallet(): void {
-    const record = getBrowserState();
-    if (record.pinFingerprint) {
-      setBrowserState({ ...record, phase: 'locked' });
+    if (this.record.pinFingerprint) {
+      this.save({ ...this.record, phase: 'locked' });
     }
   }
 
   resetPreviewWallet(): void {
+    this.record = emptyRecord();
     clearBrowserState();
   }
 }

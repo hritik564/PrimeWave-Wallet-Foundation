@@ -1,0 +1,681 @@
+PHASE 4.1 — WAVEX WALLET HOME SHELL & NAVIGATION FOUNDATION
+
+IMPORTANT:
+This is a controlled UI implementation phase.
+
+The product name displayed in the application must be:
+WAVEX
+
+Do NOT display “PrimeWave Wallet” as the product name.
+Do NOT display “by PrimeWave” in the WaveX logo/product lockup.
+
+PrimeWave remains the ecosystem/network name where applicable.
+
+==================================================
+OBJECTIVE
+==================================================
+
+Build the first real WaveX wallet interface that appears after successful wallet unlock.
+
+This phase creates the application shell and Home experience only.
+
+The goal is:
+
+Preview/native wallet unlock
+        ↓
+WaveX Wallet Home
+        ↓
+Assets / Send / Receive / Activity / Swap / Scan placeholders
+
+The Home screen must consume the existing PortfolioReadModelService from Phase 3.5.
+
+Do NOT duplicate blockchain logic inside the UI.
+
+==================================================
+1. USE EXISTING ARCHITECTURE
+==================================================
+
+The UI must consume the existing layers:
+
+Wallet / Account
+      ↓
+Network Engine
+      ↓
+Asset Engine
+      ↓
+Portfolio Aggregation
+      ↓
+Portfolio Read Model
+      ↓
+WaveX UI
+
+The UI must NOT directly implement:
+
+- RPC calls
+- eth_getBalance
+- token balance calls
+- gas estimation
+- transaction construction
+- signing
+- broadcasting
+- token discovery
+- SecureStore access
+- private-key handling
+- mnemonic handling
+
+Use existing services wherever applicable.
+
+==================================================
+2. WAVEX VISUAL DIRECTION
+==================================================
+
+Create a premium futuristic AI/Web3 wallet interface.
+
+Use the existing centralized WaveX/PrimeWave design system instead of creating unrelated colors.
+
+Visual direction:
+
+- deep dark background
+- futuristic cyan / electric blue / violet accents
+- subtle gradients
+- restrained glow effects
+- premium cards
+- clean typography
+- high contrast
+- polished spacing
+- modern Web3 wallet aesthetic
+- minimal visual clutter
+
+The interface should feel like a serious production wallet, not a demo dashboard.
+
+Do NOT use excessive neon effects.
+
+Do NOT use generic crypto-dashboard styling.
+
+Do NOT introduce a new unrelated design system.
+
+Reuse existing theme tokens, typography, spacing, radii, shadows and state styles.
+
+==================================================
+3. HOME SCREEN STRUCTURE
+==================================================
+
+Create the main wallet Home screen.
+
+Suggested structure:
+
+HEADER
+
+- WaveX branding
+- current account indicator
+- account/address shortcut
+- settings shortcut
+
+NETWORK AREA
+
+- currently selected network
+- network name
+- network indicator
+- network selector affordance
+
+Do NOT implement network switching in this phase.
+
+The selector may be visually present but must clearly behave as not-yet-implemented.
+
+Do not silently change networks.
+
+==================================================
+4. PORTFOLIO SUMMARY
+==================================================
+
+Create a primary portfolio/asset summary card.
+
+Important:
+
+There is currently NO fiat price engine.
+
+Therefore do NOT display:
+
+- USD total
+- INR total
+- fake portfolio value
+- estimated dollar value
+- token prices
+
+Instead display blockchain-native asset information.
+
+For example:
+
+“Your Assets”
+
+followed by the available asset count and/or network-scoped asset information.
+
+Use real PortfolioReadModel data where available.
+
+Do not invent balances.
+
+If blockchain data is unavailable, display an honest unavailable state.
+
+==================================================
+5. ASSET PREVIEW
+==================================================
+
+Create an initial asset list/preview using PortfolioReadModelService.
+
+Each visible asset can show:
+
+- icon
+- name
+- symbol
+- formatted balance
+- availability state
+- verification state where appropriate
+
+Do NOT display a token as verified unless the underlying verification status says verified.
+
+Do NOT infer verification from logos, names, symbols or discovery.
+
+Do NOT invent token logos.
+
+Use the existing AssetIcon / TokenLogo abstraction and deterministic fallbacks.
+
+Handle:
+
+- positive balance
+- zero balance
+- unavailable
+- stale
+- invalid
+
+using the existing read-model states.
+
+Do not hide an asset merely because its balance is zero unless the existing visibility state says hidden.
+
+==================================================
+6. PRIMARY ACTIONS
+==================================================
+
+Create the primary wallet action area with:
+
+- Send
+- Receive
+- Scan
+
+These are UI entry points only in this phase.
+
+IMPORTANT:
+
+DO NOT implement actual Send.
+
+DO NOT implement actual Receive flow.
+
+DO NOT implement QR scanning.
+
+DO NOT implement transaction signing.
+
+DO NOT implement transaction broadcasting.
+
+For unimplemented actions, provide a clean “Coming soon” or equivalent controlled state.
+
+Do not create fake transaction behavior.
+
+Do not pretend these actions work.
+
+==================================================
+7. BOTTOM NAVIGATION
+==================================================
+
+Create the main navigation structure for:
+
+- Home
+- Assets
+- Swap
+- Activity
+- Settings
+
+Home is the only fully implemented destination in this phase.
+
+The other destinations should have clean placeholder screens/states only.
+
+Do NOT implement:
+
+- Swap logic
+- transaction history
+- settings functionality
+- DApp browser
+- token management workflows
+
+The navigation architecture should make future implementation straightforward.
+
+==================================================
+8. ACCOUNT DISPLAY
+==================================================
+
+Display the currently active account using public information only.
+
+Show:
+
+- account name if an existing public account label exists
+- shortened public address
+- account index where appropriate
+
+Example:
+
+Account 1
+0x12AB...89EF
+
+Do NOT display:
+
+- seed phrase
+- private key
+- PIN
+- signing capability
+- SecureStore data
+
+Do not add account creation/import functionality in this phase.
+
+==================================================
+9. NETWORK DISPLAY
+==================================================
+
+Display the currently selected network if one exists.
+
+Use the existing EvmNetwork model.
+
+Show:
+
+- network name
+- native currency symbol
+- appropriate network status
+
+If the network is unavailable/unconfigured, display that honestly.
+
+Do NOT hardcode production PrimeWave Mainnet values.
+
+Do NOT make PrimeWave Mainnet appear live if the registry still marks it as placeholder/unconfigured.
+
+Do NOT implement network switching yet.
+
+==================================================
+10. PREVIEW TEST MODE
+==================================================
+
+The existing Preview Test Mode must continue working.
+
+Do NOT remove it.
+
+After successful Preview Test Mode PIN verification:
+
+Preview wallet
+        ↓
+WaveX Home
+
+The preview environment may use its fixed public development wallet/display model.
+
+It must NOT invoke:
+
+- SecureStore
+- WalletAccessManager
+- WalletAuthenticator
+- LocalWalletEngine secret APIs
+- native biometrics
+- real signing
+- broadcasting
+- backend
+
+The Preview Test Mode banner must remain clearly identifiable as development-only.
+
+Production/native wallet behavior must remain unchanged.
+
+==================================================
+11. NATIVE WALLET FLOW
+==================================================
+
+Do NOT modify the existing native wallet authentication/security implementation.
+
+The eventual native flow should remain:
+
+Native unlock
+      ↓
+Authenticated wallet state
+      ↓
+WaveX Home
+
+Do not weaken:
+
+- PIN authentication
+- biometric authentication
+- SecureStore
+- Keychain/Keystore
+- wallet vault
+- local signing security
+
+==================================================
+12. RESPONSIVE DESIGN
+==================================================
+
+Optimize for mobile-first wallet usage.
+
+Primary target:
+
+- 390 × 844 class mobile viewport
+
+Also ensure the layout remains usable at:
+
+- 402 × 874
+- common Android dimensions
+- Web Preview
+
+Avoid fixed-width desktop layouts.
+
+Use Safe Area handling where appropriate.
+
+Avoid content being hidden behind:
+
+- status bars
+- navigation areas
+- bottom navigation
+- device home indicators
+
+==================================================
+13. UI STATES
+==================================================
+
+The Home screen must explicitly handle:
+
+LOADING
+
+Show a polished loading skeleton/state.
+
+EMPTY
+
+No assets available.
+
+AVAILABLE
+
+Display actual portfolio assets.
+
+UNAVAILABLE
+
+Explain that blockchain data is currently unavailable.
+
+ERROR
+
+Show a sanitized, user-friendly error.
+
+Do not expose raw RPC errors.
+
+Do not display raw stack traces.
+
+Do not make an unavailable blockchain state look like a zero balance.
+
+==================================================
+14. REFRESH
+==================================================
+
+Provide a UI refresh affordance.
+
+It should call the appropriate existing read/portfolio layer.
+
+Do not add background polling.
+
+Do not add persistence.
+
+Do not create a second balance cache.
+
+Do not introduce automatic RPC retry loops.
+
+If refresh fails, preserve an honest previous/current state without fabricating data.
+
+==================================================
+15. NO FIAT / PRICE SYSTEM
+==================================================
+
+This is a hard boundary.
+
+DO NOT add:
+
+- CoinGecko
+- CoinMarketCap
+- Binance price API
+- DexScreener price API
+- custom price API
+- fiat conversion
+- USD/INR portfolio value
+- fake price placeholders
+
+We will design the price architecture separately later.
+
+==================================================
+16. NO TRANSACTION LOGIC
+==================================================
+
+Do not connect Send/Receive/Scan buttons to transaction construction.
+
+Do not call:
+
+- TransactionBuilder
+- LocalSigner
+- TransactionBroadcastEngine
+
+from Home UI.
+
+Those integrations will be handled in dedicated transaction UI phases.
+
+==================================================
+17. NO BACKEND
+==================================================
+
+Do not add backend endpoints.
+
+Do not add:
+
+- database
+- authentication API
+- analytics
+- push notifications
+- remote configuration
+
+This phase is frontend + existing read-only core integration only.
+
+==================================================
+18. ACCESSIBILITY
+==================================================
+
+Add appropriate:
+
+- accessibility labels
+- accessible button roles
+- readable contrast
+- touch targets
+- meaningful labels for icons
+
+Do not rely exclusively on icons to communicate important actions.
+
+==================================================
+19. TESTING
+==================================================
+
+Add focused UI/application tests covering:
+
+1. Home renders after successful wallet unlock.
+2. WaveX branding renders correctly.
+3. Account public address is displayed safely.
+4. No secret material is rendered.
+5. Network information comes from existing network state.
+6. Portfolio data comes from PortfolioReadModelService.
+7. No duplicate blockchain calls are created by UI.
+8. Native asset renders correctly.
+9. ERC-20 asset renders correctly.
+10. Zero balance renders correctly.
+11. Unavailable asset renders correctly.
+12. Verification status remains independent.
+13. Logo fallback renders correctly.
+14. Send shows controlled unimplemented state.
+15. Receive shows controlled unimplemented state.
+16. Scan shows controlled unimplemented state.
+17. Swap placeholder works.
+18. Activity placeholder works.
+19. Settings placeholder works.
+20. Refresh invokes the existing read-model flow.
+21. Sanitized error states render correctly.
+22. Preview Test Mode reaches WaveX Home after correct PIN.
+23. Preview Test Mode does not invoke native wallet/security services.
+
+Avoid brittle screenshot-only tests.
+
+==================================================
+20. SECURITY REGRESSION CHECK
+==================================================
+
+Search the new UI code for accidental access to:
+
+- mnemonic
+- privateKey
+- seed
+- SecureStore
+- SecureVault
+- WalletAuthenticator
+- signing capability
+- transaction authorization secrets
+
+The UI should receive only the public/read-model data required for display.
+
+Do not log:
+
+- private keys
+- mnemonic
+- PIN
+- authentication credentials
+- signed transaction payloads
+
+==================================================
+21. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+
+Document:
+
+Wallet unlock
+      ↓
+WaveX Home
+      ↓
+PortfolioReadModelService
+      ↓
+Asset presentation
+
+Update:
+
+docs/SECURITY_ARCHITECTURE.md
+
+Document that the Home UI:
+
+- consumes public/read-only wallet data
+- has no secret access
+- has no signing authority
+- has no transaction broadcast authority
+- does not determine token trust
+
+Update:
+
+docs/DEVELOPMENT_STATE.md
+
+Record:
+
+- Phase 4.1 implemented
+- Home shell
+- navigation shell
+- PortfolioReadModel integration
+- placeholder destinations
+- Preview Test Mode integration
+- tests and validation
+- deferred functionality
+
+==================================================
+22. QUALITY GATE
+==================================================
+
+Before reporting completion, run:
+
+- Phase 4.1 focused tests
+- full existing test suite
+- TypeScript
+- git diff --check
+- Expo/Metro validation
+- web bundle validation
+
+Manually verify the Web Preview flow:
+
+1. Open Preview.
+2. Create test wallet.
+3. Set six-digit PIN.
+4. Enter correct PIN.
+5. Confirm WaveX Home appears immediately.
+6. Confirm no “Preparing local vault” screen appears.
+7. Confirm assets/home state renders.
+8. Lock.
+9. Unlock again.
+10. Confirm Home appears again.
+11. Test wrong PIN.
+12. Confirm wrong PIN remains locked.
+13. Test Reset Local Preview if available.
+
+Do not claim native biometric behavior is tested unless a real native development build/device is used.
+
+==================================================
+23. SCOPE CONTROL
+==================================================
+
+DO NOT implement in Phase 4.1:
+
+- real Send
+- real Receive
+- QR scanner
+- QR generation
+- token transfers
+- transaction history
+- Swap
+- DApps
+- WalletConnect
+- price feeds
+- fiat values
+- external token lists
+- external logo APIs
+- token verification providers
+- push notifications
+- backend services
+- cloud backup
+- account import
+- account creation UI
+- network switching
+- biometric UI changes
+
+Those will be implemented in later controlled phases.
+
+==================================================
+FINAL REPORT
+==================================================
+
+Report:
+
+1. Files created/changed
+2. Home screen architecture
+3. Navigation architecture
+4. PortfolioReadModel integration
+5. Account/network presentation
+6. Asset presentation
+7. Loading/empty/error/unavailable states
+8. Preview Test Mode integration
+9. Security boundary
+10. Tests and results
+11. TypeScript result
+12. Expo/Metro result
+13. Web bundle result
+14. Manual Web Preview verification
+15. Warnings
+16. Deferred features
+
+Do not make architectural changes outside Phase 4.1.

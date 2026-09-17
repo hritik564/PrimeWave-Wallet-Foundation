@@ -1,0 +1,573 @@
+PHASE 3.5 — PORTFOLIO READ MODEL & ASSET PRESENTATION LAYER
+
+IMPORTANT:
+This is a controlled implementation phase for the WaveX wallet foundation.
+
+DO NOT build the Home screen, Assets screen, Send screen, Receive screen, QR scanner, Activity screen, Swap UI, DApp UI, or any other major user-facing wallet UI in this phase.
+
+DO NOT redesign existing UI.
+
+DO NOT modify the established native security architecture.
+
+DO NOT modify SecureStore, Keychain/Keystore, WalletAccessManager, WalletAuthenticator, LocalWalletEngine, transaction signing, broadcasting, or biometric authentication.
+
+DO NOT add backend services, database persistence, price APIs, fiat APIs, token-list providers, logo providers, analytics, or external services.
+
+Use the existing architecture from Phases 3.1–3.4.
+
+==================================================
+OBJECTIVE
+==================================================
+
+Create a clean, UI-independent Portfolio Read Model layer that converts the existing Portfolio Aggregation results into a stable presentation-oriented model for future WaveX wallet screens.
+
+The future UI should be able to consume one clean read model rather than directly calling:
+
+- NetworkRegistry
+- EvmAccountStateService
+- NativeAssetBalanceService
+- ERC-20 Token Engine
+- Token Discovery Engine
+- PortfolioAggregationService
+
+This phase is an application/read-model layer only.
+
+Architecture:
+
+Blockchain / Asset Engines
+        ↓
+PortfolioAggregationService
+        ↓
+PortfolioReadModelService
+        ↓
+Future Wallet UI
+
+==================================================
+1. CREATE PORTFOLIO READ MODEL TYPES
+==================================================
+
+Create:
+
+src/core/assets/portfolio/read-model.ts
+
+Define strongly typed presentation models.
+
+At minimum include:
+
+PortfolioReadModel
+
+Fields should represent:
+
+- accountId
+- accountAddress
+- networkId
+- networkName
+- chainId
+- generatedAt
+- totalAssetCount
+- visibleAssetCount
+- assets
+- warnings
+- state
+
+Each asset should contain a stable presentation model such as:
+
+PortfolioAssetViewModel
+
+Fields:
+
+- identity
+- assetType
+- networkId
+- contractAddress when applicable
+- symbol
+- name
+- decimals
+- rawBalance
+- formattedBalance
+- visibility
+- verificationStatus
+- metadataStatus
+- provenance
+- icon
+- balanceState
+- availabilityState
+
+Do NOT introduce fiat values.
+
+Do NOT introduce token prices.
+
+Do NOT introduce portfolio USD/INR totals.
+
+Do NOT invent token trust scores.
+
+==================================================
+2. ASSET PRESENTATION STATES
+==================================================
+
+Define explicit states rather than relying on null/undefined ambiguity.
+
+Examples:
+
+Balance state:
+
+- positive
+- zero
+- unavailable
+
+Availability state:
+
+- available
+- unavailable
+- stale
+- invalid
+
+Metadata state:
+
+- complete
+- partial
+- unavailable
+- invalid
+
+Verification remains independent:
+
+- verified
+- unverified
+- unknown
+
+Do not infer verification from:
+
+- contract code
+- token name
+- symbol
+- decimals
+- balance
+- transfer history
+- discovery
+- popularity
+
+==================================================
+3. ICON / LOGO PRESENTATION
+==================================================
+
+Reuse the AssetIcon / TokenLogo architecture created in Phase 3.4.
+
+The read model must expose an icon presentation object.
+
+It must support:
+
+- token logo when a trusted logo source is eventually available
+- deterministic fallback
+- native asset fallback
+- unknown/unavailable fallback
+
+Do NOT connect an external logo provider in this phase.
+
+Do NOT treat the existence of an icon/logo as proof of token verification or trust.
+
+Logo state must remain independent from:
+
+- verification
+- provenance
+- discovery
+- metadata status
+
+==================================================
+4. PORTFOLIO READ MODEL SERVICE
+==================================================
+
+Create:
+
+src/core/assets/portfolio/portfolio-read-model-service.ts
+
+Create a service such as:
+
+PortfolioReadModelService
+
+It should consume the existing PortfolioAggregationService.
+
+Responsibilities:
+
+1. Validate account context.
+2. Validate network context.
+3. Request the existing portfolio aggregation result.
+4. Convert aggregation results into stable presentation models.
+5. Preserve asset identity.
+6. Preserve account/network isolation.
+7. Preserve provenance.
+8. Preserve visibility state.
+9. Preserve verification state.
+10. Preserve metadata state.
+11. Preserve balance/availability state.
+12. Preserve exact BigInt raw balances.
+13. Preserve deterministic formatted balances.
+14. Preserve icon/fallback information.
+15. Return deterministic ordering.
+
+Do NOT duplicate blockchain RPC calls.
+
+Do NOT implement another token balance engine.
+
+Do NOT implement another portfolio aggregation engine.
+
+The read-model service must transform existing results rather than independently querying blockchain state.
+
+==================================================
+5. DETERMINISTIC ASSET ORDERING
+==================================================
+
+Create deterministic ordering suitable for future UI.
+
+Recommended ordering:
+
+1. visible assets before hidden assets
+2. available assets before unavailable assets
+3. positive balances before zero balances
+4. native asset before fungible tokens
+5. deterministic identity-based ordering for remaining ties
+
+Do not use:
+
+- token popularity
+- fiat value
+- external rankings
+- arbitrary random ordering
+
+Document the ordering rules.
+
+==================================================
+6. VISIBILITY
+==================================================
+
+Respect the existing Phase 3.3 / 3.4 visibility model.
+
+The read model must distinguish:
+
+- visible
+- hidden
+
+Do not delete the underlying token identity merely because an asset is hidden.
+
+Do not confuse:
+
+hidden
+with
+unverified
+with
+unavailable.
+
+They are independent concepts.
+
+==================================================
+7. NETWORK AND ACCOUNT ISOLATION
+==================================================
+
+The read model must remain explicitly scoped to:
+
+account + network.
+
+Never merge balances between:
+
+- Ethereum and BNB
+- Ethereum and Polygon
+- PrimeWave and Ethereum
+- Account 0 and Account 1
+- any other network/account combination.
+
+The same contract address on two different networks must remain different asset identities.
+
+Use the existing authoritative asset identity model.
+
+==================================================
+8. PRIMEWAVE NETWORK RULE
+==================================================
+
+Continue respecting the existing PrimeWave placeholder configuration.
+
+Do NOT invent:
+
+- PrimeWave Mainnet chain ID
+- PrimeWave RPC URL
+- PrimeWave explorer
+- PrimeWave token metadata
+- PrimeWave production configuration
+
+If the existing network engine marks PrimeWave as placeholder/unconfigured, the read model must preserve that state and must not fabricate usable blockchain data.
+
+==================================================
+9. ERROR HANDLING
+==================================================
+
+Create read-model-specific normalized errors where necessary.
+
+Do not expose:
+
+- private keys
+- seed phrases
+- PINs
+- SecureStore contents
+- raw native authentication errors
+- RPC credentials
+- full RPC URLs containing credentials
+- raw stack traces
+
+Do not swallow meaningful asset/network errors.
+
+Represent expected read states explicitly.
+
+==================================================
+10. NO SECRET ACCESS
+==================================================
+
+This entire phase must remain completely outside the secret boundary.
+
+The new code MUST NOT access:
+
+- SecureStore
+- SecureVault
+- Keychain
+- Keystore
+- WalletAuthenticator
+- LocalWalletEngine secrets
+- mnemonic
+- private keys
+- signing capabilities
+- transaction authorization secrets
+
+The read model only deals with public wallet/account information and public blockchain asset state.
+
+==================================================
+11. NO PERSISTENCE
+==================================================
+
+Do not add:
+
+- AsyncStorage
+- localStorage
+- SecureStore persistence
+- database persistence
+- filesystem persistence
+- backend persistence
+
+The read model is an in-memory/read-only application model.
+
+==================================================
+12. TESTS
+==================================================
+
+Create focused tests for:
+
+A. Basic transformation
+
+- aggregation result → read model
+- correct account
+- correct network
+- correct asset count
+
+B. Native asset
+
+- native asset correctly represented
+- symbol/name/decimals preserved
+- exact raw balance preserved
+- formatted balance preserved
+- native icon fallback exposed
+
+C. ERC-20
+
+- contract address preserved
+- checksum identity preserved
+- symbol/name/decimals preserved
+- raw balance preserved
+- formatted balance preserved
+
+D. Visibility
+
+- visible asset remains visible
+- hidden asset remains hidden
+- hidden does not mean unverified
+
+E. Verification
+
+- verified remains verified
+- unverified remains unverified
+- unknown remains unknown
+- verification is not inferred
+
+F. Metadata
+
+- complete
+- partial
+- unavailable
+- invalid
+
+G. Availability
+
+- available
+- unavailable
+- stale
+- invalid
+
+H. Ordering
+
+Test deterministic ordering for:
+
+- native vs token
+- visible vs hidden
+- positive vs zero
+- available vs unavailable
+- deterministic tie breaking
+
+I. Network isolation
+
+Verify the same contract address on two networks produces separate identities.
+
+J. Account isolation
+
+Verify the same account's assets cannot appear under another account.
+
+K. BigInt precision
+
+Use large balances and verify no precision loss.
+
+L. Icon fallback
+
+Verify deterministic fallback behavior when no trusted logo source exists.
+
+M. No secret access
+
+Regression-test that the read-model layer does not access SecureStore, WalletAuthenticator, LocalWalletEngine secret APIs, signing, or native authentication.
+
+N. No persistence
+
+Regression-test that the new layer does not use AsyncStorage, localStorage, filesystem persistence, or backend calls.
+
+O. No duplicate blockchain calls
+
+Verify PortfolioReadModelService delegates to PortfolioAggregationService rather than creating independent RPC reads.
+
+==================================================
+13. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+
+Add the new flow:
+
+Blockchain / Asset Services
+        ↓
+PortfolioAggregationService
+        ↓
+PortfolioReadModelService
+        ↓
+Future Wallet UI
+
+Update:
+
+docs/SECURITY_ARCHITECTURE.md
+
+Document that the Portfolio Read Model:
+
+- handles public asset/account data only
+- has no secret access
+- has no signing capability
+- has no persistence
+- does not perform transactions
+- does not determine token trust
+- does not infer verification
+
+Update:
+
+docs/DEVELOPMENT_STATE.md
+
+Record:
+
+- Phase 3.5 implemented
+- files added/changed
+- tests
+- architecture boundary
+- deferred items
+
+==================================================
+14. EXPORTS
+==================================================
+
+Keep exports clean and intentional.
+
+Do not expose internal helpers unnecessarily.
+
+The future UI should have a simple public entry point to request:
+
+PortfolioReadModel
+
+for a specific account and network.
+
+==================================================
+15. QUALITY GATE
+==================================================
+
+Before reporting completion, run:
+
+- focused Phase 3.5 tests
+- complete existing test suite
+- TypeScript
+- git diff --check
+- Expo/Metro validation
+- web bundle validation
+
+Confirm that all previous tests still pass.
+
+Do not report success based only on static code inspection.
+
+==================================================
+16. IMPORTANT SCOPE LIMIT
+==================================================
+
+DO NOT implement in this phase:
+
+- Home screen
+- Assets screen
+- Send
+- Receive
+- QR scanner
+- QR display UI
+- transaction history UI
+- network selector UI
+- account selector UI
+- Settings UI
+- Swap
+- DApps
+- WalletConnect
+- price feeds
+- fiat valuation
+- token logo APIs
+- backend indexing
+- push notifications
+- analytics
+
+Those will be handled in later controlled phases.
+
+==================================================
+FINAL REPORT
+==================================================
+
+When complete, report:
+
+1. Files created/changed
+2. Portfolio Read Model architecture
+3. Exact public models/interfaces
+4. Deterministic ordering rules
+5. Visibility/verification/metadata separation
+6. Icon/logo abstraction behavior
+7. Account/network isolation
+8. Security boundary
+9. Persistence boundary
+10. Test count and results
+11. TypeScript result
+12. Expo/Metro result
+13. Web bundle result
+14. Any warnings
+15. Any deferred items
+
+Do not make additional architectural changes outside Phase 3.5.
