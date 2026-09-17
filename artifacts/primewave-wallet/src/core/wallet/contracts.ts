@@ -5,8 +5,17 @@ import type {
 } from '@/src/core/security';
 import type { Wallet, WalletAccount } from './models';
 
+export interface WalletSetupResult {
+  wallet: Wallet;
+  recoveryPhrase: string;
+}
+
 export interface WalletEngine {
   createWallet(): Promise<Wallet>;
+  prepareWallet(): Promise<WalletSetupResult>;
+  prepareImportWallet(recoveryPhrase: string): Promise<Wallet>;
+  persistPreparedWallet(): Promise<Wallet>;
+  importWallet(recoveryPhrase: string): Promise<Wallet>;
   loadWallet(): Promise<Wallet | null>;
   deriveAccount(accountIndex?: number): Promise<WalletAccount>;
   getAccounts(): Promise<WalletAccount[]>;

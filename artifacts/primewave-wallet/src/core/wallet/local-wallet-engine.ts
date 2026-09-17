@@ -2,7 +2,7 @@ import { entropyToMnemonic } from '@scure/bip39';
 import { wordlist } from '@scure/bip39/wordlists/english';
 import { secureLogger } from '@/src/core/security';
 import type { AccountDerivationRequest } from '@/src/core/security';
-import type { WalletEngine } from './contracts';
+import type { WalletEngine, WalletSetupResult } from './contracts';
 import type { Wallet, WalletAccount } from './models';
 import {
   derivePublicAccountFromMnemonic,
@@ -50,6 +50,11 @@ export class LocalWalletEngine implements WalletEngine {
   }
 
   async createWallet(): Promise<Wallet> {
+    await this.prepareWallet();
+    return this.persistPreparedWallet();
+  }
+
+  async prepareWallet(): Promise<WalletSetupResult> {
     secureLogger.info('Wallet core creation started');
     this.discard();
 
@@ -76,15 +81,63 @@ export class LocalWalletEngine implements WalletEngine {
       this.walletId = walletId;
       this.createdAt = createdAt;
 
-      secureLogger.info('Wallet core created', {
-        accountIndex: 0,
-        derivationPath: `${EVM_DERIVATION_PREFIX}/0`,
-      });
-
-      return this.toWalletModel();
+      return {
+        wallet: this.toWalletModel(),
+        recoveryPhrase: mnemonic,
+      };
     } finally {
       entropy.fill(0);
     }
+  }
+
+  async prepareImportWallet(recoveryPhrase: string): Promise<Wallet> {
+    this.discard();
+    const normalizedPhrase = normalizeRecoveryPhrase(recoveryPhrase);
+    const firstAccount = derivePublicAccountFromMnemonic(normalizedPhrase, 0);
+    const createdAt = new Date().toISOString();
+
+    secretStates.set(this, { mnemonic: normalizedPhrase });
+    this.accounts = [firstAccount];
+    this.walletId = `wallet-${createdAt}`;
+    this.createdAt = createdAt;
+
+    secureLogger.info('Wallet import prepared', {
+      accountIndex: 0,
+      derivationPath: `${EVM_DERIVATION_PREFIX}/0`,
+    });
+
+    return this.toWalletModel();
+  }
+
+  async persistPreparedWallet(): Promise<Wallet> {
+    const state = secretStates.get(this);
+    if (!state || !this.walletId || !this.createdAt) {
+      throw new WalletCoreError(
+        'WALLET_NOT_CREATED',
+        'Prepare a wallet before persisting it.',
+      );
+    }
+
+    const vault = await this.getVault();
+    await vault.saveEncryptedWalletState(
+      createEncryptedWalletState({
+        walletId: this.walletId,
+        createdAt: this.createdAt,
+        accountIndexes: this.accounts.map((account) => account.index),
+        mnemonic: state.mnemonic,
+      }),
+    );
+
+    secureLogger.info('Wallet vault created', {
+      accountCount: this.accounts.length,
+    });
+
+    return this.toWalletModel();
+  }
+
+  async importWallet(recoveryPhrase: string): Promise<Wallet> {
+    await this.prepareImportWallet(recoveryPhrase);
+    return this.persistPreparedWallet();
   }
 
   async loadWallet(): Promise<Wallet | null> {
@@ -121,6 +174,22 @@ export class LocalWalletEngine implements WalletEngine {
     } finally {
       record.mnemonic = '';
     }
+  }
+
+  async getRecoveryPhraseForAuthenticatedSession(): Promise<string> {
+    const state = secretStates.get(this);
+    if (!state) {
+      throw new WalletCoreError(
+        'WALLET_NOT_CREATED',
+        'Unlock the wallet before accessing recovery material.',
+      );
+    }
+
+    return state.mnemonic;
+  }
+
+  async getCurrentWallet(): Promise<Wallet> {
+    return this.toWalletModel();
   }
 
   async deriveAccount(accountIndex = 0): Promise<WalletAccount> {
