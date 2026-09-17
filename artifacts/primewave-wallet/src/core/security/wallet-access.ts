@@ -97,6 +97,13 @@ export class WalletAccessManager {
     this.status = 'unlocked';
   }
 
+  async resetLocalWallet(): Promise<void> {
+    await this.engine.deleteWallet();
+    await this.authenticator.clearAuthenticationState();
+    this.currentWallet = null;
+    this.status = 'onboarding';
+  }
+
   async unlockWithPin(pin: string): Promise<AuthenticationResult> {
     const result = await this.authenticator.authenticateWithPin(pin);
     if (result.authenticated) {

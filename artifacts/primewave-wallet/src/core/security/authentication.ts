@@ -361,6 +361,26 @@ export class AuthenticationManager implements WalletAuthenticator {
     }
   }
 
+  async clearAuthenticationState(): Promise<void> {
+    this.clearAutoLockTimer();
+    this.isBackgrounded = false;
+    this.biometricPromptInFlight = false;
+    this.pendingBackgroundLock = false;
+
+    try {
+      await (await this.storagePromise).deleteItemAsync(
+        AUTHENTICATION_STORAGE_KEY,
+      );
+    } catch {
+      throw new AuthenticationError(
+        'AUTHENTICATION_STORAGE_FAILED',
+        'Authentication is unavailable.',
+      );
+    }
+
+    this.state = 'LOCKED';
+  }
+
   async authenticateWithPin(pin: string): Promise<AuthenticationResult> {
     if (!isValidPin(pin)) {
       this.state = 'AUTHENTICATION_FAILED';
