@@ -233,6 +233,18 @@ export class SecureWalletVault implements SecureVault {
     try {
       await this.storage.deleteItemAsync(VAULT_STORAGE_KEY);
     } catch {
+      // Some native SecureStore implementations reject deletion when the
+      // item is already absent. Treat that state as successfully erased, but
+      // only after checking the key without parsing or exposing its payload.
+      try {
+        const remaining = await this.storage.getItemAsync(VAULT_STORAGE_KEY);
+        if (remaining === null) {
+          return;
+        }
+      } catch {
+        // Preserve the original delete failure when the verification read
+        // cannot establish that the item is gone.
+      }
       throw new WalletVaultError(
         'STORAGE_DELETE_FAILED',
         'The wallet vault could not be deleted.',

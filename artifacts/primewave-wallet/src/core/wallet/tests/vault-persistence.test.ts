@@ -15,6 +15,7 @@ import {
 class MemorySecureStorage implements SecureKeyValueStorage {
   value: string | null = null;
   available = true;
+  failDeleteWhenEmpty = false;
 
   async isAvailableAsync(): Promise<boolean> {
     return this.available;
@@ -29,6 +30,9 @@ class MemorySecureStorage implements SecureKeyValueStorage {
   }
 
   async deleteItemAsync(_key: string): Promise<void> {
+    if (this.failDeleteWhenEmpty && this.value === null) {
+      throw new Error('item not found');
+    }
     this.value = null;
   }
 }
@@ -214,6 +218,16 @@ test('deletes the persisted vault without exposing its contents', async () => {
   await vault.saveEncryptedWalletState(
     createEncryptedWalletState(createRecord()),
   );
+
+  await vault.deleteWalletState();
+
+  assert.equal(await vault.hasVault(), false);
+});
+
+test('treats deletion of an already-erased vault as successful', async () => {
+  const storage = new MemorySecureStorage();
+  storage.failDeleteWhenEmpty = true;
+  const vault = new SecureWalletVault(storage);
 
   await vault.deleteWalletState();
 
