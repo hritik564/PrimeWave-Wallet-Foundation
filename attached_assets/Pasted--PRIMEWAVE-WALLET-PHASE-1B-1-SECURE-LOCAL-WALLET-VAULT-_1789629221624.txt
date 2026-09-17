@@ -1,0 +1,567 @@
+# PRIMEWAVE WALLET — PHASE 1B-1
+
+## SECURE LOCAL WALLET VAULT
+
+Phase 1A has been completed and approved.
+
+Continue from the existing PrimeWave Wallet project.
+
+This is **PHASE 1B-1 ONLY**.
+
+We are now implementing secure local persistence for the non-custodial wallet created in Phase 1A.
+
+The purpose of this phase is to create a secure encrypted wallet vault using platform-appropriate secure storage.
+
+DO NOT implement the complete authentication UX yet.
+
+DO NOT implement transaction signing.
+
+DO NOT implement blockchain connectivity.
+
+DO NOT implement transactions, swaps, DApps, backend, or portfolio functionality.
+
+---
+
+# 1. OBJECTIVE
+
+Convert the current in-memory wallet into a securely persisted local wallet.
+
+The required lifecycle will eventually be:
+
+Create Wallet
+↓
+Generate mnemonic
+↓
+Derive account
+↓
+Encrypt wallet secret material
+↓
+Store encrypted vault using secure device storage
+↓
+App closes
+↓
+App reopens
+↓
+Vault remains available
+↓
+Authentication unlocks vault
+↓
+WalletEngine reconstructs wallet
+
+The actual authentication UX will be implemented in Phase 1B-2.
+
+---
+
+# 2. NON-CUSTODIAL RULE
+
+The following must NEVER be transmitted to PrimeWave backend infrastructure:
+
+* mnemonic
+* seed
+* private key
+* encryption key
+* wallet password
+* wallet PIN
+* biometric secret
+
+There is no backend in this phase.
+
+There must be no network calls.
+
+---
+
+# 3. SECURE STORAGE REQUIREMENT
+
+Use platform-appropriate secure storage.
+
+The implementation must use:
+
+### iOS
+
+Apple Keychain / appropriate secure credential storage.
+
+### Android
+
+Android Keystore-backed secure storage where appropriate.
+
+Do not use:
+
+* AsyncStorage
+* localStorage
+* plain SQLite
+* plain files
+* unencrypted JSON
+* Redux persistence
+* Zustand persistence
+* cookies
+* browser storage
+
+for wallet secrets.
+
+If the selected Expo-compatible secure storage solution cannot provide the required security guarantees, STOP and report the limitation rather than pretending it is secure.
+
+---
+
+# 4. DEPENDENCY SELECTION
+
+Before implementation:
+
+1. Inspect the current project.
+2. Identify the appropriate secure-storage solution for React Native + Expo.
+3. Select a maintained and reputable library.
+4. Add only the minimum required dependency.
+5. Record:
+
+   * package name
+   * exact installed version
+   * purpose
+   * platform behavior
+   * important limitations
+
+Do not install a large authentication framework.
+
+Do not install unnecessary wallet frameworks.
+
+Do not replace the existing cryptographic libraries.
+
+---
+
+# 5. ENCRYPTION ARCHITECTURE
+
+Do not invent encryption.
+
+Use established cryptographic primitives or a trusted secure-storage mechanism.
+
+The architecture should ensure that the persistent wallet representation is encrypted/protected.
+
+The stored data must not be usable as a plain-text wallet representation.
+
+Do not write custom encryption algorithms.
+
+Do not implement AES, ChaCha, PBKDF, Argon2, scrypt, or other cryptographic primitives manually.
+
+Use established implementations.
+
+If a password-derived encryption layer is required, use a well-established password-based key derivation mechanism rather than inventing one.
+
+Document the exact algorithm and parameters.
+
+---
+
+# 6. WHAT SHOULD BE STORED
+
+The persistent vault may contain the minimum secret material necessary to restore the wallet locally.
+
+Do not store unnecessary information.
+
+The public metadata may contain:
+
+* wallet ID
+* account IDs
+* account indexes
+* addresses
+* derivation paths
+* creation timestamp
+
+Secret wallet material must remain inside the protected vault.
+
+Do NOT put private keys or mnemonic phrases into public application state.
+
+Do NOT return secret material from SecureVault methods unnecessarily.
+
+---
+
+# 7. VAULT CONTRACT
+
+Implement the SecureVault contract created during Phase 0B.
+
+The architecture should support concepts equivalent to:
+
+saveVault()
+
+loadVault()
+
+vaultExists()
+
+deleteVault()
+
+isVaultValid()
+
+The implementation should return safe status information rather than exposing secret contents.
+
+Avoid APIs that allow arbitrary code throughout the application to request the raw decrypted vault.
+
+---
+
+# 8. SECRET ISOLATION
+
+Create a clear boundary:
+
+UI
+↓
+WalletEngine
+↓
+SecureVault
+↓
+Secure Storage
+
+The UI must NOT directly access secure-storage APIs.
+
+The UI must NOT directly access encryption APIs.
+
+The UI must NOT receive the raw mnemonic.
+
+The UI must NOT receive private keys.
+
+The UI must not be responsible for encryption/decryption.
+
+---
+
+# 9. WALLET ENGINE INTEGRATION
+
+Modify LocalWalletEngine as necessary so that the architecture can:
+
+* create a wallet
+* persist it securely
+* load it after application restart
+* reconstruct public account metadata
+
+Do not implement the final authentication mechanism yet.
+
+For development/testing purposes, the vault implementation may expose a controlled internal mechanism required to verify persistence, but do not create a production UI bypass.
+
+Do NOT create:
+
+getPrivateKey()
+
+exportPrivateKey()
+
+getMnemonic()
+
+or equivalent public APIs.
+
+---
+
+# 10. VAULT VERSIONING
+
+Implement a versioned vault format.
+
+For example:
+
+vaultVersion: 1
+
+The exact structure is up to you, but it must allow future migration.
+
+Document:
+
+* current vault version
+* encrypted payload structure
+* metadata structure
+* migration strategy
+
+Never assume the wallet vault format will remain unchanged forever.
+
+---
+
+# 11. CORRUPTION HANDLING
+
+The vault must detect:
+
+* missing vault
+* malformed vault
+* corrupted vault
+* invalid authentication/decryption state
+* unsupported vault version
+
+Do not crash the application.
+
+Return sanitized errors.
+
+Do not expose encrypted payloads or secret material in errors.
+
+---
+
+# 12. BACKUP MODEL
+
+Do NOT implement cloud backup.
+
+Do NOT upload the vault anywhere.
+
+Do NOT sync the vault to PrimeWave servers.
+
+The recovery phrase remains the user's recovery mechanism.
+
+Document clearly:
+
+A local encrypted vault is a convenience for the device.
+
+The recovery phrase is the fundamental wallet recovery mechanism.
+
+---
+
+# 13. DEVICE LOSS MODEL
+
+Document:
+
+If the user loses the device but still has their recovery phrase:
+
+→ they can recover the wallet on another compatible device.
+
+If the user loses both:
+
+→ PrimeWave cannot recover the wallet.
+
+Do not implement server recovery.
+
+---
+
+# 14. APPLICATION LIFECYCLE
+
+Prepare secure handling for:
+
+* application launch
+* application backgrounding
+* application termination
+* application restart
+
+Do not implement the final automatic lock UX yet.
+
+But document the lifecycle hooks that Phase 1B-2 will use.
+
+---
+
+# 15. MEMORY SAFETY
+
+When decrypted secret material is required:
+
+* keep its lifetime as short as practical
+* avoid unnecessary copies
+* do not put it in global state
+* do not put it in React state
+* do not persist it through state-management libraries
+* do not log it
+
+Do not falsely claim that JavaScript garbage collection guarantees memory wiping.
+
+Document this limitation.
+
+---
+
+# 16. LOGGING
+
+Continue using SecureLogger from Phase 0B.
+
+NEVER log:
+
+* mnemonic
+* seed
+* private key
+* encryption key
+* decrypted vault
+* authentication secrets
+* raw encrypted payloads if unnecessary
+
+Safe logging may include:
+
+* vault created
+* vault loaded
+* vault deleted
+* vault version
+* account count
+* operation success/failure
+
+Do not log addresses unnecessarily.
+
+---
+
+# 17. TESTING
+
+Add meaningful tests.
+
+At minimum verify:
+
+### Persistence
+
+Create wallet
+↓
+Save vault
+↓
+Clear engine instance
+↓
+Create new engine instance
+↓
+Load vault
+↓
+Verify same account addresses
+
+### Security
+
+Verify:
+
+* plaintext mnemonic is not written to normal storage
+* plaintext private key is not written to normal storage
+* UI-facing wallet models contain no private key
+* UI-facing wallet models contain no mnemonic
+* no network request occurs during vault operations
+* vault corruption is detected
+* unsupported vault version is handled
+* missing vault is handled
+
+### Determinism
+
+The recovered wallet must derive the same address as the original wallet.
+
+Do not create superficial tests that only check that a function returns a value.
+
+---
+
+# 18. DEVELOPMENT TESTING
+
+For development, create a safe test pathway that can verify:
+
+1. Create wallet.
+2. Persist vault.
+3. Destroy in-memory wallet engine.
+4. Recreate engine.
+5. Load vault.
+6. Verify address consistency.
+
+Do NOT display the recovery phrase.
+
+Do NOT display private keys.
+
+Do NOT create a production bypass password.
+
+Do NOT add a debug endpoint that reveals secrets.
+
+---
+
+# 19. SECURITY DOCUMENTATION
+
+Update:
+
+docs/SECURITY_ARCHITECTURE.md
+
+with:
+
+* secure storage technology
+* encryption/protection mechanism
+* vault architecture
+* vault versioning
+* secret lifecycle
+* platform differences
+* limitations
+* threat model updates
+
+Update:
+
+docs/ARCHITECTURE.md
+
+with the new:
+
+UI
+↓
+WalletEngine
+↓
+SecureVault
+↓
+Platform Secure Storage
+
+architecture.
+
+Update:
+
+docs/DEVELOPMENT_STATE.md
+
+with Phase 1B-1 status.
+
+---
+
+# 20. NO AUTHENTICATION UX YET
+
+Do NOT implement:
+
+* PIN creation
+* PIN login
+* biometric login
+* biometric enrollment
+* lock screen
+* authentication screens
+
+Those belong to Phase 1B-2.
+
+The vault must nevertheless be designed so authentication can be added cleanly.
+
+---
+
+# 21. NO BLOCKCHAIN
+
+Do not add:
+
+* RPC
+* fetch to blockchain providers
+* WebSocket
+* blockchain API
+* transaction functionality
+
+The wallet must remain offline-capable.
+
+---
+
+# 22. VALIDATION
+
+Before completion:
+
+* TypeScript check passes.
+* Existing wallet-core tests pass.
+* New vault tests pass.
+* Application starts.
+* Phase 0A UI remains functional.
+* Wallet creation still works.
+* Wallet persistence works.
+* Wallet restoration works.
+* No secret network traffic exists.
+* No plaintext secret persistence exists.
+* No private-key public API exists.
+* No authentication UI was implemented.
+* No blockchain functionality was implemented.
+
+---
+
+# 23. STOP CONDITION
+
+STOP after Phase 1B-1.
+
+Do NOT implement Phase 1B-2 automatically.
+
+Do NOT implement PINs.
+
+Do NOT implement biometrics.
+
+Do NOT implement transaction signing.
+
+Do NOT implement blockchain connectivity.
+
+---
+
+# FINAL REPORT
+
+When finished, report:
+
+1. Secure-storage library selected.
+2. Exact version.
+3. Why it was selected.
+4. Platform behavior on iOS and Android.
+5. Encryption/protection mechanism.
+6. Vault format/version.
+7. Files created/modified.
+8. Tests performed and results.
+9. Security checks performed.
+10. Any platform limitations.
+11. Any warnings/errors.
+12. Confirmation that no backend/network was introduced.
+13. Confirmation that no authentication UI was introduced.
+14. Confirmation that private keys and recovery phrases are not exposed through public APIs.
+15. Exact next recommended step.
+
+Do NOT start Phase 1B-2 automatically.
