@@ -1,0 +1,951 @@
+PRIMEWAVE WALLET — PHASE 2.5
+TRANSACTION CONSTRUCTION ENGINE
+================================
+
+You are continuing development of PrimeWave Wallet.
+
+IMPORTANT WORKFLOW:
+- Do ONLY Phase 2.5.
+- Do not proceed to signing, broadcasting, transaction history, tokens, swaps, DApps, backend, or UI redesign.
+- Do not invent future functionality.
+- Preserve all existing architecture and tests.
+- This phase must remain completely safe if the wallet contains real funds later.
+- After implementation, run the required tests/checks and provide a detailed completion report.
+- Do not ask me to approve intermediate implementation decisions unless absolutely necessary; follow the architecture below.
+
+==================================================
+PRODUCT SECURITY INVARIANT
+==================================================
+
+PrimeWave Wallet is strictly non-custodial.
+
+Private keys and recovery phrases:
+- MUST NEVER leave the user's device.
+- MUST NEVER be sent to the backend.
+- MUST NEVER be sent to RPC providers.
+- MUST NEVER be logged.
+- MUST NEVER be persisted outside the secure vault.
+- MUST NEVER be exposed through transaction-construction APIs.
+- MUST NEVER be required by this phase.
+
+PHASE 2.5 MUST NOT:
+- sign transactions
+- broadcast transactions
+- access private keys
+- access recovery phrases
+- unlock the secure vault
+- create signatures
+- call eth_sendRawTransaction
+- add backend transaction APIs
+- add token logic
+- add swap logic
+- add DApp logic
+- add WalletConnect
+- add transaction history
+- add fiat pricing
+- add UI screens
+
+This is an UNSIGNED TRANSACTION CONSTRUCTION phase only.
+
+==================================================
+EXISTING ARCHITECTURE
+==================================================
+
+Existing architecture:
+
+PRIMEWAVE UI
+  Home / Assets / Swap / Activity / Settings
+       ↓
+WALLET ENGINE
+  Accounts / Signing / Transactions / Sessions
+       ↓
+BLOCKCHAIN ENGINE
+  EVM / RPC / Gas / Tokens / Networks
+       ↓
+SECURE DEVICE LAYER
+  Keychain / Keystore / Biometrics / Encryption
+
+Backend separately handles:
+- authentication/profile where applicable
+- wallet metadata
+- token metadata
+- price data
+- blockchain indexing
+- transaction history
+- notifications
+- analytics
+
+Backend MUST NOT handle:
+- private keys
+- recovery phrases
+- wallet PIN
+- signing secrets
+- encryption keys
+- transaction signing
+
+Existing completed components include:
+
+1. Network Registry
+2. EVM RPC Provider
+3. EVM Account State Service
+4. Gas/Fee Engine
+5. Secure Vault
+6. Wallet Engine
+7. Security contracts
+
+Reuse these components rather than duplicating their logic.
+
+==================================================
+PHASE 2.5 OBJECTIVE
+==================================================
+
+Build a UI-independent EVM Transaction Construction Engine.
+
+Its responsibility is:
+
+Transaction Intent
+        ↓
+Validation
+        ↓
+Network Context Validation
+        ↓
+Gas Estimation
+        ↓
+Fee Selection
+        ↓
+Unsigned Transaction Envelope
+        ↓
+Transaction Preview Model
+
+Nothing after that.
+
+The result must be an unsigned, deterministic transaction representation that a future signing phase can consume.
+
+==================================================
+1. CREATE TRANSACTION MODELS
+==================================================
+
+Create strongly typed transaction models.
+
+At minimum support:
+
+A. Native currency transfer
+
+Example concept:
+
+FROM:
+0x...
+
+TO:
+0x...
+
+VALUE:
+1.5 ETH
+
+DATA:
+0x
+
+B. Generic contract call
+
+Example concept:
+
+FROM:
+0x...
+
+TO:
+0x...
+
+VALUE:
+0 ETH
+
+DATA:
+0x...
+
+The generic contract-call model must NOT attempt ABI decoding in this phase.
+
+Do not create token-specific abstractions yet.
+
+Suggested conceptual model:
+
+TransactionIntent
+
+- from
+- to
+- value
+- data
+- optional nonce
+- optional gasLimit
+- optional fee configuration
+- networkId
+
+UnsignedTransaction
+
+- from
+- to
+- value
+- data
+- nonce
+- gasLimit
+- chainId
+- transactionType
+- fee fields
+
+TransactionPreview
+
+- network
+- chainId
+- from
+- to
+- value
+- data
+- nonce
+- gasLimit
+- fee model
+- maxFeePerGas where applicable
+- maxPriorityFeePerGas where applicable
+- gasPrice where applicable
+- estimatedNetworkFee
+- totalNativeValue
+- warnings / validation information
+
+Use bigint internally for all blockchain numeric quantities.
+
+DO NOT use JavaScript floating point numbers for:
+- value
+- gas
+- gas price
+- fees
+- nonce
+- chain ID
+- transaction quantities
+
+==================================================
+2. TRANSACTION TYPES
+==================================================
+
+Support:
+
+LEGACY
+
+and
+
+EIP1559
+
+Use the fee information already provided by Phase 2.4.
+
+For Legacy:
+
+- gasPrice
+- gasLimit
+
+For EIP-1559:
+
+- maxFeePerGas
+- maxPriorityFeePerGas
+- gasLimit
+
+Do not create a fake fee model.
+
+Do not silently convert one model into another.
+
+The transaction object must explicitly state which fee model is being used.
+
+If the existing fee engine determines that only Legacy is available, construct a Legacy transaction.
+
+If EIP-1559 is available, use the appropriate EIP-1559 model according to the existing fee engine.
+
+Do not introduce arbitrary gas multipliers or fee padding.
+
+==================================================
+3. VALIDATE NETWORK
+==================================================
+
+Every transaction must be bound to an explicit network.
+
+Before constructing a transaction:
+
+- verify the network exists
+- verify it is enabled
+- verify it is configured
+- verify it is the currently selected active network
+- verify the RPC chain ID matches the registry chain ID
+
+The transaction chainId MUST come from the validated network context.
+
+Never allow the caller to arbitrarily construct a transaction for a different chain than the active network.
+
+If the active network changes during construction:
+
+FAIL safely.
+
+Return a normalized network-change error.
+
+Do not silently rebuild using the new network.
+
+PrimeWave's current Mainnet entry remains a placeholder until real Mainnet configuration is supplied.
+
+Do NOT invent PrimeWave Mainnet RPC or chain values.
+
+==================================================
+4. VALIDATE FROM ADDRESS
+==================================================
+
+Validate:
+
+- valid EVM address
+- checksum normalization where appropriate
+- transaction FROM must correspond to a known local wallet account
+
+IMPORTANT:
+
+This does NOT mean accessing the private key.
+
+Use public wallet/account metadata only.
+
+If the FROM address is not one of the locally available public wallet accounts:
+
+reject construction.
+
+Do not automatically substitute another account.
+
+==================================================
+5. VALIDATE TO ADDRESS
+==================================================
+
+For normal transactions:
+
+- TO must be a valid EVM address.
+
+Support generic contract destinations.
+
+Do not assume every contract address is safe.
+
+Do not attempt to determine whether a contract is malicious.
+
+Do not add security claims that cannot be verified.
+
+For native transfers, TO is required.
+
+If contract creation is NOT already supported by the current architecture, do not introduce it in this phase.
+
+Do not expand scope unnecessarily.
+
+==================================================
+6. VALIDATE VALUE
+==================================================
+
+Value must be represented safely as bigint internally.
+
+Accept a deterministic blockchain-unit representation.
+
+The engine must reject:
+
+- negative values
+- malformed numeric values
+- unsafe JavaScript numbers
+- NaN
+- Infinity
+- decimal strings where the expected input is base-unit quantity
+- overflow conditions
+
+Do not use parseFloat for blockchain amounts.
+
+Do not use floating-point arithmetic.
+
+If human-readable conversion is needed, use existing exact formatting utilities.
+
+==================================================
+7. VALIDATE DATA / CALLDATA
+==================================================
+
+Transaction data must:
+
+- be a valid 0x-prefixed hexadecimal string
+- contain only hexadecimal characters
+- have valid byte structure
+
+Normalize consistently.
+
+For example:
+
+0x
+
+must represent empty calldata.
+
+Reject malformed calldata.
+
+Do not decode ABI.
+
+Do not guess what calldata does.
+
+Do not modify calldata.
+
+==================================================
+8. NONCE HANDLING
+==================================================
+
+If nonce is supplied:
+
+- validate it as a safe non-negative bigint/integer representation
+- use it exactly as supplied
+- never silently modify it
+
+If nonce is omitted:
+
+retrieve the current transaction count using the existing Account State / RPC layer.
+
+Use the appropriate existing RPC method.
+
+The nonce must belong to the validated FROM address and active network.
+
+Do not maintain a local nonce counter.
+
+Do not persist nonce state.
+
+Do not implement nonce replacement.
+
+Do not implement speed-up transactions.
+
+Do not implement cancellation transactions.
+
+Those belong to a later phase.
+
+==================================================
+9. GAS ESTIMATION
+==================================================
+
+Use the existing Phase 2.4 Gas/Fee Engine.
+
+Do not duplicate eth_estimateGas logic.
+
+If gasLimit is explicitly supplied:
+
+validate it.
+
+If gasLimit is omitted:
+
+estimate gas using:
+
+- from
+- to
+- value
+- data
+
+Only public transaction information may be passed.
+
+Never pass private key material.
+
+Never sign anything.
+
+Never broadcast anything.
+
+Reject:
+
+- zero gas estimates
+- malformed estimates
+- RPC estimation errors
+- network changes during estimation
+
+IMPORTANT:
+
+Do not automatically add:
+- 10%
+- 20%
+- 30%
+- any hidden multiplier
+- any hidden buffer
+
+If future UX requires a buffer, it must be an explicit later design decision.
+
+==================================================
+10. FEE CONSTRUCTION
+==================================================
+
+Use Phase 2.4 Fee Engine.
+
+For Legacy:
+
+network fee =
+gasLimit × gasPrice
+
+For EIP-1559:
+
+network fee estimate =
+gasLimit × maxFeePerGas
+
+Clearly label this as a maximum fee estimate rather than claiming it is the exact amount ultimately charged.
+
+All calculations must use bigint.
+
+No floating point.
+
+No fiat conversion.
+
+No price API.
+
+No hidden markup.
+
+No PrimeWave fee unless an explicit protocol fee exists in a future specification.
+
+==================================================
+11. TOTAL VALUE CALCULATION
+==================================================
+
+For a native currency transaction:
+
+total maximum native amount required =
+value + estimated/max network fee
+
+Use bigint.
+
+Never allow overflow.
+
+The engine should provide enough information for future UI to show:
+
+Amount
++
+Maximum network fee
+=
+Maximum total required
+
+Do not claim this is the final fee actually charged on-chain.
+
+For contract calls with non-zero value, the same calculation applies.
+
+==================================================
+12. TRANSACTION PREVIEW
+==================================================
+
+Create a structured TransactionPreview.
+
+It should expose enough information for a future confirmation UI.
+
+At minimum:
+
+- network name
+- network ID
+- chain ID
+- transaction type
+- sender address
+- recipient address
+- value
+- calldata presence
+- nonce
+- gas limit
+- fee model
+- gas price OR max fee/max priority fee
+- estimated/max network fee
+- total maximum native amount
+- relevant warnings
+
+The preview must be read-only.
+
+Creating a preview must NEVER sign or broadcast.
+
+==================================================
+13. CONTRACT INTERACTION WARNING
+==================================================
+
+Generic contract calls can have arbitrary effects.
+
+Do not label a contract interaction as:
+- safe
+- trusted
+- harmless
+- approved
+
+unless that information comes from a future verified system.
+
+For this phase, provide a generic warning when calldata is non-empty, such as:
+
+"Contract interaction: review the transaction details carefully."
+
+Do not pretend to know the exact contract action.
+
+ABI decoding belongs to a future phase.
+
+==================================================
+14. DETERMINISTIC TRANSACTION REPRESENTATION
+==================================================
+
+Create a deterministic representation of the unsigned transaction.
+
+Requirements:
+
+- stable field ordering
+- normalized addresses
+- normalized hexadecimal data
+- deterministic quantity formatting
+- explicit chain ID
+- explicit transaction type
+- explicit fee model
+
+Do not serialize using JSON if doing so loses bigint precision.
+
+If JSON is needed for tests/debugging, convert bigint quantities explicitly to canonical decimal strings.
+
+Do not include:
+- private keys
+- mnemonic
+- vault handles
+- PIN
+- biometric secrets
+- encryption keys
+
+==================================================
+15. SECURITY BOUNDARY
+==================================================
+
+The transaction construction engine MUST NOT import:
+
+- SecureStore directly
+- SecureVault implementation
+- mnemonic storage
+- private-key storage
+- biometric authentication implementation
+- PIN storage
+
+It may consume public wallet/account information through the established contracts.
+
+The architecture must make it difficult for future developers to accidentally pass secret material into transaction construction.
+
+If practical, use TypeScript types that distinguish:
+
+PublicAccount
+
+from
+
+SensitiveSecretMaterial
+
+Do not weaken existing security contracts to make this phase easier.
+
+==================================================
+16. RPC SAFETY
+==================================================
+
+Allowed RPC calls in this phase may include:
+
+- eth_chainId
+- eth_getTransactionCount
+- eth_estimateGas
+- eth_gasPrice
+- eth_maxPriorityFeePerGas
+- eth_getBlockByNumber
+- other already-approved public read methods required by the existing fee engine
+
+Absolutely forbidden:
+
+eth_sendRawTransaction
+
+No transaction may leave the device as a signed transaction.
+
+==================================================
+17. NETWORK RACE PROTECTION
+==================================================
+
+This is important.
+
+A transaction must not be constructed using mixed network state.
+
+Capture network context at the beginning:
+
+- network ID
+- chain ID
+- active network
+- relevant configuration identity
+
+Before returning the final transaction:
+
+verify that the active network has not changed.
+
+If it changed:
+
+reject with NETWORK_CHANGED.
+
+Do not return a transaction built from stale network context.
+
+Apply the same protection to nonce, gas estimation, and fee retrieval wherever practical.
+
+==================================================
+18. ERROR HANDLING
+==================================================
+
+Use the existing sanitized error architecture.
+
+Create or extend normalized errors for:
+
+- invalid transaction
+- invalid from address
+- unknown account
+- invalid recipient
+- invalid value
+- invalid calldata
+- invalid nonce
+- invalid gas limit
+- network not selected
+- network changed
+- chain mismatch
+- gas estimation failure
+- fee unavailable
+- unsupported fee model
+- insufficient public balance if this can be determined safely
+- transaction construction failure
+
+Do NOT expose:
+
+- private keys
+- recovery phrases
+- secrets
+- full RPC URLs
+- authentication tokens
+- raw stack traces
+- sensitive request payloads
+
+Errors must be safe for UI presentation and safe for logs.
+
+==================================================
+19. OPTIONAL BALANCE VALIDATION
+==================================================
+
+If existing public account-state functionality makes this straightforward, validate that:
+
+balance >= value + maximum network fee
+
+for native currency transactions.
+
+This is only a preflight check.
+
+It MUST NOT be treated as a guarantee because the balance can change before signing/broadcast.
+
+If implementing this:
+
+use bigint only.
+
+If balance is insufficient:
+
+return a normalized insufficient-balance error.
+
+Do not reserve funds.
+
+Do not modify balances locally.
+
+Do not persist any state.
+
+==================================================
+20. ARCHITECTURE / FILE ORGANIZATION
+==================================================
+
+Follow the existing project structure.
+
+Prefer a dedicated transaction construction module, for example:
+
+src/core/transactions/
+
+Possible responsibilities:
+
+transaction-models
+transaction-validation
+transaction-construction
+transaction-preview
+transaction-errors
+index
+
+Do not create unnecessary duplicated RPC or fee logic.
+
+Reuse:
+
+Network Registry
+RPC Provider
+Account State Service
+Gas/Fee Engine
+Security contracts
+existing sanitized logging/errors
+
+Keep the engine UI-independent.
+
+==================================================
+21. TESTING REQUIREMENTS
+==================================================
+
+Create comprehensive offline tests.
+
+Use deterministic fake RPC transports.
+
+DO NOT connect tests to real blockchain networks.
+
+At minimum test:
+
+1. valid native transfer
+2. valid contract call
+3. invalid FROM address
+4. FROM address not belonging to local wallet
+5. invalid TO address
+6. negative value
+7. malformed value
+8. unsafe numeric input
+9. malformed calldata
+10. valid empty calldata
+11. malformed nonce
+12. valid explicit nonce
+13. nonce retrieval when omitted
+14. explicit gas limit
+15. gas estimation
+16. zero gas rejection
+17. Legacy transaction construction
+18. EIP-1559 transaction construction
+19. correct fee calculation
+20. bigint precision with very large values
+21. chain ID correctness
+22. network selection validation
+23. unconfigured network rejection
+24. disabled network rejection
+25. PrimeWave placeholder network rejection
+26. active network change during construction
+27. chain mismatch
+28. RPC error normalization
+29. fee unavailable
+30. insufficient balance if implemented
+31. calldata warning presence
+32. deterministic transaction representation
+33. no secret material in returned models
+34. no signing capability
+35. no eth_sendRawTransaction invocation
+36. no persistence
+37. concurrent construction safety
+38. repeated deterministic construction produces equivalent result
+
+Add tests specifically proving that:
+
+- private keys are never requested
+- mnemonic is never requested
+- SecureStore is never imported
+- eth_sendRawTransaction is never called
+- no secret appears in errors
+- no secret appears in logs
+
+==================================================
+22. NEGATIVE SECURITY TEST
+==================================================
+
+Create at least one explicit test proving that the transaction constructor cannot broadcast.
+
+Use a fake RPC transport that throws an assertion failure if:
+
+eth_sendRawTransaction
+
+is ever requested.
+
+The complete transaction construction test suite must pass without that method being called.
+
+==================================================
+23. TYPE SAFETY
+==================================================
+
+Run:
+
+- TypeScript checks
+- transaction tests
+- full existing test suite
+- Expo validation
+- Expo Doctor
+- Metro/preview validation if available
+- existing workflow checks
+
+Do not weaken TypeScript strictness.
+
+Do not use `any` to bypass transaction typing.
+
+Avoid unsafe type assertions.
+
+==================================================
+24. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+
+Document:
+
+- transaction construction boundary
+- unsigned transaction lifecycle
+- supported transaction types
+- fee model behavior
+- nonce behavior
+- gas estimation behavior
+- network race protection
+- security restrictions
+- what is intentionally NOT implemented
+
+Clearly state:
+
+"Phase 2.5 constructs unsigned transactions only. Signing and broadcasting are intentionally deferred."
+
+==================================================
+25. ABSOLUTE SCOPE RESTRICTIONS
+==================================================
+
+DO NOT IMPLEMENT:
+
+❌ private-key signing
+❌ transaction signatures
+❌ wallet unlock
+❌ seed phrase access
+❌ transaction broadcasting
+❌ eth_sendRawTransaction
+❌ token transfers
+❌ ERC-20 logic
+❌ NFT logic
+❌ swaps
+❌ DEX integration
+❌ transaction history
+❌ blockchain indexing
+❌ DApp connection
+❌ WalletConnect
+❌ smart-contract ABI decoding
+❌ fiat prices
+❌ backend transaction APIs
+❌ transaction notifications
+❌ background signing
+❌ automatic transaction approval
+❌ automatic gas bumping
+❌ nonce replacement
+❌ speed-up
+❌ cancellation
+
+Those belong to later phases.
+
+==================================================
+FINAL VERIFICATION REPORT
+==================================================
+
+When finished, report:
+
+1. Files created
+2. Files modified
+3. Transaction models implemented
+4. Supported transaction types
+5. Fee models implemented
+6. Validation implemented
+7. Network race protection
+8. Security boundary
+9. RPC methods used
+10. Confirmation that eth_sendRawTransaction is NOT used
+11. Test count
+12. Test failures
+13. TypeScript result
+14. Expo/Doctor result
+15. Metro/preview result
+16. Documentation updated
+17. Any warnings
+18. Any deferred items
+
+Do not say the phase is production-ready merely because tests pass.
+
+Explicitly identify anything that still requires physical-device or later integration testing.
+
+STOP after Phase 2.5.
+
+Do not begin Phase 2.6.
