@@ -1,0 +1,338 @@
+URGENT DEBUG — PREVIEW UNLOCK STILL ENTERS NATIVE VAULT FLOW
+
+The previous Preview Test Mode routing fix did NOT solve the actual runtime issue.
+
+MANUAL OBSERVATION AFTER THE FIX:
+
+In Replit Web Preview:
+
+1. Preview Test Mode onboarding works.
+2. I create the test wallet.
+3. I create my 6-digit Preview PIN.
+4. I lock the wallet.
+5. On the Locked Wallet screen I enter the correct Preview PIN.
+6. The UI STILL shows:
+
+"Preparing local vault
+
+Checking platform-secure storage."
+
+7. After approximately 30 seconds it returns to the Locked Wallet screen.
+
+Therefore the real runtime unlock path is STILL invoking native wallet/vault initialization.
+
+The previous report claimed the preview PIN path was isolated, but the actual runtime behavior proves there is another path or state transition invoking native wallet initialization.
+
+DO NOT make another speculative fix.
+
+We need to TRACE THE ACTUAL RUNTIME PATH.
+
+==================================================
+1. TRACE THE UNLOCK BUTTON
+==================================================
+
+Find the exact component currently rendered for the Locked Wallet screen in Web Preview.
+
+Trace the exact handler attached to the PIN unlock action.
+
+Determine:
+
+- component name
+- handler name
+- function called by handler
+- every function called afterward
+- every state/context update
+- every navigation/state transition
+- every effect triggered by that transition
+
+Specifically identify where:
+
+"Preparing local vault"
+"Checking platform-secure storage."
+
+is rendered.
+
+Do not rely only on static code inspection.
+
+==================================================
+2. ADD TEMPORARY DEVELOPMENT LOGGING
+==================================================
+
+Add clearly development-only diagnostic logging around the Preview unlock path.
+
+The logs should identify:
+
+[PREVIEW-DEBUG] locked screen mounted
+[PREVIEW-DEBUG] PIN submit invoked
+[PREVIEW-DEBUG] preview mode detected
+[PREVIEW-DEBUG] preview PIN verification invoked
+[PREVIEW-DEBUG] preview PIN verification result
+[PREVIEW-DEBUG] state transition
+[PREVIEW-DEBUG] native wallet access invoked
+
+If any of the following functions are invoked during Web Preview unlock, log exactly which one:
+
+- access.getStatus()
+- access.unlock()
+- access.unlockWithPin()
+- access.unlockWithBiometrics()
+- access.initialize()
+- wallet vault initialization
+- SecureStore access
+- WalletAuthenticator
+- LocalWalletEngine
+
+DO NOT log:
+
+- PIN
+- PIN fingerprint
+- mnemonic
+- private key
+- SecureStore contents
+- authentication secrets
+- wallet secrets
+
+Only log function/control-flow names and safe state identifiers.
+
+==================================================
+3. TRACE THE "PREPARING LOCAL VAULT" SCREEN
+==================================================
+
+Find the exact source of the visible text:
+
+"Preparing local vault"
+
+and:
+
+"Checking platform-secure storage."
+
+Determine exactly which component/state causes this screen to appear.
+
+Then trace backward:
+
+What state causes this screen?
+
+What action changes the state to that value?
+
+Which function triggers that action?
+
+This is the most important part of the investigation.
+
+==================================================
+4. DO NOT ASSUME FOUNDATIONSCREEN IS THE ONLY PATH
+==================================================
+
+The previous fix focused on FoundationScreen.
+
+Do NOT assume FoundationScreen is the only source of the problem.
+
+Inspect:
+
+- app/index.tsx
+- FoundationScreen
+- Wallet Locked screen
+- wallet access context/provider
+- authentication state provider
+- startup initialization
+- AppState handlers
+- effects triggered after PIN verification
+- navigation/router state
+- any loading/bootstrap state
+- any wallet status subscriptions
+
+Search the entire project for:
+
+"Preparing local vault"
+"Checking platform-secure storage"
+"getStatus("
+"unlockWith"
+"unlockWallet"
+"WalletAuthenticator"
+"SecureStore"
+"initialize"
+"locked"
+"UNLOCKING"
+
+==================================================
+5. CRITICAL RUNTIME RULE
+==================================================
+
+When:
+
+__DEV__ === true
+AND browser/Web Preview
+AND Preview Test Mode is active
+
+the Preview Locked screen MUST NEVER transition into a state that causes real wallet initialization.
+
+The correct runtime sequence is:
+
+Preview Locked
+→ preview PIN submit
+→ preview PIN verification
+→ Preview Unlocked
+→ application content
+
+There must be NO intermediate native state such as:
+
+UNLOCKING
+INITIALIZING
+PREPARING_VAULT
+CHECKING_SECURE_STORAGE
+
+during Preview unlock.
+
+==================================================
+6. CHECK FOR STATE-MACHINE COLLISION
+==================================================
+
+Investigate whether the application has TWO independent state machines:
+
+A. Preview Test Mode state
+B. Real WalletAccessManager state
+
+If Preview PIN verification succeeds but the application then observes the real WalletAccessManager state as "locked" or "unavailable", determine whether that causes the app to re-enter native initialization.
+
+If so, the architecture needs a clean preview-mode ownership boundary.
+
+Preview mode should be authoritative for Web Preview application state.
+
+Do not merely suppress the error.
+
+==================================================
+7. CHECK EFFECTS AFTER UNLOCK
+==================================================
+
+Inspect React useEffect/useFocusEffect/AppState/navigation callbacks that execute after:
+
+- PIN verification
+- locked → unlocked state
+- route change
+- app resume
+
+A hidden effect may be calling:
+
+access.getStatus()
+
+or another native wallet operation after the preview unlock.
+
+Identify it precisely.
+
+==================================================
+8. NO SECURITY WEAKENING
+==================================================
+
+Do NOT solve this by:
+
+- disabling SecureStore
+- mocking SecureStore globally
+- changing WalletAuthenticator
+- changing LocalWalletEngine
+- adding browser storage to the production wallet
+- shortening native timeouts
+- catching native errors and treating them as successful unlock
+- bypassing authentication in native builds
+
+The fix must remain isolated to Web Preview Preview Test Mode.
+
+==================================================
+9. TEST THE ACTUAL RUNTIME PATH
+==================================================
+
+After tracing and identifying the issue, make the minimum architectural fix.
+
+Then manually test the actual Replit Web Preview:
+
+1. Reset Local Preview
+2. Create test wallet
+3. Set a 6-digit PIN
+4. Enter wallet
+5. Lock
+6. Enter correct PIN
+
+Expected:
+
+IMMEDIATE PREVIEW UNLOCK
+
+The following MUST NOT appear:
+
+"Preparing local vault"
+
+"Checking platform-secure storage"
+
+There must be no 30-second wait.
+
+Then:
+
+7. Lock again
+8. Enter incorrect PIN
+9. Must remain locked
+10. Refresh
+11. Enter correct PIN
+12. Must immediately unlock
+13. Reset
+14. Must return to onboarding
+
+==================================================
+10. TEMPORARY DEBUG LOGS
+==================================================
+
+Keep the diagnostic logging development-only.
+
+If the logs are no longer needed after the fix, remove them before finalizing.
+
+Do not leave verbose authentication logging in the application.
+
+==================================================
+11. TESTS
+==================================================
+
+Add a regression test that specifically proves:
+
+Web Preview + Preview Test Mode + correct PIN
+
+does NOT invoke:
+
+- SecureStore
+- WalletAuthenticator
+- WalletAccessManager native unlock
+- LocalWalletEngine
+- native biometrics
+
+and transitions directly to Preview Unlocked state.
+
+Keep all existing tests passing.
+
+==================================================
+12. VERIFICATION
+==================================================
+
+Run:
+
+- full test suite
+- TypeScript
+- git diff --check
+- Expo/Metro
+- Web Preview
+
+FINAL REPORT MUST INCLUDE:
+
+1. Exact runtime component displaying "Preparing local vault"
+2. Exact function invoked by the PIN button
+3. Exact function that incorrectly triggered native vault initialization
+4. Why the previous fix did not catch this path
+5. Exact files changed
+6. Exact architectural fix
+7. Confirmation Preview unlock never invokes SecureStore/native wallet flow
+8. Manual Web Preview unlock result
+9. Tests passed
+10. TypeScript
+11. Expo/Metro
+12. git diff --check
+13. Confirmation native iOS/Android flow was not changed
+
+DO NOT CLAIM SUCCESS FROM STATIC TESTS ALONE.
+
+The manual Web Preview sequence above MUST actually work.
+
+STOP AFTER THIS DEBUG/FIX.
