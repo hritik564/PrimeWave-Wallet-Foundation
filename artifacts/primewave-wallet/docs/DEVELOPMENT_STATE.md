@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 0B — security architecture and interfaces (completed)**
+**Phase 1A — local EVM wallet core (completed)**
 
 ## Completed work
 
@@ -25,14 +25,22 @@
   plan structures.
 - Expanded the security architecture with classifications, trust boundaries,
   attack surfaces, recovery, memory, and multi-account rules.
+- Added an in-memory `LocalWalletEngine` for local wallet creation and
+  multiple-account derivation.
+- Added BIP-39 mnemonic generation from Expo cryptographic entropy and
+  mnemonic validation.
+- Added standard EVM derivation at `m/44'/60'/0'/0/<index>` through `viem`.
+- Added safe public wallet/account models and EVM address validation.
+- Added offline Node test coverage with known account 0, 1, and 2 vectors.
+- Reviewed the dependency tree and documented the selected library versions.
 
 ## Pending work
 
-- No wallet functionality is approved or implemented yet.
 - Production PrimeWave Chain configuration must be supplied and reviewed.
-- Security review is required before local wallet creation, import, or signing.
-- A real test runner and concrete implementations are still required before
-  security contract tests can be marked complete.
+- Recovery UX, secure persistent storage, and authentication require separate
+  scope and security review.
+- The Phase 0B security contract test plan remains a plan for future
+  platform-secure implementations.
 
 ## Important architectural decisions
 
@@ -41,19 +49,22 @@
 - Production network values are not invented in this phase.
 - Wallet secrets must remain device-local and must never be sent to backend
   infrastructure.
-- The first screen is intentionally an honest foundation state, not a wallet
-  simulation.
+- PrimeWave uses the standard Ethereum coin type and does not use a
+  PrimeWave-specific seed or derivation path.
 
 ## Known limitations
 
-- No wallet generation, import, cryptography, vault, authentication, or signing.
+- No secure persistent storage, import/recovery UI, vault, authentication, or
+  signing.
 - No blockchain RPC, indexer, price service, database, notification service, or
   DApp connection.
 - The PrimeWave Chain entry has null chain and endpoint values by design.
-- No cryptographic dependency or test runner has been added in Phase 0B.
+- JavaScript garbage collection is not a guaranteed memory wipe for temporary
+  secrets.
+- There has been no full external security audit.
 
 ## Next recommended phase
 
-**Phase 1 — local wallet lifecycle**, only after approving the security model,
-device storage strategy, recovery UX, threat model, and production library
-choices.
+**Phase 1B — secure wallet lifecycle**, as a separate approved phase covering
+encrypted platform storage, recovery UX, authentication, and wallet locking.
+Do not begin it automatically.

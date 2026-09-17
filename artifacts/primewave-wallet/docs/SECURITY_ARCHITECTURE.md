@@ -341,11 +341,79 @@ Phase 0B adds a reviewable test-case plan under
 tests. A real test runner and concrete implementations must be added before
 the corresponding contract tests are marked complete.
 
-## 16. Dependency and backend rules
+## 16. Phase 1A cryptographic implementation
 
-No cryptographic or wallet dependency is installed in Phase 0B. No custom
-cryptography, encryption, mnemonic generation, or elliptic-curve logic is
-allowed.
+Phase 1A uses the following exact dependencies:
+
+| Package | Version | Purpose and standards |
+| --- | --- | --- |
+| `expo-crypto` | `~57.0.3` | Platform-provided cryptographically secure random bytes for 128-bit BIP-39 entropy on Expo native and web targets. |
+| `@scure/bip39` | `1.6.0` | Audited/minimal BIP-39 English wordlist, entropy-to-mnemonic conversion, and mnemonic checksum validation. |
+| `viem` | `2.56.0` | Maintained EVM account layer. `mnemonicToAccount` performs standard BIP-39 seed plus BIP-32/BIP-44-compatible derivation, and `getAddress`/`isAddress` provide EVM address and checksum handling. |
+
+`viem` already depends on the same `@scure/bip32` and `@scure/bip39`
+implementations needed for its mnemonic account API, so a separate direct
+wallet framework or duplicate direct HD-wallet package is not installed.
+`tsx` `4.23.13` is a development-only TypeScript loader for Node's built-in
+offline test runner and is not part of the wallet runtime.
+
+These packages were selected because they are maintained, focused on standard
+cryptographic primitives/account operations, and do not require RPC,
+blockchain, backend, or cloud services for local derivation. The mobile package
+was checked with Expo web bundling and TypeScript. The workspace retains its
+one-day minimum package release age guard; `viem` `2.56.0` was selected instead
+of the newest release because newer releases were outside that guard.
+
+The standard path is:
+
+```text
+m/44'/60'/0'/0/<accountIndex>
+```
+
+PrimeWave does not have a separate seed or derivation path. The same EVM
+account can later be used on any supported EVM network.
+
+## 17. Phase 1A secret handling
+
+Wallet creation obtains 16 bytes from `expo-crypto`, converts that entropy to a
+12-word BIP-39 phrase, and immediately clears the temporary entropy buffer on a
+best-effort basis. The mnemonic is retained only in the engine's in-memory
+secret state so additional accounts can be derived during the current runtime.
+
+The public `Wallet`, `WalletAccount`, and `WalletEngine` API exposes no
+mnemonic, seed, private key, raw secret buffer, signing capability, or secret
+export method. The internal derivation operation creates an EVM account only
+long enough to copy its public address and returns safe metadata.
+
+The implementation does not log, persist, transmit, or place secrets in
+errors, URLs, query parameters, AsyncStorage, localStorage, Redux, Zustand, or
+backend requests. Logs contain only safe operation metadata such as account
+index and derivation path. `LocalWalletEngine.discard()` removes in-memory
+secret references, but JavaScript garbage collection is not a guaranteed
+cryptographic wipe.
+
+## 18. Phase 1A verification and limitations
+
+Offline tests cover:
+
+- Known BIP-39 mnemonic validation and rejection.
+- Known EVM addresses for account indexes 0, 1, and 2.
+- Repeated deterministic derivation.
+- Invalid account indexes.
+- Valid, invalid-checksum, and malformed EVM addresses.
+- Absence of mnemonic/private-key fields from public metadata.
+
+Phase 1A is not production-secure wallet storage. It does not implement
+encrypted persistence, Keychain/Keystore, authentication, PINs, biometrics,
+locking, recovery UI, transaction signing, RPC, broadcasting, or a full
+security audit. Those are explicitly deferred to later phases.
+
+## 19. Dependency and backend rules
+
+No custom cryptography, encryption, mnemonic generation, or elliptic-curve
+logic is allowed. Dependency changes require the same review for maintenance,
+platform compatibility, transitive duplication, unexpected network behavior,
+and unnecessary permissions.
 
 No backend endpoints are created for mnemonic, seed, privateKey, signingKey,
 walletPassword, walletPin, or encryptionKey fields. The current backend

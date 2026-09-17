@@ -1,25 +1,16 @@
 import type {
   AccountDerivationRequest,
   SecureVault,
-  WalletAccount,
   WalletAuthenticator,
 } from '@/src/core/security';
-import type {
-  TransactionPreview,
-  TransactionRequest,
-  UserConfirmation,
-} from '@/src/core/transactions/contracts';
+import type { Wallet, WalletAccount } from './models';
 
 export interface WalletEngine {
+  createWallet(): Promise<Wallet>;
+  deriveAccount(accountIndex?: number): Promise<WalletAccount>;
   getAccounts(): Promise<WalletAccount[]>;
   deriveAccounts(request: AccountDerivationRequest): Promise<WalletAccount[]>;
-  previewTransaction(
-    request: TransactionRequest,
-  ): Promise<TransactionPreview>;
-  signAfterExplicitConfirmation(
-    preview: TransactionPreview,
-    confirmation: UserConfirmation,
-  ): Promise<void>;
+  validateRecoveryPhrase(recoveryPhrase: string): boolean;
 }
 
 export interface WalletSecurityDependencies {
