@@ -1,0 +1,698 @@
+# PRIMEWAVE WALLET — PHASE 0B
+
+## SECURITY ARCHITECTURE, TRUST BOUNDARIES & INTERFACES
+
+Phase 0A has been completed and approved.
+
+Continue from the existing PrimeWave Wallet project.
+
+This is **PHASE 0B ONLY**.
+
+Do not implement actual wallet generation, seed phrase generation, private-key generation, transaction signing, or blockchain transactions yet.
+
+The purpose of this phase is to design and document the security architecture and create the interfaces/contracts that Phase 1 and Phase 2 will implement.
+
+Do not skip ahead.
+
+---
+
+# 1. NON-CUSTODIAL SECURITY MODEL
+
+PrimeWave Wallet is STRICTLY NON-CUSTODIAL.
+
+The user controls their wallet keys.
+
+PrimeWave infrastructure must never have access to the user's private keys or recovery phrase.
+
+The following information must NEVER leave the user's device:
+
+* seed phrase / mnemonic
+* private key
+* derived private signing key
+* wallet encryption key
+* wallet password
+* wallet PIN
+* biometric credentials
+* decrypted wallet vault
+* raw cryptographic secrets
+
+These values must never be:
+
+* sent to an API
+* stored in PostgreSQL
+* stored in cloud storage
+* written to logs
+* written to analytics
+* sent to crash-reporting systems
+* included in error messages
+* included in telemetry
+* included in URLs
+* included in query parameters
+* included in application analytics events
+
+This rule must be documented as a permanent architectural invariant.
+
+---
+
+# 2. TRUST BOUNDARY
+
+Create a clear trust-boundary architecture.
+
+The future system should conceptually be:
+
+USER DEVICE
+
+```
+|
+| private wallet secrets remain here
+|
+v
+```
+
+LOCAL WALLET ENGINE
+
+```
+|
++--> Key derivation
++--> Transaction construction
++--> Transaction signing
++--> Secure vault
+|
+v
+```
+
+BLOCKCHAIN RPC
+
+```
+|
+v
+```
+
+BLOCKCHAIN NETWORK
+
+Separately:
+
+PRIMEWAVE BACKEND
+
+```
+|
++--> Token metadata
++--> Market data
++--> Transaction indexing
++--> Notifications
++--> Optional user profile
++--> Analytics
+|
+X--> NO PRIVATE KEYS
+X--> NO SEED PHRASES
+X--> NO SIGNING SECRETS
+```
+
+Document this separation.
+
+---
+
+# 3. SECURITY ARCHITECTURE DOCUMENT
+
+Update:
+
+docs/SECURITY_ARCHITECTURE.md
+
+It must contain at minimum:
+
+## A. Security principles
+
+Document:
+
+* non-custodial architecture
+* local key ownership
+* least privilege
+* defense in depth
+* fail closed
+* secure defaults
+* no secret transmission
+* no secret logging
+
+## B. Secret classification
+
+Define at least:
+
+CRITICAL SECRETS
+
+* seed phrase
+* private keys
+* encryption keys
+* wallet authentication secrets
+
+SENSITIVE DATA
+
+* wallet addresses
+* transaction history
+* connected DApps
+* portfolio information
+
+PUBLIC DATA
+
+* token metadata
+* blockchain data
+* network configuration
+* public transaction hashes
+
+Explain that public blockchain data is not equivalent to private wallet secrets.
+
+## C. Data-flow boundaries
+
+Document which information is allowed to leave the device and which information must remain local.
+
+## D. Attack surface
+
+Document potential attack surfaces:
+
+* malicious applications
+* compromised RPC providers
+* malicious DApps
+* phishing
+* malicious tokens
+* clipboard exposure
+* screenshots
+* device compromise
+* rooted Android devices
+* jailbroken iOS devices
+* debugging
+* logging
+* dependency vulnerabilities
+* supply-chain attacks
+* social engineering
+* fake token contracts
+* transaction manipulation
+
+Do not claim that the application can completely prevent these threats.
+
+Document mitigations and limitations.
+
+---
+
+# 4. CREATE SECURITY INTERFACES
+
+Create TypeScript interfaces/contracts only.
+
+Do NOT implement the cryptographic functionality yet.
+
+Create a security module under:
+
+src/core/security/
+
+The architecture should include concepts equivalent to:
+
+SecureVault
+
+Responsibilities:
+
+* save encrypted wallet state
+* retrieve encrypted wallet state
+* delete wallet state
+* check whether a vault exists
+
+The implementation must eventually use platform-secure storage.
+
+Do NOT implement the storage mechanism yet.
+
+---
+
+WalletAuthenticator
+
+Responsibilities:
+
+* configure PIN authentication
+* authenticate with PIN
+* authenticate with biometrics
+* determine biometric availability
+* lock the wallet
+* unlock the wallet
+
+Do NOT implement actual PIN or biometric handling yet.
+
+---
+
+SecretManager
+
+Responsibilities:
+
+* create protected secret material
+* access protected secret material
+* clear secret material from memory when possible
+
+Do NOT implement actual secret generation yet.
+
+---
+
+KeyManager
+
+Responsibilities:
+
+* derive wallet accounts
+* access signing capability
+* sign transactions locally
+
+IMPORTANT:
+
+The interface must NOT expose private keys to UI components.
+
+Do not create methods such as:
+
+getPrivateKey()
+
+exportPrivateKeyToFrontend()
+
+sendPrivateKey()
+
+or equivalent unsafe APIs.
+
+The future implementation should encapsulate private keys.
+
+---
+
+# 5. WALLET ENGINE BOUNDARY
+
+Create the architectural contract for a future wallet engine.
+
+The UI should eventually communicate with:
+
+WalletEngine
+
+rather than directly accessing:
+
+* private keys
+* mnemonic phrases
+* cryptographic libraries
+* secure storage
+* signing libraries
+
+Conceptually:
+
+UI
+
+↓
+
+WalletEngine
+
+↓
+
+Security Layer
+
+↓
+
+Cryptographic implementation
+
+This keeps sensitive implementation details isolated.
+
+---
+
+# 6. TRANSACTION SIGNING CONTRACT
+
+Create the interface for future transaction signing.
+
+Conceptually:
+
+TransactionBuilder
+
+↓
+
+TransactionPreview
+
+↓
+
+UserConfirmation
+
+↓
+
+Authentication
+
+↓
+
+LocalSigner
+
+↓
+
+SignedTransaction
+
+↓
+
+BlockchainBroadcaster
+
+The signer must only be accessible after explicit user authorization.
+
+Do not implement transaction signing now.
+
+Do not create fake signing functionality.
+
+Do not use placeholder private keys.
+
+---
+
+# 7. TRANSACTION CONFIRMATION RULE
+
+Document this security requirement:
+
+No blockchain transaction may be signed without explicit user confirmation.
+
+Before signing, the user must eventually be shown relevant transaction information such as:
+
+* asset
+* amount
+* destination
+* network
+* network fee
+* total amount
+* transaction type
+
+For smart-contract interactions, the wallet should eventually provide as much human-readable information as safely possible.
+
+The user must have:
+
+Approve
+
+and
+
+Reject
+
+options.
+
+No automatic signing.
+
+No silent signing.
+
+No background signing.
+
+---
+
+# 8. SCREEN PRIVACY
+
+Create the architecture for protecting sensitive wallet screens.
+
+Future sensitive screens include:
+
+* recovery phrase
+* private-key export
+* transaction confirmation
+* wallet security settings
+
+Document and prepare interfaces for:
+
+* screen privacy
+* screenshot protection where technically supported
+* sensitive-content masking
+* background-app privacy
+* clipboard handling
+
+Do not overclaim platform capabilities.
+
+If iOS and Android behave differently, document that the implementation will use platform-specific behavior where required.
+
+---
+
+# 9. CLIPBOARD SECURITY
+
+Document the future clipboard policy.
+
+Recovery phrases and private keys are extremely sensitive.
+
+The architecture should support:
+
+* explicit warning before copying sensitive information
+* minimal clipboard exposure
+* clearing sensitive clipboard contents when technically possible
+* never automatically copying seed phrases
+* never logging clipboard contents
+* never reading clipboard contents unnecessarily
+
+Do not implement seed phrase functionality yet.
+
+---
+
+# 10. LOGGING SECURITY
+
+Create a safe logging abstraction.
+
+All future application logging must go through a centralized logger.
+
+Create something conceptually equivalent to:
+
+SecureLogger
+
+It must support:
+
+* debug
+* info
+* warning
+* error
+
+But it must NEVER log:
+
+* seed phrases
+* private keys
+* PINs
+* passwords
+* encryption keys
+* decrypted vaults
+* authentication secrets
+
+Add documentation and safeguards to prevent accidental secret logging.
+
+Avoid logging complete transaction payloads if they could contain sensitive user information.
+
+---
+
+# 11. ERROR HANDLING
+
+Create a security-safe error architecture.
+
+Errors shown to users should not expose:
+
+* private keys
+* seed phrases
+* internal cryptographic material
+* authentication secrets
+* secure-storage contents
+
+Internal errors should be sanitized before logging.
+
+Do not include secret material in error objects.
+
+---
+
+# 12. MEMORY HANDLING
+
+Document that cryptographic secrets should have the shortest practical lifetime in application memory.
+
+Where the chosen platform/library allows it:
+
+* minimize secret copies
+* clear sensitive buffers when possible
+* avoid storing secrets in global state
+* avoid storing secrets in Redux/Zustand or other persistent UI state
+* avoid React state for raw cryptographic secrets
+* never put secrets into URL parameters
+
+Do not claim that JavaScript garbage collection provides guaranteed secure memory wiping.
+
+Document this limitation honestly.
+
+---
+
+# 13. BACKUP AND RECOVERY MODEL
+
+Document the future recovery architecture.
+
+The recovery phrase is the user's ultimate recovery mechanism.
+
+PrimeWave must NOT provide server-side recovery of a non-custodial wallet.
+
+Do not implement recovery now.
+
+Document:
+
+Create wallet
+
+↓
+
+Display recovery phrase securely
+
+↓
+
+User backs it up offline
+
+↓
+
+User verifies backup
+
+↓
+
+Encrypted local wallet vault created
+
+If the user loses the recovery phrase and loses access to their wallet, PrimeWave cannot recover the wallet for them.
+
+This limitation must eventually be communicated clearly to users.
+
+---
+
+# 14. MULTIPLE WALLET ACCOUNTS
+
+Prepare the architecture for multiple EVM accounts.
+
+Conceptually:
+
+Vault
+
+├── Account 1
+
+├── Account 2
+
+├── Account 3
+
+└── Account N
+
+The vault should be able to manage multiple accounts without exposing their private keys to UI components.
+
+---
+
+# 15. SECURITY TESTING STRUCTURE
+
+Create a security testing structure under the existing test architecture.
+
+Prepare tests for future implementation including:
+
+* secret never sent over network
+* secret never logged
+* secret never stored in backend
+* unauthorized wallet access rejected
+* locked wallet cannot sign
+* transaction cannot sign without confirmation
+* invalid authentication rejected
+* vault access requires authentication
+* malformed encrypted vault handled safely
+* corrupted wallet state handled safely
+* wrong recovery phrase rejected
+* malicious transaction rejected or clearly presented
+* RPC failure handled safely
+
+Do NOT create fake passing tests that test nothing.
+
+If functionality does not exist yet, create test placeholders or contract tests that clearly indicate future implementation requirements.
+
+---
+
+# 16. DEPENDENCY RULE
+
+Do not install cryptographic or wallet libraries simply to satisfy this phase.
+
+We will choose the appropriate production-grade EVM cryptography/key-management libraries during Phase 1.
+
+Do not invent cryptography.
+
+Do not write custom encryption algorithms.
+
+Do not write custom mnemonic generation.
+
+Do not write custom elliptic-curve implementations.
+
+Do not implement security-sensitive cryptography manually.
+
+---
+
+# 17. NO BACKEND SECRETS
+
+Do not create backend endpoints that accept:
+
+* mnemonic
+* seed
+* privateKey
+* signingKey
+* walletPassword
+* walletPin
+* encryptionKey
+
+If any future backend API schema is created during this phase, ensure these fields are explicitly prohibited.
+
+---
+
+# 18. SECURITY DOCUMENTATION FOR FUTURE DEVELOPERS
+
+Add a prominent section:
+
+## SECURITY — DO NOT BREAK
+
+Explain that future developers/agents must never:
+
+1. send private keys to servers
+2. send seed phrases to servers
+3. store secrets in databases
+4. log secrets
+5. expose private keys to UI
+6. place secrets in persistent state
+7. implement custom cryptography
+8. silently sign transactions
+9. automatically approve transactions
+10. add analytics around secret material
+
+---
+
+# 19. DO NOT BUILD PHASE 1
+
+Do NOT implement:
+
+* wallet creation
+* mnemonic generation
+* private key generation
+* wallet import
+* cryptographic signing
+* secure vault implementation
+* biometric implementation
+* PIN implementation
+* blockchain RPC connections
+* transactions
+* swaps
+* DApps
+
+Only create the architecture, contracts, documentation, safe logging abstraction, and testing structure required for those future phases.
+
+---
+
+# 20. VALIDATION
+
+Before finishing:
+
+1. Run TypeScript checks.
+2. Run the available test suite.
+3. Verify the app still launches.
+4. Verify the existing Phase 0A UI still works.
+5. Verify no wallet secrets are generated.
+6. Verify no blockchain connections were introduced.
+7. Verify no backend was introduced.
+8. Verify no unsafe secret APIs were created.
+9. Verify documentation is complete.
+10. Update:
+
+docs/DEVELOPMENT_STATE.md
+
+Mark Phase 0B as completed only if all checks pass.
+
+If something cannot be completed, clearly state it instead of pretending it is complete.
+
+---
+
+# FINAL RESPONSE TO ME
+
+When finished, report:
+
+1. Security architecture created
+2. Interfaces/contracts created
+3. Files changed/created
+4. Dependencies added, if any
+5. Tests/checks performed
+6. Any warnings/errors
+7. Any security concerns
+8. Confirmation that no real wallet functionality was implemented
+9. Exact recommended next step
+
+Do NOT automatically start Phase 1.
