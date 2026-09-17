@@ -58,7 +58,11 @@ class MockBiometrics implements BiometricProvider {
 
 function createManager(
   storage = new MemoryStorage(),
-  options: { now?: () => number; biometrics?: MockBiometrics } = {},
+  options: {
+    now?: () => number;
+    biometrics?: BiometricProvider;
+    timeoutMs?: number;
+  } = {},
 ) {
   return {
     storage,
@@ -67,8 +71,30 @@ function createManager(
       entropyProvider: new FixedEntropy(),
       biometricProvider: options.biometrics ?? new MockBiometrics(),
       now: options.now,
+      biometricTimeoutMs: options.timeoutMs,
     }),
   };
+}
+
+class DeferredBiometrics extends MockBiometrics {
+  private resolveAuthentication:
+    | ((response: { success: boolean; error?: string }) => void)
+    | null = null;
+  private resolveStarted: (() => void) | null = null;
+  readonly started = new Promise<void>((resolve) => {
+    this.resolveStarted = resolve;
+  });
+
+  override async authenticateAsync(): Promise<{ success: boolean; error?: string }> {
+    this.resolveStarted?.();
+    return new Promise((resolve) => {
+      this.resolveAuthentication = resolve;
+    });
+  }
+
+  resolve(response: { success: boolean; error?: string }): void {
+    this.resolveAuthentication?.(response);
+  }
 }
 
 test('configures a salted scrypt PIN verifier without storing the PIN', async () => {
@@ -172,6 +198,119 @@ test('cancelled and unavailable biometrics remain locked for PIN fallback', asyn
     authenticated: true,
     reason: 'success',
   });
+});
+
+test('normalizes native biometric exceptions and preserves PIN fallback', async () => {
+  const biometrics = new MockBiometrics();
+  biometrics.authenticateAsync = async () => {
+    throw new Error('native biometric bridge failure');
+  };
+  const { manager } = createManager(new MemoryStorage(), { biometrics });
+
+  await manager.configurePinAuthentication('482913');
+  await manager.setBiometricUnlockEnabled(true);
+
+  assert.deepEqual(await manager.authenticateWithBiometrics(), {
+    authenticated: false,
+    reason: 'unavailable',
+  });
+  assert.equal(manager.getLockState(), 'AUTHENTICATION_UNAVAILABLE');
+  assert.deepEqual(await manager.authenticateWithPin('482913'), {
+    authenticated: true,
+    reason: 'success',
+  });
+});
+
+test('bounds biometric availability and authentication operations', async () => {
+  const availabilityTimeout = new MockBiometrics();
+  availabilityTimeout.isHardwareEnrolledAsync = async () =>
+    new Promise<boolean>(() => {});
+  const { manager: availabilityManager } = createManager(
+    new MemoryStorage(),
+    { biometrics: availabilityTimeout, timeoutMs: 10 },
+  );
+
+  assert.deepEqual(await availabilityManager.determineBiometricAvailability(), {
+    available: false,
+    type: null,
+  });
+
+  const authenticationTimeout = new MockBiometrics();
+  authenticationTimeout.authenticateAsync = async () =>
+    new Promise<{ success: boolean; error?: string }>(() => {});
+  const { manager } = createManager(new MemoryStorage(), {
+    biometrics: authenticationTimeout,
+    timeoutMs: 10,
+  });
+
+  await manager.configurePinAuthentication('482913');
+  await manager.setBiometricUnlockEnabled(true);
+  assert.deepEqual(await manager.authenticateWithBiometrics(), {
+    authenticated: false,
+    reason: 'unavailable',
+  });
+  assert.equal(manager.getLockState(), 'AUTHENTICATION_UNAVAILABLE');
+});
+
+test('normalizes availability exceptions without affecting PIN fallback', async () => {
+  const biometrics = new MockBiometrics();
+  biometrics.supportedAuthenticationTypesAsync = async () => {
+    throw new Error('native availability bridge failure');
+  };
+  const { manager } = createManager(new MemoryStorage(), { biometrics });
+
+  await manager.configurePinAuthentication('482913');
+  await manager.setBiometricUnlockEnabled(true);
+
+  assert.deepEqual(await manager.determineBiometricAvailability(), {
+    available: false,
+    type: null,
+  });
+  assert.deepEqual(await manager.authenticateWithPin('482913'), {
+    authenticated: true,
+    reason: 'success',
+  });
+});
+
+test('defers background locking while a biometric prompt is active', async () => {
+  const biometrics = new DeferredBiometrics();
+  const { manager } = createManager(new MemoryStorage(), { biometrics });
+
+  await manager.configurePinAuthentication('482913');
+  await manager.setBiometricUnlockEnabled(true);
+
+  const authentication = manager.authenticateWithBiometrics();
+  await biometrics.started;
+  await manager.handleAppStateChange('inactive');
+  assert.equal(manager.getLockState(), 'UNLOCKING');
+
+  await manager.handleAppStateChange('active');
+  biometrics.resolve({ success: true });
+
+  assert.deepEqual(await authentication, {
+    authenticated: true,
+    reason: 'success',
+  });
+  assert.equal(manager.getLockState(), 'UNLOCKED');
+});
+
+test('locks instead of restoring the wallet when the prompt remains backgrounded', async () => {
+  const biometrics = new DeferredBiometrics();
+  const { manager } = createManager(new MemoryStorage(), { biometrics });
+
+  await manager.configurePinAuthentication('482913');
+  await manager.setBiometricUnlockEnabled(true);
+
+  const authentication = manager.authenticateWithBiometrics();
+  await biometrics.started;
+  await manager.handleAppStateChange('background');
+  biometrics.resolve({ success: true });
+
+  assert.deepEqual(await authentication, {
+    authenticated: false,
+    reason: 'locked',
+  });
+  assert.equal(manager.getLockState(), 'LOCKED');
 });
 
 test('the secure default locks immediately when the app backgrounds', async () => {
