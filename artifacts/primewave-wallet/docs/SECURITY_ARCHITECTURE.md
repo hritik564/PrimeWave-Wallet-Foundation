@@ -425,7 +425,7 @@ identity, public sender/type metadata, lifecycle state, and safe receipt
 fields. They contain no private key, mnemonic, seed, vault contents, signing
 capability, PIN, biometric secret, or authentication credential.
 
-## 14. Phase 3.1 and 3.2 asset and token-read boundary
+## 14. Phase 3.1–3.3 asset, token-read, and discovery boundary
 
 Phase 3.1 adds a read-only asset layer. It defines architectural asset types
 for native assets, fungible tokens, and NFTs. Phase 3.2 adds generic,
@@ -487,11 +487,41 @@ states. Decimals are contract-returned metadata and must be within the
 established 0–36 policy; invalid or missing values are never defaulted to 18.
 Token balances remain exact `bigint` values and include the account,
 network/chain, and contract identity. Network changes and chain mismatches
-fail closed. No token list, discovery service, verification provider,
+fail closed.
+
+### Phase 3.3 discovery controls
+
+`TokenDiscoveryService` is a read-only candidate engine. User-added and
+discovered candidates are validated through the same network, contract-code,
+address, and bounded metadata controls as Phase 3.2. A candidate's provenance,
+visibility, discovery state, metadata status, verification status, and account
+observation are separate data. A user-added or discovered token is never
+treated as verified or trusted merely because it was requested or observed.
+
+Event discovery requires an explicit account and explicit finite block range.
+The service uses only the standard ERC-20 `Transfer` event topic, narrows each
+query to the account's indexed `from` or `to` topic, caps raw results and
+metadata lookups, deduplicates observations, rejects malformed/unrelated logs,
+and validates the remote chain before and during the operation. It never scans
+from genesis to latest, performs an unlimited scan, follows arbitrary event
+signatures, or runs in the background.
+
+The public preference seam stores only token identity, visibility, provenance,
+and safe metadata observations. The shipped in-memory adapter is session-only.
+SecureStore remains reserved for wallet secrets and is not used for token
+metadata. No private key, mnemonic, seed, PIN, vault handle, signing
+capability, transaction payload, backend record, external token list, price,
+risk score, or verification-provider response enters a discovery candidate.
+
+Token balances remain exact `bigint` values and include the account,
+network/chain, and contract identity. No token list, verification provider,
 portfolio/fiat service, indexer, backend, or secret-bearing component is used.
 
-**Phase 3.2 implements generic read-only ERC-20 identity, metadata, and balance
-retrieval only.**
+**Phase 3.3 stops at safe token candidate discovery and user-added asset
+preferences. Transfers, approvals, allowances, permits, swaps, NFTs,
+portfolio/fiat data, history, DApps, WalletConnect, signing, broadcasting,
+background execution, backend indexing, and external verification remain
+deferred.**
 
 ## 15. Error handling
 

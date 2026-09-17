@@ -26,7 +26,19 @@ export type AssetErrorCode =
   | 'TOKEN_NETWORK_UNAVAILABLE'
   | 'TOKEN_UNSUPPORTED'
   | 'TOKEN_RPC_ERROR'
-  | 'TOKEN_DUPLICATE_IDENTITY';
+  | 'TOKEN_DUPLICATE_IDENTITY'
+  | 'DISCOVERY_NETWORK_UNAVAILABLE'
+  | 'DISCOVERY_NETWORK_CHANGED'
+  | 'DISCOVERY_CHAIN_MISMATCH'
+  | 'DISCOVERY_INVALID_ACCOUNT'
+  | 'DISCOVERY_INVALID_TOKEN'
+  | 'DISCOVERY_NOT_A_CONTRACT'
+  | 'DISCOVERY_RANGE_TOO_LARGE'
+  | 'DISCOVERY_RESULT_LIMIT'
+  | 'DISCOVERY_LOG_QUERY_FAILED'
+  | 'DISCOVERY_METADATA_FAILED'
+  | 'DISCOVERY_PERSISTENCE_FAILED'
+  | 'DISCOVERY_UNSUPPORTED';
 
 const SAFE_MESSAGES: Record<AssetErrorCode, string> = {
   ASSET_NOT_FOUND: 'The requested asset was not found.',
@@ -57,6 +69,18 @@ const SAFE_MESSAGES: Record<AssetErrorCode, string> = {
   TOKEN_UNSUPPORTED: 'The token operation is not supported.',
   TOKEN_RPC_ERROR: 'The token provider returned an error.',
   TOKEN_DUPLICATE_IDENTITY: 'The token identity is duplicated.',
+  DISCOVERY_NETWORK_UNAVAILABLE: 'Token discovery is unavailable on this network.',
+  DISCOVERY_NETWORK_CHANGED: 'The discovery network changed during the read.',
+  DISCOVERY_CHAIN_MISMATCH: 'The discovery response belongs to a different chain.',
+  DISCOVERY_INVALID_ACCOUNT: 'The discovery account address is invalid.',
+  DISCOVERY_INVALID_TOKEN: 'The discovered token address is invalid.',
+  DISCOVERY_NOT_A_CONTRACT: 'The discovered address is not a contract.',
+  DISCOVERY_RANGE_TOO_LARGE: 'The discovery block range is too large.',
+  DISCOVERY_RESULT_LIMIT: 'The discovery result limit was exceeded.',
+  DISCOVERY_LOG_QUERY_FAILED: 'The token discovery log query failed.',
+  DISCOVERY_METADATA_FAILED: 'The discovered token metadata could not be read.',
+  DISCOVERY_PERSISTENCE_FAILED: 'The token preference could not be saved.',
+  DISCOVERY_UNSUPPORTED: 'This token discovery operation is not supported.',
 };
 
 export class AssetError extends Error {

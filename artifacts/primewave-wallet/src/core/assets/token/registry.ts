@@ -66,6 +66,29 @@ export class TokenRegistry {
     if (this.tokens.has(key)) {
       throw new AssetError('TOKEN_DUPLICATE_IDENTITY');
     }
+    this.assertTokenIdentity(token, identity);
+    this.tokens.set(key, token);
+    return token;
+  }
+
+  upsert(token: ERC20Token): ERC20Token {
+    const identity = this.resolveIdentity(
+      token.networkId,
+      token.contractAddress,
+    );
+    this.assertTokenIdentity(token, identity);
+    this.tokens.set(getAssetIdentityKey(identity), token);
+    return token;
+  }
+
+  get(identity: TokenAssetIdentity): ERC20Token | undefined {
+    return this.tokens.get(getAssetIdentityKey(identity));
+  }
+
+  private assertTokenIdentity(
+    token: ERC20Token,
+    identity: TokenAssetIdentity,
+  ): void {
     if (
       token.assetType !== 'fungible_token' ||
       token.assetId !== identity.assetId ||
@@ -73,11 +96,5 @@ export class TokenRegistry {
     ) {
       throw new AssetError('TOKEN_INVALID_ADDRESS');
     }
-    this.tokens.set(key, token);
-    return token;
-  }
-
-  get(identity: TokenAssetIdentity): ERC20Token | undefined {
-    return this.tokens.get(getAssetIdentityKey(identity));
   }
 }

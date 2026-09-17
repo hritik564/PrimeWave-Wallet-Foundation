@@ -230,8 +230,9 @@ export class ERC20TokenService {
     assets: AssetRegistry,
     readServices: readonly NetworkBoundTokenReadService[],
     options: TokenServiceOptions = {},
+    tokenRegistry?: TokenRegistry,
   ) {
-    this.tokenRegistry = new TokenRegistry(assets);
+    this.tokenRegistry = tokenRegistry ?? new TokenRegistry(assets);
     this.now = options.now ?? (() => Date.now());
     for (const readService of readServices) {
       const network = readService.accountState.getNetwork();
@@ -246,6 +247,10 @@ export class ERC20TokenService {
       }
       this.services.set(network.id, readService);
     }
+  }
+
+  getTokenRegistry(): TokenRegistry {
+    return this.tokenRegistry;
   }
 
   async getTokenMetadata(request: TokenRequest): Promise<ERC20Token> {

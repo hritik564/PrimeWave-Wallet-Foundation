@@ -15,6 +15,20 @@ export interface RpcCallObject {
   readonly data?: `0x${string}`;
 }
 
+export type RpcTopic =
+  | `0x${string}`
+  | null
+  | readonly `0x${string}`[];
+
+export interface RpcLogFilter {
+  readonly fromBlock?: RpcBlockTag;
+  readonly toBlock?: RpcBlockTag;
+  readonly address?: string | readonly string[];
+  readonly topics?: readonly RpcTopic[];
+}
+
+export type RpcLog = Record<string, unknown>;
+
 export interface EvmRpcMethodMap {
   eth_chainId: {
     readonly params: readonly [];
@@ -39,6 +53,10 @@ export interface EvmRpcMethodMap {
   eth_call: {
     readonly params: readonly [call: RpcCallObject, blockTag?: RpcBlockTag];
     readonly result: `0x${string}`;
+  };
+  eth_getLogs: {
+    readonly params: readonly [filter: RpcLogFilter];
+    readonly result: readonly RpcLog[];
   };
   eth_getTransactionByHash: {
     readonly params: readonly [transactionHash: string];

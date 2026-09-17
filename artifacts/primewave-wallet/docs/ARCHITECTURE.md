@@ -419,7 +419,36 @@ Network changes and remote chain mismatches fail closed.
 **Phase 3.2 implements generic read-only ERC-20 identity, metadata, and balance
 retrieval only. Transfers, approvals, allowances, `transferFrom`, permits,
 discovery, verification providers, NFTs, portfolio/fiat data, history, DApps,
-and backend APIs are intentionally deferred.**
+and backend APIs are intentionally deferred from that engine.**
+
+### Phase 3.3 token discovery and user-added candidates
+
+Phase 3.3 adds `TokenDiscoveryService` above the Phase 3.2 token read engine.
+It reuses the existing `EvmRpcProvider`, `EvmAccountStateService`,
+`AssetRegistry`, `TokenRegistry`, and viem ABI/log utilities. It does not add a
+UI, backend indexer, external token list, verification provider, or trust/risk
+system.
+
+The canonical token identity remains `assetType + networkId +
+checksum-normalized contractAddress`. A candidate's provenance, discovery
+state, visibility, metadata validity, verification state, and trust meaning
+are separate. Functional provenance is `user_added` or `discovered`; registry
+and external-source values remain reserved. Repeated user-added and discovered
+observations merge into one registry identity. Account scope belongs to
+discovery observations, not to the token identity, so one contract may be
+observed for several accounts while remaining one network-bound token.
+
+User-added and known-candidate discovery first validate network context,
+contract code, address normalization, and Phase 3.2 metadata. The bounded event
+path requires explicit block bounds and account identity, then performs only
+incoming/outgoing `Transfer(address,address,uint256)` log queries. It limits
+block span, raw results, unique contracts, and metadata reads; malformed or
+unrelated logs are ignored, and network/chain changes fail closed.
+
+`TokenPreferenceRepository` is a deliberately small public-data seam.
+`InMemoryTokenPreferenceRepository` is the default session-only adapter.
+Persisted records contain no wallet secrets and are never written through
+SecureStore. A future public-preference adapter must preserve that boundary.
 
 ## Design system
 
@@ -468,9 +497,13 @@ website layout.
   12. **Phase 3.1 — asset abstraction and native balance engine:** network-scoped
       native asset identities, exact bigint amount utilities, and read-only
       native balance retrieval. Complete.
-  13. **Phase 3.2 — generic ERC-20 token read engine:** network-scoped token
+   13. **Phase 3.2 — generic ERC-20 token read engine:** network-scoped token
       identities, contract-code validation, bounded metadata, exact token
       balances, safe errors, and offline fake-RPC tests. Complete.
-  14. **Future ecosystem capabilities:** token discovery and verification,
-      state-changing token operations, NFTs, portfolio, swaps, DApp
+   14. **Phase 3.3 — token discovery and user-added candidates:** canonical
+       network-plus-contract identities, provenance and visibility separation,
+       bounded account-scoped Transfer-log discovery, safe public preference
+       repository seam, and offline fake-RPC tests. Complete.
+   15. **Future ecosystem capabilities:** external token verification,
+       state-changing token operations, NFTs, portfolio, swaps, DApp
       connectivity, and PrimeWave integrations remain deferred.

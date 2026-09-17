@@ -8,3 +8,4 @@
 - [Broadcast and confirmation boundary](broadcast-confirmation.md) — Phase 2.7 sends exact already-signed bytes, observes receipts, and treats ambiguous outcomes as unknown.
 - [Native asset network binding](native-asset-network-binding.md) — multi-network balance reads use explicitly bound account-state services; never switch one active registry implicitly.
 - [ERC-20 read boundary](erc20-read-boundary.md) — token identity is network plus contract address; metadata is untrusted and reads stay strictly read-only.
+- [Token discovery boundary](token-discovery-boundary.md) — discovery is bounded Transfer-log observation or explicit user intent; provenance never implies verification, and public preferences stay separate from SecureStore.

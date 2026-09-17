@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 3.2 — generic read-only ERC-20 token engine (completed)**
+**Phase 3.3 — token discovery and user-added asset engine (completed)**
 
 ## Completed work
 
@@ -140,16 +140,35 @@
 - Added offline fake-RPC coverage for multiple accounts/networks, malformed
   metadata, reverted reads, EOAs, exact balances, safe errors, and forbidden
   methods.
+- Added the Phase 3.3 UI-independent token discovery and user-added candidate
+  engine above the existing ERC-20 read service.
+- Preserved the canonical `assetType + networkId + checksum contract address`
+  identity and merged repeated discovery/user-added observations without
+  duplicate token identities.
+- Added separate provenance, discovery state, visibility, metadata snapshot,
+  verification, and account-scoped observation models. User-added and
+  discovered candidates remain unknown/unverified by default.
+- Added bounded incoming/outgoing ERC-20 Transfer-event discovery with explicit
+  block ranges, narrow account topics, result limits, metadata limits,
+  malformed-log rejection, deduplication, and remote chain revalidation.
+- Extended the typed RPC provider with validated read-only `eth_getLogs`.
+- Added an injected public `TokenPreferenceRepository` seam and a session-only
+  in-memory implementation. Token preferences never use SecureStore and never
+  contain wallet secrets.
+- Added 12 offline discovery tests for user-added validation, provenance
+  merging, network/account scope, visibility/removal, bounded logs, malformed
+  data, limits, safe errors, persistence safety, concurrency, and forbidden
+  methods.
 
 ## Pending work
 
 - Production PrimeWave Chain launch configuration must be supplied and reviewed
   before the primary network can be activated.
 - Recovery UX and authentication UI require separate scope and security review.
-- Token discovery, external token lists, verification providers, NFTs,
-  portfolio valuation, fiat pricing, transaction history, transfers, approvals,
-  permits, swaps, DApps, backend asset APIs, and notifications remain outside
-  this controlled increment.
+- External token lists, verification providers, NFTs, portfolio valuation, fiat
+  pricing, transaction history, transfers, approvals, permits, swaps, DApps,
+  backend asset APIs, and notifications remain outside this controlled
+  increment.
 - Balance preflight validation is intentionally not implemented because it is
   optional and must not be mistaken for a guarantee before signing/broadcast.
 - Physical-device verification of local signing and native biometric behavior
@@ -181,8 +200,8 @@
 
 ## Phase boundary
 
-Phase 3.2 is complete. Stop here. Later phases may separately define token
-discovery, external verification, token state-changing operations, NFTs,
-portfolio valuation, fiat pricing, transaction history, UI activity, swaps,
-DApps, WalletConnect, notifications, backend indexing, replacement, speed-up,
-cancellation, automatic fee bumping, and other ecosystem capabilities.
+Phase 3.3 is complete. Stop here. Later phases may separately define external
+verification, token state-changing operations, NFTs, portfolio valuation, fiat
+pricing, transaction history, UI activity, swaps, DApps, WalletConnect,
+notifications, backend indexing, replacement, speed-up, cancellation,
+automatic fee bumping, and other ecosystem capabilities.

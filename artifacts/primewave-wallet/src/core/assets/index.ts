@@ -23,6 +23,12 @@ export {
   TokenRegistry,
   createTokenAssetIdentity,
 } from './token/registry';
+export {
+  TokenDiscoveryService,
+} from './token/discovery/service';
+export {
+  InMemoryTokenPreferenceRepository,
+} from './token/discovery/repository';
 export type {
   AssetAvailability,
   AssetAvailabilityStatus,
@@ -45,3 +51,20 @@ export type {
   TokenServiceOptions,
   TokenVerificationStatus,
 } from './models';
+export type {
+  FunctionalTokenProvenance,
+  KnownTokenDiscoveryRequest,
+  TokenCandidate,
+  TokenDiscoveryLimits,
+  TokenDiscoveryObservation,
+  TokenDiscoveryResult,
+  TokenDiscoveryServiceOptions,
+  TokenDiscoveryState,
+  TokenMetadataSnapshot,
+  TokenPreferenceRecord,
+  TokenPreferenceRepository,
+  TokenProvenance,
+  TokenVisibility,
+  TransferDiscoveryRequest,
+  UserAddedTokenRequest,
+} from './token/discovery/models';
