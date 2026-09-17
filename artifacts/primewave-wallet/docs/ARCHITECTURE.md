@@ -35,8 +35,8 @@ Expo Router app
 - **App and navigation:** Expo Router route composition.
 - **Presentation:** screens and reusable components that consume centralized
   theme tokens.
-- **Configuration:** environment and network configuration with unconfigured
-  production placeholders.
+- **Configuration:** environment and network metadata with reviewed,
+  unconfigured production placeholders.
 - **Domain core:** the Phase 1B-1 local wallet core plus typed interfaces for
   security, blockchain, network, token, transaction, portfolio, swap, and DApp
   behavior.
@@ -126,10 +126,25 @@ See `SECURITY_ARCHITECTURE.md`.
 
 ## Network abstraction
 
-`EvmNetwork` supports an id, name, chain ID, RPC URL, explorer URL, native
-currency, primary-network flag, and environment. PrimeWave Chain is represented
-as the future primary network with intentionally unconfigured production
-values.
+Phase 2 begins with a metadata-only `EvmNetwork` definition and
+`NetworkRegistry` in `src/core/networks`. Each definition has a stable ID,
+display name, chain ID, native currency, ordered public RPC endpoint metadata,
+block explorer metadata, environment, enabled state, and primary-network
+designation.
+
+The default registry includes PrimeWave Chain, Ethereum, BNB Smart Chain,
+Polygon, Arbitrum, Base, and Optimism. PrimeWave Chain is the single intended
+primary network, but its launch chain ID, RPC endpoints, explorer URLs, and
+native currency symbol remain explicit placeholders until supplied and
+reviewed. No API keys, credentials, or private configuration belong in network
+definitions.
+
+The registry validates IDs, chain IDs, URL safety, native currency metadata,
+duplicate IDs and chain IDs, primary-network rules, and environment
+combinations. Active-network selection is explicit by stable network ID and
+does not accept automatic switching requests from DApps or other untrusted
+callers. The ordered endpoint list is a future seam for health checks and
+failover; this increment performs no RPC calls.
 
 ## Design system
 
@@ -141,8 +156,8 @@ website layout.
 
 ## Development phases
 
-1. **Phase 0A/0B — foundation:** project structure, design system, typed network
-   abstraction, security documentation, and security contracts.
+1. **Phase 0A/0B — foundation:** project structure, design system, security
+   documentation, and security contracts.
 2. **Phase 1A — local wallet core:** in-memory BIP-39 generation and
    validation, BIP-32/BIP-44-compatible EVM derivation, address validation,
    multiple-account models, and offline deterministic tests.
@@ -150,9 +165,13 @@ website layout.
    restoration, corruption handling, and offline persistence tests.
 4. **Phase 1B-2 — authentication lifecycle:** PIN/biometric UX, authentication,
    and wallet locking after separate approval.
-5. **Phase 2 — network and asset read models:** configured networks, balances,
+5. **Phase 2.1 — EVM network abstraction and registry:** typed network
+   definitions, reviewed public metadata, deterministic validation, and
+   explicit active-network selection. This controlled increment is complete;
+   it performs no RPC calls.
+6. **Phase 2.2 — network and asset read models:** health checks, balances,
    native assets, ERC-20 tokens, and verified-token boundaries.
-6. **Phase 3 — transactions and signing:** local signing, user confirmation,
+7. **Phase 3 — transactions and signing:** local signing, user confirmation,
    and broadcast flows.
-7. **Phase 4 — ecosystem capabilities:** discovery, swaps, DApp connectivity,
+8. **Phase 4 — ecosystem capabilities:** discovery, swaps, DApp connectivity,
    and PrimeWave integrations.

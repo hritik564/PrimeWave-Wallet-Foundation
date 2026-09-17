@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 1B-1 — secure local wallet vault (completed)**
+**Phase 2.1 — EVM network abstraction and registry (completed)**
 
 ## Completed work
 
@@ -42,13 +42,24 @@
   vault, malformed vault, unsupported version, and unavailable-storage handling.
 - Added fail-closed web behavior because Expo SecureStore is native-only.
 - Added offline persistence tests without exposing secrets through public models.
+- Added strongly typed EVM network definitions for PrimeWave Chain, Ethereum,
+  BNB Smart Chain, Polygon, Arbitrum, Base, Optimism, and future custom networks.
+- Added ordered RPC endpoint metadata and block explorer metadata without
+  credentials or live connectivity.
+- Added deterministic registry validation for IDs, chain IDs, URLs, currency
+  metadata, duplicate networks, primary-network rules, and environments.
+- Added explicit active-network selection by stable ID; no automatic switching
+  or DApp-controlled selection is implemented.
+- Added focused offline registry tests for integrity, lookup, duplicate
+  rejection, placeholder rules, environment separation, and invalid metadata.
 
 ## Pending work
 
-- Production PrimeWave Chain configuration must be supplied and reviewed.
+- Production PrimeWave Chain launch configuration must be supplied and reviewed
+  before the primary network can be activated.
 - Recovery UX and authentication require separate scope and security review.
-- The Phase 0B authentication and signing contract test plan remains a plan for
-  future implementations.
+- Network health checks, failover, asset read models, and live RPC integration
+  remain outside this controlled increment.
 
 ## Important architectural decisions
 
@@ -62,11 +73,11 @@
 
 ## Known limitations
 
-- No authentication UX, import/recovery UI, PIN, biometrics, wallet locking,
-  or signing.
-- No blockchain RPC, indexer, price service, database, notification service, or
-  DApp connection.
+- No blockchain RPC calls, health checks, failover, indexer, price service,
+  database, notification service, or DApp connection.
 - The PrimeWave Chain entry has null chain and endpoint values by design.
+- Built-in public RPC metadata is not a live connectivity guarantee and does
+  not contain credentials.
 - JavaScript garbage collection is not a guaranteed memory wipe for temporary
   secrets.
 - SecureStore availability is false on web, so web wallet creation/restoration
@@ -75,6 +86,6 @@
 
 ## Next recommended phase
 
-**Phase 1B-2 — authentication lifecycle**, covering authentication UX,
-wallet locking, and platform authentication integration. Do not begin it
+**Phase 2.2 — network read models**, covering endpoint health checks, explicit
+failover policy, and public native-asset/balance reads. Do not begin it
 automatically.

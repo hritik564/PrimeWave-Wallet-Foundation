@@ -151,6 +151,17 @@ test('validates chain, URL, currency, and environment combinations', () => {
     'INVALID_NETWORK',
   );
 
+  const invalidEnvironment = {
+    ...configuredEthereum,
+    id: 'invalid-environment',
+    chainId: 996,
+    environment: 'production' as never,
+  };
+  expectRegistryError(
+    () => new NetworkRegistry([configuredEthereum, invalidEnvironment]),
+    'INVALID_NETWORK',
+  );
+
   const mainnetPlaceholder = {
     ...configuredEthereum,
     id: 'mainnet-placeholder',
@@ -168,7 +179,7 @@ test('validates chain, URL, currency, and environment combinations', () => {
   };
   expectRegistryError(
     () => new NetworkRegistry([configuredEthereum, mainnetPlaceholder]),
-    'PRIMARY_NETWORK_INVALID',
+    'INVALID_NETWORK',
   );
 });
 

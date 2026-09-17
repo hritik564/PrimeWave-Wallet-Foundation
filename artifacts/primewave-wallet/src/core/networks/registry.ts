@@ -146,14 +146,25 @@ function validateExplorer(
   ) {
     failInvalid('Configured networks must contain explorer URL templates.');
   }
-  validateTemplate(explorer.addressUrlTemplate, 'address', 'address');
-  validateTemplate(explorer.transactionUrlTemplate, 'transaction', 'txHash');
+  validateTemplate(
+    explorer.addressUrlTemplate,
+    'address',
+    'address',
+    environment,
+  );
+  validateTemplate(
+    explorer.transactionUrlTemplate,
+    'transaction',
+    'txHash',
+    environment,
+  );
 }
 
 function validateTemplate(
   template: string,
   label: string,
   requiredToken: 'address' | 'txHash',
+  environment: NetworkEnvironment,
 ): void {
   assertNonEmpty(template, `${label} explorer URL template`);
   const tokens = [...template.matchAll(TEMPLATE_TOKEN_PATTERN)].map(
@@ -167,7 +178,7 @@ function validateTemplate(
   const parsed = parsePublicUrl(
     template.replace(`{${requiredToken}}`, 'placeholder'),
     `${label} explorer URL template`,
-    'mainnet',
+    environment,
   );
   if (!parsed.pathname.includes('placeholder')) {
     failInvalid(`${label} explorer URL template must place its token in the path.`);
@@ -175,6 +186,13 @@ function validateTemplate(
 }
 
 export function validateEvmNetwork(network: EvmNetwork): void {
+  if (
+    network.environment !== 'development' &&
+    network.environment !== 'testnet' &&
+    network.environment !== 'mainnet'
+  ) {
+    failInvalid('Network environment is invalid.');
+  }
   if (!NETWORK_ID_PATTERN.test(network.id)) {
     failInvalid(
       'Network ID must use lowercase letters, digits, and single hyphens.',
@@ -186,6 +204,9 @@ export function validateEvmNetwork(network: EvmNetwork): void {
   const isPlaceholder = network.configurationStatus === 'placeholder';
   if (isPlaceholder && !network.isPrimary) {
     failInvalid('Only the primary network may use placeholder configuration.');
+  }
+  if (isPlaceholder && network.id !== 'primewave') {
+    failInvalid('Only PrimeWave Chain may use placeholder configuration.');
   }
   if (isPlaceholder && !network.configurationNote?.trim()) {
     failInvalid('Placeholder networks must explain their missing configuration.');
