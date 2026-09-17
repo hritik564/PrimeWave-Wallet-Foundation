@@ -1,0 +1,90 @@
+DEVELOPMENT-ONLY FIX — DIAGNOSE RESET LOCAL PREVIEW
+
+IMPORTANT:
+Do NOT implement any new product feature.
+Do NOT modify the wallet security architecture.
+Do NOT modify wallet cryptography, signing, authentication, PIN security, or production behavior.
+
+We have an existing development-only "Reset Local Preview" button intended to reset the local development wallet so the developer can repeatedly test:
+
+Create Wallet
+→ Recovery Confirmation
+→ Set 6-digit PIN
+→ Unlock
+→ Lock
+→ etc.
+
+Currently, when clicking "Reset Local Preview", the app displays:
+
+"The app could not complete that operation."
+
+I need you to diagnose the existing implementation before changing anything.
+
+1. Trace the complete Reset Local Preview button flow.
+
+2. Identify:
+   - the button handler
+   - the reset function/service it calls
+   - every storage/vault/auth state operation involved
+   - where the generic "The app could not complete that operation." error originates
+   - the exact underlying error before it is sanitized
+
+3. Determine whether the failure is caused by:
+   - SecureStore behavior in the Replit/web preview
+   - attempting to delete a non-existent vault
+   - authentication state
+   - React state/context
+   - AsyncStorage/localStorage assumptions
+   - development-preview limitations
+   - an incorrect reset implementation
+   - another concrete cause
+
+4. IMPORTANT SECURITY REQUIREMENT:
+
+The reset utility must NEVER:
+- expose a mnemonic
+- expose a private key
+- log a mnemonic/private key
+- log SecureStore contents
+- bypass wallet authentication
+- alter production wallet security
+- introduce browser persistence as a replacement for SecureStore
+- add a backend reset mechanism
+
+5. DEVELOPMENT-ONLY BEHAVIOR:
+
+If the existing architecture permits it, the reset utility should clear only the local development wallet state necessary to return the preview to a clean first-run state.
+
+It should allow the developer to immediately see the initial wallet setup flow again.
+
+The reset utility must NOT be available in production builds.
+
+6. If SecureStore cannot be reliably reset from the Replit web preview because of platform limitations, DO NOT weaken SecureStore.
+
+Instead, determine the correct development-only approach for the preview environment while preserving the real mobile SecureStore implementation.
+
+7. Do not add a second wallet storage system merely to make the preview work.
+
+8. Do not modify Phase 3.4 or unrelated portfolio/token code.
+
+9. After diagnosing the issue, make ONLY the minimum isolated fix required.
+
+10. Add/update tests for the reset behavior where technically appropriate.
+
+11. Verify:
+- TypeScript
+- existing test suite
+- Expo/Metro
+- git diff --check
+
+12. Report:
+- root cause
+- exact files involved
+- exact fix
+- why the fix is development-only
+- confirmation that SecureStore/mobile security was not weakened
+- tests passed
+- any remaining limitation
+
+STOP after this diagnostic/fix.
+Do not proceed to another feature.

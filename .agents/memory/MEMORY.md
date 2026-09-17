@@ -9,3 +9,4 @@
 - [Native asset network binding](native-asset-network-binding.md) — multi-network balance reads use explicitly bound account-state services; never switch one active registry implicitly.
 - [ERC-20 read boundary](erc20-read-boundary.md) — token identity is network plus contract address; metadata is untrusted and reads stay strictly read-only.
 - [Token discovery boundary](token-discovery-boundary.md) — discovery is bounded Transfer-log observation or explicit user intent; provenance never implies verification, and public preferences stay separate from SecureStore.
+- [Expo workflow DevTools warning](expo-workflow-devtools-warning.md) — missing system glib may prevent React Native DevTools installation while Metro and the web bundle still run normally.

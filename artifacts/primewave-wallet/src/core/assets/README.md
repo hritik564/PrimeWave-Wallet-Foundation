@@ -1,9 +1,9 @@
 # Asset core
 
-Phases 3.1–3.3 implement the network-scoped asset abstraction, native EVM
-balance engine, generic read-only ERC-20 token engine, and the UI-independent
-token candidate/discovery engine. NFTs and state-changing token operations
-remain deferred.
+Phases 3.1–3.4 implement the network-scoped asset abstraction, native EVM
+balance engine, generic read-only ERC-20 token engine, UI-independent token
+candidate/discovery, and portfolio aggregation/icon domains. NFTs and
+state-changing token operations remain deferred.
 
 Assets are network-scoped. The stable native identity is:
 
@@ -34,9 +34,9 @@ part.
 Multi-network support is achieved by supplying explicitly network-bound
 account-state services to the balance service and explicitly network-bound
 account-state/provider pairs to the ERC-20 service. The same address or
-contract on different networks produces separate identities. No balance cache,
-continuous polling, portfolio aggregation, fiat pricing, or background refresh
-exists in this phase.
+contract on different networks produces separate identities. Blockchain
+balances are live observations; there is no balance cache, continuous polling,
+fiat pricing, or background refresh.
 
 ## ERC-20 read engine
 
@@ -87,6 +87,40 @@ background scan.
 `TokenPreferenceRepository` stores only public identity, visibility, provenance,
 and metadata observations. The default `InMemoryTokenPreferenceRepository` is
 session-only and intentionally cannot access SecureStore or wallet secrets.
+
+## Portfolio aggregation and asset icons
+
+`PortfolioAggregationService` is a UI-independent, explicitly scoped
+read-only layer over the native balance service, ERC-20 token service, token
+registry, and discovery candidates. A query requires an account and one or
+more explicit configured network IDs. It never silently queries every network,
+switches networks, or adds a second discovery engine.
+
+Portfolio assets retain authoritative `AssetIdentity` and are deduplicated by
+`assetType + networkId + assetId`. Native assets and ERC-20 assets can be
+represented together; identical contract addresses on different networks and
+the same asset viewed by different accounts remain separate. User-added,
+discovered, and registry provenance are preserved independently from
+visibility, discovery state, verification, and balance availability.
+
+Balances remain exact `bigint` values with explicit decimals and formatted
+strings. Zero-balance, hidden, unavailable, metadata-unavailable, and
+unverified assets remain representable without being silently deleted.
+Portfolio summaries contain only non-financial counts. There is no price,
+fiat value, performance, risk score, or valuation.
+
+The `AssetIcon`/`TokenLogo` model is independent from token verification. The
+current implementation does not fetch logo URLs or use external token lists;
+it exposes explicit future sources and provides a deterministic identity-based
+fallback plus bounded initials. Logo availability never implies legitimacy,
+verification, or trust. Native assets use network currency metadata as the
+foundation for their icon fallback.
+
+Portfolio aggregation uses only existing read methods (`eth_chainId`,
+`eth_getBalance`, `eth_getCode`, and `eth_call`) and does not access wallet
+secrets, SecureStore, signing, broadcasting, backend services, or persistent
+portfolio balance storage.
+
 External token lists, verification providers, pricing, risk systems, indexers,
 backend APIs, transfers, approvals, permits, NFTs, portfolio/fiat data,
 history, DApps, signing, and broadcasting remain outside this boundary.

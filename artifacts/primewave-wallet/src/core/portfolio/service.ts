@@ -288,7 +288,7 @@ export class PortfolioAggregationService {
   private resolveRequestedTokens(
     identities: readonly AssetIdentity[] | undefined,
     networkIds: readonly string[],
-  ): readonly AssetIdentity[] | null {
+  ): readonly TokenAssetIdentity[] | null {
     if (identities === undefined) return null;
     if (!Array.isArray(identities)) {
       throw new PortfolioError('PORTFOLIO_INVALID_REQUEST');
@@ -316,7 +316,7 @@ export class PortfolioAggregationService {
 
   private tokensForNetwork(
     networkId: string,
-    requested: readonly AssetIdentity[] | null,
+    requested: readonly TokenAssetIdentity[] | null,
   ): readonly ERC20Token[] {
     const tokens = requested
       ? requested

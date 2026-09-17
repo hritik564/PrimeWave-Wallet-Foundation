@@ -425,7 +425,7 @@ identity, public sender/type metadata, lifecycle state, and safe receipt
 fields. They contain no private key, mnemonic, seed, vault contents, signing
 capability, PIN, biometric secret, or authentication credential.
 
-## 14. Phase 3.1–3.3 asset, token-read, and discovery boundary
+## 14. Phase 3.1–3.4 asset, token-read, discovery, and portfolio boundary
 
 Phase 3.1 adds a read-only asset layer. It defines architectural asset types
 for native assets, fungible tokens, and NFTs. Phase 3.2 adds generic,
@@ -515,13 +515,50 @@ risk score, or verification-provider response enters a discovery candidate.
 
 Token balances remain exact `bigint` values and include the account,
 network/chain, and contract identity. No token list, verification provider,
-portfolio/fiat service, indexer, backend, or secret-bearing component is used.
+portfolio valuation/fiat service, indexer, backend, or secret-bearing
+component is used.
 
-**Phase 3.3 stops at safe token candidate discovery and user-added asset
-preferences. Transfers, approvals, allowances, permits, swaps, NFTs,
-portfolio/fiat data, history, DApps, WalletConnect, signing, broadcasting,
-background execution, backend indexing, and external verification remain
-deferred.**
+### Phase 3.4 portfolio controls
+
+`PortfolioAggregationService` is a read-only composition layer. It receives
+an explicit public account and explicit configured network IDs, then reuses
+the existing network-bound native and ERC-20 read services. It does not
+switch networks, silently enumerate networks, fail over outside the existing
+provider rules, access wallet authentication or vault state, or create a
+second discovery engine.
+
+Portfolio asset identity is authoritative asset identity, never a symbol,
+name, decimals, logo, or display label. Account and network context remains
+attached to every portfolio and asset result. Native assets, registry tokens,
+user-added tokens, and discovered tokens are combined only when their
+authoritative identity matches; different accounts or networks cannot merge.
+
+Raw blockchain quantities remain exact `bigint` values. Portfolio states keep
+metadata availability, balance availability, hidden/visible presentation,
+discovery state, provenance, verification, and logo state separate. Hidden
+does not mean deleted, zero balance does not mean hidden, and unverified does
+not mean removed. Portfolio summaries contain no financial valuation, pricing,
+fiat conversion, performance, market-cap, or risk information.
+
+The `AssetIcon`/`TokenLogo` abstraction is metadata only. Its source,
+reference, status, provenance, dimensions, and deterministic fallback are
+independent from token verification. No external logo URL is fetched, no
+token-list SDK is added, and no logo is treated as a safety or legitimacy
+claim. Native icons are based only on reviewed network native-currency
+metadata; placeholder networks remain unavailable.
+
+Portfolio blockchain access is limited to the existing read-only
+`eth_chainId`, `eth_getBalance`, `eth_getCode`, and `eth_call` methods.
+`eth_getLogs` remains confined to the bounded Phase 3.3 discovery service.
+There is no portfolio persistence of live balances, no SecureStore use for
+public portfolio data, no backend dependency, no background refresh, and no
+signing, authorization, transaction construction, or broadcasting path.
+
+**Phase 3.4 stops at safe account/network-scoped asset aggregation and logo
+architecture. Transfers, approvals, allowances, permits, swaps, NFTs,
+portfolio valuation, price feeds, history, DApps, WalletConnect, signing,
+broadcasting, background execution, backend indexing, external lists,
+verification providers, and risk systems remain deferred.**
 
 ## 15. Error handling
 

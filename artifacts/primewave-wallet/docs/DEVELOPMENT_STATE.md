@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 3.3 — token discovery and user-added asset engine (completed)**
+**Phase 3.4 — portfolio aggregation and token-logo architecture (completed)**
 
 ## Completed work
 
@@ -159,6 +159,21 @@
   merging, network/account scope, visibility/removal, bounded logs, malformed
   data, limits, safe errors, persistence safety, concurrency, and forbidden
   methods.
+- Added the UI-independent `src/core/portfolio` aggregation domain.
+- Added explicit `Portfolio`, account, network, asset, balance, status, source,
+  visibility, and summary models without duplicating asset identity rules.
+- Added account- and network-scoped aggregation for native and ERC-20 assets,
+  with explicit network requests, configured-network validation, exact bigint
+  balances, metadata reuse, live balance states, and non-financial summaries.
+- Added identity-based deduplication preserving registry, user-added, and
+  discovered provenance and visibility.
+- Added deterministic `AssetIcon`/`TokenLogo` models and fallback identifiers
+  without fetching remote logos or implying verification.
+- Added portfolio-specific safe errors, result bounds, remote-chain checks,
+  stale network rejection, no-persistence behavior, and read-only RPC audits.
+- Added 12 offline portfolio tests covering aggregation, isolation,
+  deduplication, provenance, visibility, zero balances, metadata gaps, icons,
+  fallbacks, chain/network races, limits, safe errors, and forbidden methods.
 
 ## Pending work
 
@@ -167,8 +182,8 @@
 - Recovery UX and authentication UI require separate scope and security review.
 - External token lists, verification providers, NFTs, portfolio valuation, fiat
   pricing, transaction history, transfers, approvals, permits, swaps, DApps,
-  backend asset APIs, and notifications remain outside this controlled
-  increment.
+  backend asset APIs, notifications, and full wallet UI remain outside this
+  controlled increment.
 - Balance preflight validation is intentionally not implemented because it is
   optional and must not be mistaken for a guarantee before signing/broadcast.
 - Physical-device verification of local signing and native biometric behavior
@@ -200,8 +215,8 @@
 
 ## Phase boundary
 
-Phase 3.3 is complete. Stop here. Later phases may separately define external
+Phase 3.4 is complete. Stop here. Later phases may separately define external
 verification, token state-changing operations, NFTs, portfolio valuation, fiat
 pricing, transaction history, UI activity, swaps, DApps, WalletConnect,
 notifications, backend indexing, replacement, speed-up, cancellation,
-automatic fee bumping, and other ecosystem capabilities.
+automatic fee bumping, full wallet UI, and other ecosystem capabilities.

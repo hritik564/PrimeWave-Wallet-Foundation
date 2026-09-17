@@ -450,6 +450,52 @@ unrelated logs are ignored, and network/chain changes fail closed.
 Persisted records contain no wallet secrets and are never written through
 SecureStore. A future public-preference adapter must preserve that boundary.
 
+### Phase 3.4 portfolio aggregation and asset icon architecture
+
+Phase 3.4 adds the UI-independent `PortfolioAggregationService` under
+`src/core/portfolio`. It composes the existing `AssetRegistry`,
+`NativeAssetBalanceService`, `ERC20TokenService`, `TokenRegistry`, discovery
+candidates, and explicitly network-bound account-state/provider pairs. It does
+not add a second metadata or discovery engine.
+
+Portfolio queries require an explicit public account and an explicit finite
+list of configured network IDs. Each returned portfolio asset retains its
+authoritative identity:
+
+```text
+native:         assetType + networkId + native assetId
+fungible token: assetType + networkId + checksum contract address
+```
+
+Deduplication uses that identity only. Symbols, names, decimals, logos, and
+display labels are never identity keys. Same-address assets on different
+networks and the same network asset viewed by different accounts remain
+separate. Native, registry, user-added, and discovered provenance is preserved
+independently from visibility, discovery state, verification, metadata
+availability, and live balance state.
+
+The portfolio model keeps exact raw `bigint` balances, decimals, formatted
+amounts, account/network context, availability state, and non-financial
+summary counts. Zero-balance and hidden assets remain representable. Portfolio
+aggregation does not calculate prices, fiat values, profit/loss, performance,
+risk, or financial recommendations.
+
+Phase 3.4 also adds the UI-independent `AssetIcon`/`TokenLogo` abstraction.
+Logo source and provenance are explicit future-facing fields
+(`curated_registry`, `trusted_external_source`, `user_provided`, or `none`),
+but no external logo provider, token list, URL fetch, or remote-content trust
+is implemented. Assets without logos expose bounded initials and a
+deterministic identity-derived fallback. Logo availability never changes
+verification or trust. Native icon fallbacks use the configured network native
+currency metadata and do not invent placeholder PrimeWave branding.
+
+Portfolio reads are explicit and bounded. They reuse only the existing
+read-only RPC methods `eth_chainId`, `eth_getBalance`, `eth_getCode`, and
+`eth_call`; they do not use `eth_getLogs` to create a second discovery path.
+Network and chain changes fail closed. No portfolio balance persistence,
+SecureStore access, wallet-secret access, signing, broadcasting, backend
+indexing, background polling, or automatic network switching is introduced.
+
 ## Design system
 
 PrimeWave Wallet uses a centralized dark foundation with blue, cyan, and violet
@@ -504,6 +550,10 @@ website layout.
        network-plus-contract identities, provenance and visibility separation,
        bounded account-scoped Transfer-log discovery, safe public preference
        repository seam, and offline fake-RPC tests. Complete.
-   15. **Future ecosystem capabilities:** external token verification,
+   15. **Phase 3.4 — portfolio aggregation and asset icons:** explicit
+       account/network-scoped native and ERC-20 aggregation, identity
+       deduplication, provenance/visibility preservation, exact balances,
+       deterministic icon fallbacks, safe errors, and offline tests. Complete.
+   16. **Future ecosystem capabilities:** external token verification,
        state-changing token operations, NFTs, portfolio, swaps, DApp
       connectivity, and PrimeWave integrations remain deferred.
