@@ -1,0 +1,382 @@
+PHASE 2.2 — EVM RPC PROVIDER ENGINE
+
+We have completed and approved Phase 2.1: EVM Network Abstraction & Registry.
+
+Now implement ONLY Phase 2.2: the RPC Provider Engine.
+
+IMPORTANT:
+Do NOT implement balances, token discovery, portfolio data, transactions, gas estimation, signing, swaps, DApps, WalletConnect, indexing, backend integration, price feeds, or UI redesign.
+
+This phase is ONLY about creating a safe, deterministic abstraction for communicating with EVM JSON-RPC endpoints.
+
+PRIMEWAVE SECURITY INVARIANT
+
+PrimeWave Wallet is strictly non-custodial.
+
+The RPC layer must NEVER receive, store, log, serialize, transmit, or have access to:
+
+- private keys
+- recovery phrases
+- PINs
+- biometric secrets
+- encryption keys
+- wallet passwords
+- seed material
+- signing secrets
+
+The RPC engine may receive PUBLIC blockchain information such as:
+
+- chain ID
+- block numbers
+- public addresses
+- transaction hashes
+- public transaction data
+
+Never introduce any mechanism that could transmit wallet secrets through RPC.
+
+1. RPC PROVIDER ABSTRACTION
+
+Create a strongly typed RPC provider/client abstraction that works with the existing EVM Network Registry.
+
+The provider must be selected from the active network.
+
+The architecture should support:
+
+- JSON-RPC request
+- JSON-RPC response
+- JSON-RPC errors
+- request IDs
+- endpoint selection
+- timeout handling
+- deterministic error normalization
+
+Do not couple the RPC layer directly to React UI components.
+
+2. JSON-RPC 2.0
+
+Implement proper JSON-RPC 2.0 request handling.
+
+Support the foundation required for standard EVM methods, including:
+
+- eth_chainId
+- eth_blockNumber
+- eth_getBalance
+- eth_getTransactionCount
+- eth_getCode
+- eth_call
+- eth_getTransactionByHash
+- eth_getTransactionReceipt
+- eth_estimateGas
+- eth_gasPrice
+- eth_getBlockByNumber
+- eth_getBlockByHash
+- eth_sendRawTransaction
+
+IMPORTANT:
+Although the provider abstraction may support these methods, DO NOT build wallet transaction functionality yet.
+
+In this phase they should exist only as generic RPC capabilities/interfaces.
+
+3. ENDPOINT SELECTION
+
+Use the ordered RPC endpoints already defined by Phase 2.1.
+
+Implement deterministic endpoint selection.
+
+For now:
+
+- Start with the highest-priority enabled endpoint.
+- Do not silently switch networks.
+- Do not silently modify network configuration.
+- Do not invent endpoints.
+- Do not add third-party RPC services unless already present in the registry.
+
+If multiple endpoints exist, design the abstraction so failover can be added later without changing consumers.
+
+Do NOT implement aggressive automatic failover yet.
+
+4. TIMEOUTS
+
+Every network request must have a bounded timeout.
+
+No RPC promise should be capable of leaving the application waiting indefinitely.
+
+Use a sensible configurable default timeout.
+
+Allow the timeout to be overridden by the provider configuration where appropriate.
+
+Timeouts must produce normalized, safe errors.
+
+5. ERROR NORMALIZATION
+
+Create a safe RPC error model.
+
+Distinguish at least:
+
+- network unavailable
+- timeout
+- HTTP failure
+- malformed response
+- JSON-RPC error
+- invalid response
+- unsupported method
+- chain ID mismatch
+- endpoint unavailable
+- configuration error
+
+Errors shown to the UI must be sanitized.
+
+Do not expose:
+
+- authorization headers
+- credentials
+- secret configuration
+- raw internal stack traces
+- private wallet information
+
+RPC errors must never contain or log recovery phrases/private keys/PINs.
+
+6. CHAIN ID VERIFICATION
+
+When initializing an RPC provider for a configured network, verify the remote chain ID using eth_chainId.
+
+Compare the returned chain ID with the network registry's expected chain ID.
+
+If they do not match:
+
+- reject the endpoint
+- return a specific chain-ID-mismatch error
+- do not treat the endpoint as valid
+- do not automatically continue against the mismatched chain
+
+This is an important protection against accidental network misconfiguration.
+
+For the intentionally unconfigured PrimeWave Mainnet placeholder, do not attempt a real RPC request.
+
+7. RPC URL SECURITY
+
+Continue enforcing the Phase 2.1 rules.
+
+Reject RPC endpoints containing:
+
+- username/password credentials
+- unexpected query parameters
+- embedded secrets
+- malformed URLs
+
+Do not log complete RPC URLs if they could contain sensitive configuration.
+
+Public RPC URLs may be represented internally, but logging should use sanitized endpoint identifiers rather than full URLs.
+
+8. REQUEST VALIDATION
+
+Create deterministic validation for RPC requests:
+
+- valid JSON-RPC version
+- valid method
+- valid request ID
+- valid params
+- no unsupported secret-bearing request fields
+
+Prevent arbitrary objects from being serialized into RPC requests.
+
+Keep the request model strongly typed.
+
+9. RESPONSE VALIDATION
+
+Validate RPC responses before returning them to callers.
+
+Check:
+
+- JSON-RPC version
+- response ID
+- result/error exclusivity
+- valid error structure
+- expected response shape where practical
+
+Malformed responses must be rejected safely.
+
+10. NETWORK ACCESS BOUNDARY
+
+Keep all network access inside the blockchain/RPC layer.
+
+Do not allow UI components, authentication components, secure-vault components, or wallet-secret components to directly call fetch/network APIs.
+
+The wallet engine and secure vault must remain completely independent of RPC.
+
+11. CACHING
+
+Do NOT add persistent RPC response caching in this phase.
+
+Do not store blockchain data in AsyncStorage, SecureStore, browser localStorage, or wallet storage.
+
+A future caching layer can be added later.
+
+12. LOGGING
+
+Use the existing safe logging system.
+
+Never log:
+
+- private keys
+- recovery phrases
+- PINs
+- biometric information
+- signing payloads containing secret material
+- authorization headers
+- full sensitive RPC URLs
+
+Development logs may identify:
+
+- network ID
+- chain ID
+- RPC endpoint ID
+- method name
+- request duration
+- success/failure category
+
+but must remain sanitized.
+
+13. ENVIRONMENT SEPARATION
+
+Respect the Phase 2.1 environment model:
+
+- development
+- testnet
+- mainnet
+
+Do not allow a mainnet-configured network to accidentally use a development endpoint.
+
+Do not automatically fall back from mainnet to testnet or vice versa.
+
+14. PRIMEWAVE MAINNET
+
+Do not invent any PrimeWave Mainnet infrastructure.
+
+PrimeWave Chain remains intentionally unconfigured until official values are supplied.
+
+The RPC provider must refuse to initialize an unconfigured PrimeWave Mainnet network.
+
+Do not use fake RPC URLs.
+
+15. TESTING
+
+Add comprehensive automated tests for:
+
+- JSON-RPC request creation
+- JSON-RPC response validation
+- JSON-RPC error handling
+- request ID matching
+- malformed response handling
+- timeout handling
+- HTTP failures
+- endpoint selection
+- disabled endpoint rejection
+- unconfigured network rejection
+- chain ID verification
+- chain ID mismatch
+- environment separation
+- RPC URL validation
+- credential/query parameter rejection
+- sanitized errors
+- safe logging
+- network layer separation
+- no wallet-secret dependency
+
+Use mocked/fake transport for automated tests.
+
+DO NOT make tests depend on live public RPC endpoints.
+
+Tests must remain deterministic and work offline.
+
+16. REAL RPC CALLS
+
+The application may contain the provider implementation necessary for future real blockchain connectivity.
+
+However, automated tests must use mocked transport.
+
+Do not make the test suite dependent on Ethereum, BNB, Polygon, Arbitrum, Base, Optimism, or PrimeWave infrastructure being online.
+
+17. DEPENDENCY DISCIPLINE
+
+Before adding a dependency, check whether the current project already contains suitable functionality.
+
+Avoid unnecessary RPC libraries if the architecture can safely use a small typed JSON-RPC transport abstraction.
+
+If a dependency is genuinely necessary, use a stable version compatible with the existing Expo SDK 57 / React Native environment.
+
+Do not introduce Node-only dependencies into the mobile runtime.
+
+18. DOCUMENTATION
+
+Update the relevant architecture/development documentation to explain:
+
+- RPC Provider Engine
+- JSON-RPC abstraction
+- endpoint selection
+- timeout behavior
+- chain-ID verification
+- error normalization
+- environment separation
+- security boundary
+- mocked testing strategy
+- why wallet secrets never enter the RPC layer
+
+Mark Phase 2.2 complete only after validation passes.
+
+19. REGRESSION SAFETY
+
+Do not modify existing:
+
+- wallet creation
+- recovery phrase handling
+- secure vault
+- PIN authentication
+- biometric authentication
+- wallet locking
+- network registry behavior
+
+unless absolutely required to connect the RPC abstraction cleanly.
+
+If a change to an existing component is necessary, explain exactly why it was necessary in the final report.
+
+20. VALIDATION
+
+After implementation, run:
+
+- pnpm run typecheck
+- pnpm test
+- CI=1 pnpm exec expo install --check
+- pnpm dlx expo-doctor@latest
+- Expo config validation
+- git diff --check
+- Expo workflow restart/validation where available
+
+Report exact results.
+
+FINAL REPORT
+
+Do not continue automatically into Phase 2.3.
+
+Stop after Phase 2.2.
+
+Return a concise completion report containing:
+
+1. What was implemented
+2. RPC architecture created
+3. Endpoint handling
+4. Timeout behavior
+5. Chain-ID verification
+6. Error handling
+7. Security controls
+8. Tests added
+9. Exact test results
+10. TypeScript result
+11. Expo validation result
+12. Any warnings
+13. Any assumptions
+14. Anything intentionally NOT implemented
+15. Any changes made to existing wallet/security code
+16. Confirmation that no private keys, recovery phrases, PINs, biometric secrets, signing secrets, transactions, balances, tokens, swaps, DApps, indexing, or backend custody were introduced.
+
+Do not proceed to Phase 2.3 automatically.
