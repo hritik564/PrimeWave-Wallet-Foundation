@@ -1,0 +1,1229 @@
+PRIMEWAVE WALLET — PHASE 2.7
+TRANSACTION BROADCASTING & CONFIRMATION ENGINE
+==============================================
+
+You are continuing development of PrimeWave Wallet.
+
+IMPORTANT:
+This is Phase 2.7 ONLY.
+
+This phase introduces controlled broadcasting of an already-signed EVM transaction and read-only confirmation monitoring.
+
+DO NOT implement:
+- token functionality
+- ERC-20 transfers
+- NFTs
+- swaps
+- DEX integration
+- DApps
+- WalletConnect
+- transaction history UI
+- backend transaction APIs
+- automatic transaction replacement
+- speed-up
+- cancellation
+- automatic gas bumping
+- background signing
+- background transaction creation
+- automatic transaction approval
+- arbitrary transaction signing
+- UI redesign
+
+Do not redesign previous security architecture.
+
+==================================================
+CRITICAL NON-CUSTODIAL SECURITY INVARIANT
+==================================================
+
+PrimeWave Wallet remains strictly non-custodial.
+
+Private keys and recovery phrases:
+
+- never leave the device
+- never enter RPC requests
+- never enter backend requests
+- never enter analytics
+- never enter transaction history
+- never enter logs
+- never enter errors
+- never enter UI state
+- never enter notification payloads
+
+Phase 2.7 MUST consume an already signed transaction.
+
+It MUST NOT have access to:
+
+- mnemonic
+- seed
+- private key
+- decrypted vault
+- signing key
+- PIN
+- biometric secret
+
+The broadcaster receives only the signed transaction produced by Phase 2.6.
+
+==================================================
+PHASE BOUNDARY
+==================================================
+
+Phase 2.5:
+
+Transaction Construction
+        ↓
+Unsigned Transaction
+
+Phase 2.6:
+
+Authorization
+        ↓
+Authentication
+        ↓
+Local Signing
+        ↓
+Signed Transaction
+
+Phase 2.7:
+
+Signed Transaction
+        ↓
+Validate Broadcast Context
+        ↓
+Broadcast
+        ↓
+Transaction Hash
+        ↓
+Monitor Receipt
+        ↓
+Final Transaction State
+
+STOP.
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Build a UI-independent transaction broadcasting and confirmation engine.
+
+Responsibilities:
+
+1. Validate the signed transaction is appropriate for the currently selected network.
+2. Broadcast it through the existing EVM RPC provider.
+3. Receive the transaction hash.
+4. Monitor blockchain state for the transaction.
+5. Detect successful confirmation.
+6. Detect reverted transaction.
+7. Detect dropped/not-found transaction according to a clearly defined policy.
+8. Prevent accidental duplicate broadcast attempts.
+9. Prevent network mismatch.
+10. Normalize errors.
+11. Never sign.
+12. Never access secrets.
+
+==================================================
+2. REUSE EXISTING RPC PROVIDER
+==================================================
+
+Use the existing EvmRpcProvider.
+
+Do not create a second RPC implementation.
+
+The existing provider already supports:
+
+eth_sendRawTransaction
+
+Use that existing method.
+
+Do not bypass the provider with direct fetch calls.
+
+Do not create another HTTP client.
+
+==================================================
+3. BROADCAST INPUT
+==================================================
+
+The broadcaster must accept a narrow signed transaction model from Phase 2.6.
+
+Conceptually:
+
+SignedTransaction
+
+containing:
+
+- rawTransaction
+- transactionHash if available
+- networkId
+- chainId
+- transactionType
+
+The exact project types should be reused.
+
+Do not accept:
+
+- private key
+- mnemonic
+- seed
+- wallet password
+- PIN
+- decrypted vault
+- arbitrary unsigned transaction
+
+The broadcaster must NOT be capable of signing.
+
+==================================================
+4. VALIDATE SIGNED TRANSACTION
+==================================================
+
+Before broadcasting validate:
+
+- raw transaction exists
+- raw transaction is valid 0x-prefixed hex
+- raw transaction contains valid byte data
+- network ID is valid
+- network is enabled
+- network is configured
+- network is currently active
+- chain ID matches the active network
+- signed transaction chain context matches expected chain
+- transaction hash, if supplied, is internally consistent where practical
+
+If the active network differs:
+
+REJECT.
+
+Do not switch networks automatically.
+
+Do not broadcast.
+
+==================================================
+5. CHAIN ID PROTECTION
+==================================================
+
+Before broadcasting:
+
+1. Obtain the active network.
+2. Verify its configured chain ID.
+3. Verify remote RPC chain ID.
+4. Verify signed transaction chain ID.
+5. Verify all three match.
+
+If any mismatch occurs:
+
+STOP.
+
+Return a normalized chain/network mismatch error.
+
+Never broadcast a transaction to a chain different from the one it was signed for.
+
+==================================================
+6. DO NOT MODIFY SIGNED TRANSACTION
+==================================================
+
+Once signed:
+
+DO NOT modify:
+
+- nonce
+- gas limit
+- gas price
+- max fee
+- max priority fee
+- recipient
+- value
+- calldata
+- chain ID
+- transaction type
+
+The broadcaster must transmit the signed raw transaction exactly as received.
+
+No:
+
+- gas changes
+- fee changes
+- nonce changes
+- formatting changes that alter bytes
+- transaction rebuilding
+- re-signing
+
+The raw signed bytes are immutable for the broadcast operation.
+
+==================================================
+7. FIRST BROADCAST
+==================================================
+
+Broadcast using:
+
+eth_sendRawTransaction
+
+The RPC response should contain a transaction hash.
+
+Validate the response.
+
+Do not blindly trust malformed RPC responses.
+
+If the RPC response is malformed:
+
+return a normalized error.
+
+==================================================
+8. TRANSACTION HASH
+==================================================
+
+Where practical:
+
+calculate or verify the transaction hash locally using the same standard transaction hashing rules used during Phase 2.6.
+
+Compare it with the RPC returned hash.
+
+If they do not match:
+
+DO NOT report success.
+
+Return a normalized transaction-hash-mismatch error.
+
+Do not automatically rebroadcast.
+
+If the existing signing layer already provides a trusted hash, reuse it.
+
+Do not duplicate cryptographic implementations unnecessarily.
+
+==================================================
+9. DUPLICATE BROADCAST PROTECTION
+==================================================
+
+This is critical.
+
+A broadcast operation must not accidentally submit the same signed transaction repeatedly because of:
+
+- UI double tap
+- network timeout
+- React rerender
+- retry
+- duplicate callback
+- app lifecycle event
+- concurrent calls
+
+Because the same signed transaction can be submitted more than once by accident, the engine must maintain an in-memory broadcast operation guard.
+
+Use a deterministic transaction identity such as:
+
+transaction hash
+
+or a safe hash of the signed bytes.
+
+If the same transaction is already being broadcast:
+
+- do not start another independent broadcast operation
+- return/reuse the existing operation state according to the architecture
+
+Do not create persistent transaction queues yet.
+
+Do not implement transaction replacement.
+
+==================================================
+10. TIMEOUT SEMANTICS
+==================================================
+
+This is extremely important.
+
+An RPC timeout does NOT necessarily mean the transaction was not accepted.
+
+Example:
+
+Wallet → RPC
+RPC accepts transaction
+RPC → Wallet response is lost
+Wallet sees timeout
+
+The transaction may already be in the mempool.
+
+Therefore:
+
+DO NOT automatically rebroadcast after a timeout.
+
+Return a state such as:
+
+BROADCAST_STATUS_UNKNOWN
+
+and allow the transaction hash to be determined/reconciled through an appropriate later lookup mechanism if possible.
+
+Never claim:
+
+"Transaction failed"
+
+solely because the HTTP/RPC request timed out.
+
+==================================================
+11. ERROR CLASSIFICATION
+==================================================
+
+Normalize broadcast errors into clear categories.
+
+At minimum consider:
+
+- BROADCAST_NETWORK_UNAVAILABLE
+- BROADCAST_TIMEOUT
+- BROADCAST_RPC_ERROR
+- BROADCAST_REJECTED
+- BROADCAST_MALFORMED_RESPONSE
+- BROADCAST_CHAIN_MISMATCH
+- BROADCAST_NETWORK_CHANGED
+- BROADCAST_INVALID_TRANSACTION
+- BROADCAST_HASH_MISMATCH
+- BROADCAST_ALREADY_IN_PROGRESS
+- BROADCAST_UNKNOWN_RESULT
+
+Do not expose raw RPC payloads containing sensitive information.
+
+Do not include:
+
+- private keys
+- mnemonic
+- vault contents
+- authentication secrets
+- full internal stack traces
+
+==================================================
+12. RPC ERROR INTERPRETATION
+==================================================
+
+Common EVM rejection cases may include:
+
+- insufficient funds
+- nonce too low
+- nonce too high
+- replacement transaction underpriced
+- intrinsic gas errors
+- invalid sender
+- execution-related rejection
+- already known
+
+Do not automatically retry rejected transactions.
+
+Do not automatically modify the transaction.
+
+Do not increase fees.
+
+Do not change nonce.
+
+Normalize the error while preserving useful information for a future UI.
+
+"already known" must NOT automatically be treated as a new successful transaction unless the transaction hash can be safely established.
+
+==================================================
+13. RECEIPT MONITORING
+==================================================
+
+After a successful broadcast response:
+
+monitor:
+
+eth_getTransactionReceipt
+
+for the transaction hash.
+
+Use the existing RPC provider.
+
+Do not create a second RPC client.
+
+==================================================
+14. CONFIRMATION STATES
+==================================================
+
+Create a clear transaction lifecycle.
+
+At minimum:
+
+CREATED / READY
+BROADCASTING
+BROADCASTED
+CONFIRMING
+CONFIRMED
+REVERTED
+FAILED
+UNKNOWN
+
+Use appropriate naming consistent with the existing architecture.
+
+Important distinction:
+
+BROADCASTED
+does not mean
+CONFIRMED.
+
+A transaction is only confirmed when an appropriate receipt is observed.
+
+==================================================
+15. RECEIPT HANDLING
+==================================================
+
+For a valid receipt:
+
+Read:
+
+- transactionHash
+- blockHash
+- blockNumber
+- status
+- gasUsed
+- effectiveGasPrice where available
+
+Do not assume all networks provide identical optional fields.
+
+Use bigint for numeric blockchain quantities.
+
+Receipt status should be interpreted according to standard EVM semantics.
+
+If status indicates success:
+
+CONFIRMED
+
+If status indicates failure/revert:
+
+REVERTED
+
+Do not call a reverted transaction "successful."
+
+==================================================
+16. CONFIRMATION COUNT
+==================================================
+
+For initial Phase 2.7:
+
+A receipt in a block may be treated as the first confirmation.
+
+Do not build a sophisticated multi-confirmation policy yet unless the existing architecture already requires it.
+
+However, design the model so future phases can support:
+
+- required confirmations
+- current confirmations
+- finalized state
+
+Do not pretend "receipt exists" means irreversible finality on every chain.
+
+==================================================
+17. POLLING
+==================================================
+
+Implement controlled receipt polling.
+
+Requirements:
+
+- bounded polling
+- configurable interval
+- configurable timeout
+- no infinite loop
+- no aggressive polling
+- no polling when transaction is already terminal
+
+Suggested defaults can be selected sensibly, but document them.
+
+Do not poll every second forever.
+
+Do not run receipt polling globally in the background.
+
+The polling engine should be explicitly invoked.
+
+==================================================
+18. APP LIFECYCLE
+==================================================
+
+Do not allow app lifecycle events to trigger automatic broadcasting.
+
+App resume may later support explicit transaction-status reconciliation, but do not automatically broadcast.
+
+If polling is interrupted because the app is backgrounded:
+
+- do not rebroadcast
+- do not assume failure
+- preserve enough non-secret transaction identity to allow later reconciliation
+
+Do not persist anything in this phase unless absolutely necessary for the explicitly implemented lifecycle behavior.
+
+==================================================
+19. DROPPED / NOT FOUND TRANSACTIONS
+==================================================
+
+Do NOT immediately label a transaction as dropped because:
+
+eth_getTransactionReceipt
+
+returns null.
+
+A pending transaction naturally has no receipt.
+
+Also do not declare it permanently dropped based solely on a short timeout.
+
+For this phase:
+
+- null receipt during polling = still pending/unknown
+- polling timeout = confirmation unknown/pending
+- do not rebroadcast automatically
+
+If implementing transaction lookup via:
+
+eth_getTransactionByHash
+
+use it only for reconciliation and status observation.
+
+Do not treat absence from one RPC endpoint as proof that the transaction never existed.
+
+Document provider/mempool visibility limitations.
+
+==================================================
+20. TRANSACTION HASH LOOKUP
+==================================================
+
+If practical, support read-only lookup using:
+
+eth_getTransactionByHash
+
+This can help reconcile:
+
+- RPC timeout
+- app restart
+- delayed receipt
+
+However:
+
+Do not build a full transaction indexing system.
+
+Do not persist a transaction database.
+
+Do not create transaction history.
+
+This is only broadcast/confirmation infrastructure.
+
+==================================================
+21. ENDPOINT FAILOVER
+==================================================
+
+DO NOT implement automatic multi-RPC failover in this phase.
+
+The existing provider may have endpoint priority.
+
+Do not add sophisticated failover behavior.
+
+Why:
+
+A broadcast timeout can be ambiguous.
+
+Sending the same transaction to another endpoint may be safe from a protocol perspective because the transaction hash is deterministic, but the application must not hide ambiguity behind aggressive retries.
+
+Keep behavior deterministic.
+
+Endpoint health/failover remains a separate future concern.
+
+==================================================
+22. NETWORK RACE PROTECTION
+==================================================
+
+Capture network context before broadcast:
+
+- network ID
+- chain ID
+- active network identity
+
+Verify it again before sending.
+
+If the network changes:
+
+STOP.
+
+Do not broadcast.
+
+After broadcast, confirmation lookup must remain tied to the transaction's original network.
+
+Do not accidentally query the new active network for the old transaction.
+
+This is especially important if the user switches networks while a transaction is confirming.
+
+==================================================
+23. ORIGINAL NETWORK CONTEXT
+==================================================
+
+The confirmation engine must not depend solely on the CURRENT active network.
+
+A transaction belongs to the network on which it was signed and broadcast.
+
+Therefore confirmation requests should use the transaction's original network context.
+
+However:
+
+Do not automatically switch the user's active network.
+
+The confirmation engine may use the appropriate configured RPC provider for the transaction's network without changing UI network selection.
+
+==================================================
+24. PUBLIC TRANSACTION MODEL
+==================================================
+
+Create a safe public transaction result model.
+
+It may contain:
+
+- transaction hash
+- network ID
+- chain ID
+- sender
+- recipient if available
+- transaction type
+- broadcast status
+- confirmation status
+- block number
+- block hash
+- gas used
+- effective gas price
+- timestamps
+- error category if applicable
+
+Do NOT include:
+
+- private key
+- mnemonic
+- seed
+- decrypted vault
+- signing capability
+- authentication secrets
+
+==================================================
+25. NO PERSISTENT HISTORY
+==================================================
+
+Do not create:
+
+- transaction history database
+- AsyncStorage transaction records
+- local transaction index
+- backend transaction history
+- analytics transaction records
+
+A later Activity/History phase will design persistent transaction history.
+
+Phase 2.7 is only the execution engine.
+
+==================================================
+26. SECURITY LOGGING
+==================================================
+
+Logs must contain only safe metadata.
+
+Allowed examples:
+
+- transaction hash
+- network ID
+- chain ID
+- status
+- error category
+
+Avoid logging:
+
+- full signed raw transaction
+- calldata payloads unless explicitly safe
+- full RPC request/response payloads
+- authentication information
+
+Most importantly:
+
+Never log secrets.
+
+==================================================
+27. NO UI
+==================================================
+
+Do not build transaction screens.
+
+Do not build:
+
+- Send screen
+- Confirmation modal
+- Activity screen
+- Toast system
+- transaction notifications
+
+The engine must remain UI-independent.
+
+A future UI phase will consume this engine.
+
+==================================================
+28. TESTING
+==================================================
+
+Use fake deterministic RPC transports.
+
+DO NOT broadcast test transactions to real networks.
+
+At minimum test:
+
+1. valid signed transaction broadcast
+2. transaction hash returned
+3. malformed RPC response
+4. RPC rejection
+5. timeout
+6. unknown broadcast result
+7. hash mismatch
+8. active network mismatch
+9. remote chain mismatch
+10. signed transaction chain mismatch
+11. malformed raw transaction
+12. duplicate broadcast prevention
+13. concurrent broadcast protection
+14. successful receipt
+15. reverted receipt
+16. pending receipt/null receipt
+17. receipt timeout
+18. transaction lookup
+19. app/poll interruption behavior if implemented
+20. original network retained during confirmation
+21. network switch during confirmation
+22. no automatic rebroadcast
+23. no transaction modification
+24. exact raw transaction passed to RPC
+25. no signing call
+26. no vault access
+27. no private-key access
+28. no mnemonic access
+29. no backend calls
+30. no analytics calls
+31. bigint receipt values
+32. terminal-state polling stops
+33. malformed receipt handling
+34. RPC error sanitization
+35. concurrent confirmation requests
+36. deterministic lifecycle transitions
+
+==================================================
+29. CRITICAL BROADCAST TEST
+==================================================
+
+Create a fake RPC transport that records every RPC method.
+
+Verify:
+
+eth_sendRawTransaction
+
+is called only when:
+
+- explicit broadcast method is invoked
+- network validation succeeds
+- signed transaction validation succeeds
+
+Verify it is NEVER called during:
+
+- construction
+- signing
+- confirmation initialization
+- balance refresh
+- app startup
+- network selection
+- background lifecycle events
+
+==================================================
+30. EXACT RAW TRANSACTION TEST
+==================================================
+
+The fake transport must verify that:
+
+the exact signed raw transaction bytes supplied by Phase 2.6
+
+are passed to:
+
+eth_sendRawTransaction
+
+without:
+
+- modifying
+- rebuilding
+- reserializing
+- changing case in a way that alters data
+- changing nonce
+- changing gas
+- changing fees
+- changing recipient
+- changing calldata
+
+The broadcaster is a transport layer, not a transaction builder.
+
+==================================================
+31. NO AUTOMATIC RETRY TEST
+==================================================
+
+Simulate:
+
+1. RPC accepts the transaction.
+2. RPC response times out.
+3. Broadcast call reports timeout.
+
+Verify:
+
+- no second eth_sendRawTransaction occurs automatically
+- transaction state becomes UNKNOWN/BROADCAST_STATUS_UNKNOWN as designed
+- no fee modification occurs
+- no nonce modification occurs
+
+This test is mandatory.
+
+==================================================
+32. RECEIPT STATE TESTS
+==================================================
+
+Simulate:
+
+A. successful receipt
+
+Expected:
+
+BROADCASTED
+→ CONFIRMING
+→ CONFIRMED
+
+B. reverted receipt
+
+Expected:
+
+BROADCASTED
+→ CONFIRMING
+→ REVERTED
+
+C. repeated null receipts
+
+Expected:
+
+remain pending/confirming/unknown according to defined timeout policy.
+
+Never mark null receipt as confirmed.
+
+==================================================
+33. SECURITY LEAK TESTS
+==================================================
+
+Verify no:
+
+- private key
+- mnemonic
+- seed
+- PIN
+- secure vault content
+
+appears in:
+
+- broadcast result
+- confirmation result
+- errors
+- logs
+- public transaction models
+
+The signed raw transaction itself is NOT a secret in the cryptographic sense, but avoid logging it unnecessarily.
+
+==================================================
+34. NO SIGNING TEST
+==================================================
+
+The Phase 2.7 module must not have access to signing APIs.
+
+If practical, add a structural test proving the broadcaster cannot request:
+
+- private key
+- mnemonic
+- signer
+- SecureVault secret material
+
+It should consume only SignedTransaction.
+
+==================================================
+35. NO BACKEND TEST
+==================================================
+
+Verify no:
+
+- backend requests
+- analytics requests
+- cloud requests
+
+occur during broadcast/confirmation.
+
+Blockchain communication happens through the existing RPC layer only.
+
+==================================================
+36. RECEIPT DATA SAFETY
+==================================================
+
+Use bigint for:
+
+- block number
+- gas used
+- effective gas price
+- other blockchain quantities
+
+Do not use floating-point numbers.
+
+Do not calculate fiat value.
+
+Do not add token balance updates.
+
+==================================================
+37. STATE MACHINE
+==================================================
+
+Implement an explicit transaction execution state machine.
+
+Avoid scattered boolean flags such as:
+
+isSending
+isConfirmed
+hasError
+isPending
+
+Prefer one authoritative lifecycle state.
+
+Define valid transitions.
+
+For example:
+
+READY
+ ↓
+BROADCASTING
+ ↓
+BROADCASTED
+ ↓
+CONFIRMING
+ ↓
+CONFIRMED
+
+or:
+
+BROADCASTING
+ ↓
+FAILED
+
+or:
+
+BROADCASTING
+ ↓
+UNKNOWN
+
+or:
+
+CONFIRMING
+ ↓
+REVERTED
+
+Invalid transitions must be rejected.
+
+A terminal transaction state must not return to:
+
+BROADCASTING
+
+automatically.
+
+==================================================
+38. IDEMPOTENCY
+==================================================
+
+Use transaction hash / signed transaction identity for in-memory idempotency.
+
+If a transaction is already terminal:
+
+do not broadcast again automatically.
+
+If a transaction is currently broadcasting:
+
+do not start another broadcast operation.
+
+If the previous result is UNKNOWN:
+
+do not automatically broadcast again.
+
+Require explicit future reconciliation/retry policy.
+
+==================================================
+39. BROADCAST RESULT
+==================================================
+
+Separate:
+
+"RPC accepted the transaction"
+
+from:
+
+"Transaction confirmed on-chain."
+
+The API must make this distinction obvious.
+
+Do not return a single generic:
+
+success = true
+
+that could be misunderstood.
+
+==================================================
+40. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+src/core/transactions/README.md
+
+Document:
+
+- broadcast boundary
+- exact signed transaction flow
+- network validation
+- chain validation
+- duplicate protection
+- timeout semantics
+- receipt polling
+- confirmation states
+- revert handling
+- unknown state
+- no automatic retry
+- no transaction modification
+- no persistent history
+- no backend communication
+- no secret access
+- no signing
+- no token/swap/DApp functionality
+
+Clearly state:
+
+"Phase 2.7 broadcasts already-signed transactions and observes blockchain confirmation. It does not construct or sign transactions."
+
+==================================================
+41. REQUIRED VALIDATION
+==================================================
+
+Run:
+
+- complete test suite
+- Phase 2.7 tests
+- TypeScript
+- Expo dependency check
+- Expo Doctor
+- Expo public config
+- git diff --check
+- Expo/Metro workflow validation if available
+
+Do not delete existing tests.
+
+Do not weaken previous security checks.
+
+==================================================
+42. FINAL REPORT
+==================================================
+
+When complete, report:
+
+1. Files created
+2. Files modified
+3. RPC provider reused
+4. Broadcast API
+5. Confirmation API
+6. State machine
+7. Broadcast validation
+8. Chain/network protection
+9. Duplicate protection
+10. Timeout behavior
+11. Retry behavior
+12. Receipt polling behavior
+13. Revert handling
+14. Unknown-state behavior
+15. Transaction hash handling
+16. Exact raw transaction preservation
+17. Secret boundary
+18. Confirmation no vault access
+19. Confirmation no signing
+20. Confirmation no backend
+21. Confirmation no analytics
+22. Confirmation eth_sendRawTransaction is only invoked by explicit broadcast
+23. Test count
+24. Test failures
+25. TypeScript result
+26. Expo Doctor result
+27. Expo config result
+28. Metro result
+29. Warnings
+30. Security limitations
+31. Physical-device testing still required
+32. Deferred functionality
+
+==================================================
+ABSOLUTE STOP CONDITION
+==================================================
+
+STOP after Phase 2.7.
+
+DO NOT implement:
+
+- transaction history
+- Activity UI
+- token transfers
+- ERC-20
+- NFT
+- swaps
+- DEX
+- DApps
+- WalletConnect
+- notifications
+- backend transaction indexing
+- replacement transactions
+- speed-up
+- cancellation
+- automatic fee bumping
+- automatic rebroadcast
+- UI confirmation screens
+
+Those belong to later phases.
+
+==================================================
+FINAL ARCHITECTURAL PRINCIPLE
+==================================================
+
+The complete execution pipeline after this phase must be:
+
+CONSTRUCT
+   ↓
+AUTHORIZE
+   ↓
+AUTHENTICATE
+   ↓
+SIGN LOCALLY
+   ↓
+DISCARD SENSITIVE MATERIAL
+   ↓
+SIGNED TRANSACTION
+   ↓
+EXPLICIT BROADCAST
+   ↓
+TRANSACTION HASH
+   ↓
+CONFIRMATION MONITORING
+   ↓
+CONFIRMED / REVERTED / UNKNOWN
+   ↓
+STOP
+
+Never:
+
+CONSTRUCT
+   ↓
+AUTO SIGN
+   ↓
+AUTO BROADCAST
+
+Never:
+
+TIMEOUT
+   ↓
+AUTOMATIC REBROADCAST
+
+Never:
+
+NETWORK CHANGE
+   ↓
+AUTOMATIC NETWORK SWITCH
+   ↓
+BROADCAST
