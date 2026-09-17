@@ -60,8 +60,8 @@ export interface AuthenticationResult {
 }
 
 export interface WalletAuthenticator {
-  configurePinAuthentication(input: ProtectedAuthInput): Promise<void>;
-  authenticateWithPin(input: ProtectedAuthInput): Promise<AuthenticationResult>;
+  configurePinAuthentication(pin: string): Promise<void>;
+  authenticateWithPin(pin: string): Promise<AuthenticationResult>;
   authenticateWithBiometrics(): Promise<AuthenticationResult>;
   determineBiometricAvailability(): Promise<BiometricAvailability>;
   lockWallet(): Promise<void>;

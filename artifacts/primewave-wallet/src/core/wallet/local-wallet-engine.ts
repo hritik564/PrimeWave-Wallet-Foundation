@@ -65,16 +65,6 @@ export class LocalWalletEngine implements WalletEngine {
       const firstAccount = derivePublicAccountFromMnemonic(mnemonic, 0);
       const createdAt = new Date().toISOString();
       const walletId = `wallet-${createdAt}`;
-      const vault = await this.getVault();
-
-      await vault.saveEncryptedWalletState(
-        createEncryptedWalletState({
-          walletId,
-          createdAt,
-          accountIndexes: [0],
-          mnemonic,
-        }),
-      );
 
       secretStates.set(this, { mnemonic });
       this.accounts = [firstAccount];
