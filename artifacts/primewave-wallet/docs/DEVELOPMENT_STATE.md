@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 2.2 — EVM RPC provider engine (completed)**
+**Phase 2.3 — EVM account and chain state (completed)**
 
 ## Completed work
 
@@ -58,14 +58,26 @@
   endpoint selection, disabled endpoints, and chain-ID verification.
 - Added safe RPC error normalization and sanitized diagnostic logging without
   exposing full URLs, credentials, or wallet-secret material.
+- Added the read-only `EvmAccountStateService` behind the blockchain boundary.
+- Added public-address validation and checksum normalization without wallet
+  secret access.
+- Added lossless native balance, nonce, chain ID, block number, and timestamp
+  handling using `bigint`, plus safe decimal display formatting.
+- Added contract-code observation, latest-block parsing, and coherent
+  non-persistent account snapshots.
+- Added active-network consistency checks that reject stale results after a
+  network change during an in-flight read.
+- Added offline account-state tests for invalid addresses, zero and very large
+  balances, nonces, code classification, snapshots, stale results, provider
+  errors, concurrency, and no persistent state.
 
 ## Pending work
 
 - Production PrimeWave Chain launch configuration must be supplied and reviewed
   before the primary network can be activated.
 - Recovery UX and authentication require separate scope and security review.
-- Aggressive endpoint failover, network health checks, asset read models,
-  balances, tokens, and live application read flows remain outside this
+- Aggressive endpoint failover, network health checks, token discovery,
+  portfolio aggregation, and live application read flows remain outside this
   controlled increment.
 
 ## Important architectural decisions
@@ -94,6 +106,6 @@
 
 ## Next recommended phase
 
-**Phase 2.3 — network and asset read models**, covering endpoint health checks,
-explicit failover policy, and public native-asset/balance reads. Do not begin
-it automatically.
+**Phase 2.4 — network health and asset read models**, covering endpoint health
+checks, explicit failover policy, and public token/portfolio read boundaries.
+Do not begin it automatically.

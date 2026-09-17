@@ -167,6 +167,26 @@ network ID, chain ID, endpoint ID, method, and error category. The RPC layer
 has no dependency on wallet keys, recovery phrases, PINs, biometric secrets,
 secure-vault state, or signing material.
 
+## Account and chain state
+
+Phase 2.3 adds the read-only `EvmAccountStateService` in
+`src/core/blockchain/account-state`. The service accepts the existing
+`NetworkRegistry` and an initialized `EvmRpcProvider`, validates and
+checksums public EVM addresses, and retrieves only public chain state.
+
+Native balances, nonces, block numbers, timestamps, and chain IDs remain
+lossless `bigint` values internally. A decimal string formatter is used for
+display values without floating-point conversion. Contract-code inspection is
+represented as either code-present or no-code observation; no-code does not
+claim address ownership.
+
+Snapshots capture the network ID, verified chain ID, address, native balance,
+nonce, code observation, latest block context, and retrieval timestamp. Snapshot
+reads use one captured block number for account queries where practical and
+reject results if the registry's active network changes during the operation.
+Snapshots are not persisted or cached, and the service has no dependency on
+wallet secrets, SecureStore, authentication, or UI components.
+
 ## Design system
 
 PrimeWave Wallet uses a centralized dark foundation with blue, cyan, and violet
@@ -194,8 +214,10 @@ website layout.
    requests, deterministic endpoint selection, response validation, safe error
    normalization, and chain-ID verification. This controlled increment is
    complete; it performs no wallet read models.
-7. **Phase 2.3 — network and asset read models:** health checks, balances,
-   native assets, ERC-20 tokens, and verified-token boundaries.
+7. **Phase 2.3 — EVM account and chain state:** read-only public-address
+   state, native balances, nonces, contract-code observations, latest block
+   state, lossless snapshots, and network-consistency protection. This
+   controlled increment is complete; it performs no token or transaction work.
 8. **Phase 3 — transactions and signing:** local signing, user confirmation,
    and broadcast flows.
 9. **Phase 4 — ecosystem capabilities:** discovery, swaps, DApp connectivity,
