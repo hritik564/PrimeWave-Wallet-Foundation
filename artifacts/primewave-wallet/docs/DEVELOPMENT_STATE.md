@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 0A — foundation only**
+**Phase 0B — security architecture and interfaces (completed)**
 
 ## Completed work
 
@@ -17,12 +17,22 @@
 - Added application architecture and development-state documentation.
 - Added reserved modules for future wallet, security, blockchain, network,
   token, transaction, portfolio, swap, and DApp work.
+- Defined opaque security contracts for vault, authentication, secret, and key
+  management boundaries.
+- Defined the future `WalletEngine` boundary and explicit transaction signing
+  flow.
+- Added privacy, clipboard, safe logging, sanitized error, and security test
+  plan structures.
+- Expanded the security architecture with classifications, trust boundaries,
+  attack surfaces, recovery, memory, and multi-account rules.
 
 ## Pending work
 
 - No wallet functionality is approved or implemented yet.
 - Production PrimeWave Chain configuration must be supplied and reviewed.
 - Security review is required before local wallet creation, import, or signing.
+- A real test runner and concrete implementations are still required before
+  security contract tests can be marked complete.
 
 ## Important architectural decisions
 
@@ -40,8 +50,10 @@
 - No blockchain RPC, indexer, price service, database, notification service, or
   DApp connection.
 - The PrimeWave Chain entry has null chain and endpoint values by design.
+- No cryptographic dependency or test runner has been added in Phase 0B.
 
 ## Next recommended phase
 
 **Phase 1 — local wallet lifecycle**, only after approving the security model,
-device storage strategy, recovery UX, and threat model.
+device storage strategy, recovery UX, threat model, and production library
+choices.

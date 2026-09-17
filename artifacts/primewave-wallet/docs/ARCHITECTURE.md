@@ -44,8 +44,17 @@ Expo Router app
 ## Future wallet core
 
 The wallet core will own wallet lifecycle concepts without exposing secrets to
-UI components or remote services. Key generation, import, vault handling, and
-signing are deliberately deferred.
+UI components or remote services. Phase 0B formalizes the `WalletEngine`
+boundary in `src/core/wallet/contracts.ts`; key generation, import, vault
+handling, and signing are deliberately deferred.
+
+## Trust boundaries
+
+The UI will communicate with `WalletEngine`, which coordinates the security
+layer and later cryptographic implementation. Private keys, recovery phrases,
+secure storage, and signing libraries remain behind that boundary. Public
+metadata and user-approved transaction data may use future backend or RPC
+services, but secret material may not leave the device.
 
 ## Future blockchain engine
 
@@ -63,8 +72,9 @@ mobile app's independent operation and the non-custodial security boundary.
 
 Signing material stays on the user's device. The backend must never receive
 seed phrases, mnemonics, private keys, raw signing keys, passwords, PINs,
-biometric secrets, decrypted vaults, or encryption keys. See
-`SECURITY_ARCHITECTURE.md`.
+biometric secrets, decrypted vaults, or encryption keys. Transaction signing
+also requires an explicit user confirmation after a human-readable preview.
+See `SECURITY_ARCHITECTURE.md`.
 
 ## Network abstraction
 

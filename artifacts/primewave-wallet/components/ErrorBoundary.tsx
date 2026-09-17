@@ -1,9 +1,13 @@
 import React, { Component, ComponentType, PropsWithChildren } from 'react';
 import { ErrorFallback, ErrorFallbackProps } from '@/components/ErrorFallback';
+import {
+  SafeError,
+  sanitizeError,
+} from '@/src/core/security/errors';
 
 export type ErrorBoundaryProps = PropsWithChildren<{
   FallbackComponent?: ComponentType<ErrorFallbackProps>;
-  onError?: (error: Error, stackTrace: string) => void;
+  onError?: (error: SafeError, stackTrace: string) => void;
 }>;
 
 type ErrorBoundaryState = { error: Error | null };
@@ -30,7 +34,7 @@ export class ErrorBoundary extends Component<
 
   componentDidCatch(error: Error, info: { componentStack: string }): void {
     if (typeof this.props.onError === 'function') {
-      this.props.onError(error, info.componentStack);
+      this.props.onError(sanitizeError(error), '[SANITIZED]');
     }
   }
 
