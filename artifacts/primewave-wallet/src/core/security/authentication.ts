@@ -10,6 +10,7 @@ import { secureLogger } from './logging';
 export const WALLET_PIN_LENGTH = 6;
 export const AUTHENTICATION_STORAGE_KEY = 'primewave.wallet.authentication';
 export const AUTHENTICATION_RECORD_VERSION = 1 as const;
+export const BIOMETRIC_OPERATION_TIMEOUT_MS = 15_000;
 
 export type AutoLockPolicy = 0 | 30 | 300 | 900;
 export const DEFAULT_AUTO_LOCK_POLICY: AutoLockPolicy = 0;
@@ -20,6 +21,31 @@ const SCRYPT_P = 1;
 const SCRYPT_DK_LEN = 32;
 const SALT_BYTES = 16;
 const MAX_BACKOFF_MS = 10_000;
+
+class BiometricOperationTimeoutError extends Error {
+  constructor() {
+    super('Biometric operation timed out.');
+    this.name = 'BiometricOperationTimeoutError';
+  }
+}
+
+async function withTimeout<T>(
+  operation: Promise<T>,
+  timeoutMs: number,
+): Promise<T> {
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+  const timeout = new Promise<T>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new BiometricOperationTimeoutError()), timeoutMs);
+  });
+
+  try {
+    return await Promise.race([operation, timeout]);
+  } finally {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+    }
+  }
+}
 
 export type WalletLockState =
   | 'LOCKED'
@@ -261,9 +287,12 @@ export class AuthenticationManager implements WalletAuthenticator {
   private readonly biometricPromise: Promise<BiometricProvider>;
   private readonly now: () => number;
   private readonly onLock?: () => void;
+  private readonly biometricTimeoutMs: number;
   private state: WalletLockState = 'LOCKED';
   private autoLockTimer: ReturnType<typeof setTimeout> | null = null;
   private isBackgrounded = false;
+  private biometricPromptInFlight = false;
+  private pendingBackgroundLock = false;
 
   constructor(options?: {
     storage?: AuthenticationStorage;
@@ -271,6 +300,7 @@ export class AuthenticationManager implements WalletAuthenticator {
     biometricProvider?: BiometricProvider;
     now?: () => number;
     onLock?: () => void;
+    biometricTimeoutMs?: number;
   }) {
     this.storagePromise = options?.storage
       ? Promise.resolve(options.storage)
@@ -285,6 +315,10 @@ export class AuthenticationManager implements WalletAuthenticator {
       : Promise.resolve(new ExpoBiometricProvider());
     this.now = options?.now ?? (() => Date.now());
     this.onLock = options?.onLock;
+    this.biometricTimeoutMs = Math.max(
+      1,
+      options?.biometricTimeoutMs ?? BIOMETRIC_OPERATION_TIMEOUT_MS,
+    );
   }
 
   getLockState(): WalletLockState {
@@ -382,7 +416,17 @@ export class AuthenticationManager implements WalletAuthenticator {
   }
 
   async authenticateWithBiometrics(): Promise<AuthenticationResult> {
-    const record = await this.readRecord();
+    let record: AuthenticationRecord | null;
+    try {
+      record = await withTimeout(
+        this.readRecord(),
+        this.biometricTimeoutMs,
+      );
+    } catch {
+      this.state = 'AUTHENTICATION_UNAVAILABLE';
+      return { authenticated: false, reason: 'unavailable' };
+    }
+
     if (!record || !record.biometricEnabled) {
       this.state = 'AUTHENTICATION_UNAVAILABLE';
       return { authenticated: false, reason: 'not-configured' };
@@ -395,30 +439,47 @@ export class AuthenticationManager implements WalletAuthenticator {
     }
 
     this.state = 'UNLOCKING';
-    const response = await (
-      await this.biometricPromise
-    ).authenticateAsync({
-      promptMessage: 'Unlock PrimeWave Wallet',
-      cancelLabel: 'Use PIN',
-      disableDeviceFallback: true,
-    });
+    this.biometricPromptInFlight = true;
 
-    if (response.success) {
-      this.state = 'UNLOCKED';
-      return { authenticated: true, reason: 'success' };
+    let result: AuthenticationResult;
+    try {
+      const response = await withTimeout(
+        (async () => {
+          const provider = await this.biometricPromise;
+          return provider.authenticateAsync({
+            promptMessage: 'Unlock PrimeWave Wallet',
+            cancelLabel: 'Use PIN',
+            disableDeviceFallback: true,
+          });
+        })(),
+        this.biometricTimeoutMs,
+      );
+
+      if (response.success) {
+        this.state = 'UNLOCKED';
+        result = { authenticated: true, reason: 'success' };
+      } else if (
+        response.error === 'user_cancel' ||
+        response.error === 'system_cancel'
+      ) {
+        this.state = 'AUTHENTICATION_FAILED';
+        result = { authenticated: false, reason: 'cancelled' };
+      } else if (
+        response.error === 'lockout' ||
+        response.error === 'lockout_permanent'
+      ) {
+        this.state = 'AUTHENTICATION_FAILED';
+        result = { authenticated: false, reason: 'locked' };
+      } else {
+        this.state = 'AUTHENTICATION_FAILED';
+        result = { authenticated: false, reason: 'rejected' };
+      }
+    } catch {
+      this.state = 'AUTHENTICATION_UNAVAILABLE';
+      result = { authenticated: false, reason: 'unavailable' };
     }
 
-    this.state = 'AUTHENTICATION_FAILED';
-    if (response.error === 'user_cancel' || response.error === 'system_cancel') {
-      return { authenticated: false, reason: 'cancelled' };
-    }
-    if (
-      response.error === 'lockout' ||
-      response.error === 'lockout_permanent'
-    ) {
-      return { authenticated: false, reason: 'locked' };
-    }
-    return { authenticated: false, reason: 'rejected' };
+    return this.completeBiometricAttempt(result);
   }
 
   async determineBiometricAvailability(): Promise<BiometricAvailability> {
@@ -427,11 +488,16 @@ export class AuthenticationManager implements WalletAuthenticator {
     }
 
     try {
-      const provider = await this.biometricPromise;
-      const [hardwareEnrolled, types] = await Promise.all([
-        provider.isHardwareEnrolledAsync(),
-        provider.supportedAuthenticationTypesAsync(),
-      ]);
+      const [hardwareEnrolled, types] = await withTimeout(
+        (async () => {
+          const provider = await this.biometricPromise;
+          return Promise.all([
+            provider.isHardwareEnrolledAsync(),
+            provider.supportedAuthenticationTypesAsync(),
+          ]);
+        })(),
+        this.biometricTimeoutMs,
+      );
       return {
         available: hardwareEnrolled && types.length > 0,
         type: getBiometricType(types),
@@ -469,9 +535,36 @@ export class AuthenticationManager implements WalletAuthenticator {
     if (nextState === 'active') {
       this.isBackgrounded = false;
       this.clearAutoLockTimer();
+      if (this.biometricPromptInFlight) {
+        this.pendingBackgroundLock = false;
+      }
       return;
     }
     this.isBackgrounded = true;
+    if (this.biometricPromptInFlight) {
+      this.pendingBackgroundLock = true;
+      return;
+    }
+    await this.lockForBackground();
+  }
+
+  async lockWallet(): Promise<void> {
+    this.clearAutoLockTimer();
+    this.isBackgrounded = false;
+    this.pendingBackgroundLock = false;
+    this.state = 'LOCKED';
+    this.onLock?.();
+    secureLogger.info('Wallet locked');
+  }
+
+  async unlockWallet(): Promise<AuthenticationResult> {
+    if (this.state === 'UNLOCKED') {
+      return { authenticated: true, reason: 'success' };
+    }
+    return { authenticated: false, reason: 'not-configured' };
+  }
+
+  private async lockForBackground(): Promise<void> {
     let record: AuthenticationRecord | null;
     try {
       record = await this.readRecord();
@@ -490,19 +583,19 @@ export class AuthenticationManager implements WalletAuthenticator {
     this.scheduleAutoLock(record.autoLockPolicy);
   }
 
-  async lockWallet(): Promise<void> {
-    this.clearAutoLockTimer();
-    this.isBackgrounded = false;
-    this.state = 'LOCKED';
-    this.onLock?.();
-    secureLogger.info('Wallet locked');
-  }
+  private async completeBiometricAttempt(
+    result: AuthenticationResult,
+  ): Promise<AuthenticationResult> {
+    this.biometricPromptInFlight = false;
+    const shouldLock = this.pendingBackgroundLock && this.isBackgrounded;
+    this.pendingBackgroundLock = false;
 
-  async unlockWallet(): Promise<AuthenticationResult> {
-    if (this.state === 'UNLOCKED') {
-      return { authenticated: true, reason: 'success' };
+    if (shouldLock) {
+      await this.lockWallet();
+      return { authenticated: false, reason: 'locked' };
     }
-    return { authenticated: false, reason: 'not-configured' };
+
+    return result;
   }
 
   private async deriveVerifier(pin: string, salt: Uint8Array): Promise<Uint8Array> {
@@ -581,11 +674,19 @@ export class AuthenticationManager implements WalletAuthenticator {
   private scheduleAutoLock(policy: AutoLockPolicy): void {
     this.clearAutoLockTimer();
     if (policy === 0) {
-      void this.lockWallet();
+      if (this.biometricPromptInFlight) {
+        this.pendingBackgroundLock = true;
+      } else {
+        void this.lockWallet();
+      }
       return;
     }
     this.autoLockTimer = setTimeout(() => {
-      void this.lockWallet();
+      if (this.biometricPromptInFlight) {
+        this.pendingBackgroundLock = true;
+      } else {
+        void this.lockWallet();
+      }
     }, policy * 1000);
   }
 

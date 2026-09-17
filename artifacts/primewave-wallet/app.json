@@ -17,7 +17,12 @@
     "plugins": [
       "expo-router",
       "expo-secure-store",
-      "expo-local-authentication"
+      [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "Use Face ID to unlock your PrimeWave Wallet."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
