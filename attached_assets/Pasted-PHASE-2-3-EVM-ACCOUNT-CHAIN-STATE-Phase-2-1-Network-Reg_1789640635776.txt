@@ -1,0 +1,403 @@
+PHASE 2.3 — EVM ACCOUNT & CHAIN STATE
+
+Phase 2.1 Network Registry is approved.
+Phase 2.2 RPC Provider Engine is approved.
+
+Now implement ONLY Phase 2.3: read-only EVM account and chain state.
+
+IMPORTANT:
+
+Do NOT implement:
+
+- transaction sending
+- transaction signing
+- private-key access
+- recovery phrase access
+- token discovery
+- ERC-20 token balances
+- portfolio aggregation
+- swaps
+- DApps
+- WalletConnect
+- blockchain indexing
+- backend integration
+- price feeds
+- transaction history UI
+- gas estimation UI
+- UI redesign
+
+This phase is ONLY about safely retrieving and representing public blockchain state for the wallet's public addresses.
+
+PRIMEWAVE SECURITY INVARIANT
+
+PrimeWave Wallet remains strictly non-custodial.
+
+This phase must operate exclusively on:
+
+- public wallet addresses
+- public chain/network information
+- public blockchain state
+
+The account-state layer must have ZERO dependency on:
+
+- private keys
+- recovery phrases
+- PINs
+- biometric secrets
+- SecureStore
+- wallet vault
+- signing secrets
+
+Do not modify the secure wallet architecture.
+
+1. ACCOUNT STATE ABSTRACTION
+
+Create a strongly typed read-only account-state service.
+
+It should accept:
+
+- selected EVM network
+- public EVM address
+
+and retrieve public blockchain state through the Phase 2.2 RPC provider.
+
+The service should be independent from React UI.
+
+2. NATIVE BALANCE
+
+Implement read-only native currency balance retrieval using:
+
+eth_getBalance
+
+Return a strongly typed representation containing:
+
+- address
+- network ID
+- chain ID
+- native currency symbol
+- raw balance in bigint-safe representation
+- normalized/display balance where appropriate
+
+IMPORTANT:
+
+Do not use JavaScript Number for blockchain balances.
+
+Do not convert large integer blockchain balances through floating-point arithmetic.
+
+Use bigint or another lossless representation internally.
+
+Provide a safe formatting layer for UI display.
+
+3. ADDRESS VALIDATION
+
+Before querying account state:
+
+- validate the EVM address
+- normalize/checksum the address where appropriate
+- reject malformed addresses
+- reject empty addresses
+
+Do not silently mutate invalid addresses.
+
+Do not access wallet secrets to validate an address.
+
+4. CHAIN STATE
+
+Implement read-only retrieval for basic chain state:
+
+- chain ID
+- latest block number
+
+Use:
+
+eth_chainId
+eth_blockNumber
+
+The chain ID returned by the provider must match the network registry.
+
+Do not silently accept a mismatch.
+
+5. ACCOUNT NONCE
+
+Implement read-only retrieval of the public account transaction count using:
+
+eth_getTransactionCount
+
+Use the appropriate EVM state tag.
+
+Return the nonce in a lossless representation.
+
+This is read-only information only.
+
+Do NOT use it to construct or send transactions yet.
+
+6. CONTRACT CODE CHECK
+
+Implement optional read-only account classification using:
+
+eth_getCode
+
+Allow callers to determine whether an address currently has contract bytecode.
+
+Represent the result clearly as:
+
+- externally owned account / no code
+- contract address / code exists
+
+Do not claim that absence of code proves ownership of an address.
+
+This is only a blockchain-state observation.
+
+7. BLOCK STATE
+
+Implement read-only retrieval of the latest block required by the account-state layer.
+
+At minimum expose:
+
+- block number
+- block hash where available
+- timestamp where available
+
+Use lossless representations for numeric blockchain values.
+
+Do not build historical indexing.
+
+8. SNAPSHOT MODEL
+
+Create a coherent read-only account snapshot containing, as appropriate:
+
+- address
+- network ID
+- chain ID
+- native balance
+- nonce
+- contract-code status
+- latest block information
+- retrieval timestamp
+
+The snapshot must clearly identify the network it belongs to.
+
+Do not persist snapshots yet.
+
+Do not use SecureStore, AsyncStorage, localStorage, or wallet storage for blockchain state.
+
+9. CONSISTENCY
+
+When collecting multiple pieces of state:
+
+- use the same active network
+- verify chain identity
+- avoid accidentally combining results from different networks
+- clearly identify the block context where practical
+
+If the active network changes during a read operation, prevent the result from being incorrectly attributed to the newly selected network.
+
+Prefer deterministic cancellation or stale-result rejection rather than returning ambiguous data.
+
+10. CONCURRENCY
+
+Design the account-state layer so multiple read requests can be made safely.
+
+Avoid unnecessary duplicate requests where practical.
+
+Do not introduce persistent caching.
+
+Do not introduce a complicated global state-management system.
+
+Keep the implementation simple and deterministic.
+
+11. REFRESH BEHAVIOR
+
+Provide a read-only refresh mechanism.
+
+The refresh operation must:
+
+- query the currently selected network
+- retrieve fresh public blockchain state
+- return a new snapshot
+- normalize errors safely
+
+Do not implement background polling yet.
+
+Do not implement push/websocket subscriptions yet.
+
+12. ERROR HANDLING
+
+Use the existing normalized RPC error model.
+
+Account-state errors should distinguish, where practical:
+
+- invalid address
+- provider unavailable
+- timeout
+- chain mismatch
+- malformed blockchain response
+- unsupported operation
+- network configuration problem
+
+Do not expose raw provider internals to the UI.
+
+13. SECURITY LOGGING
+
+Use the existing safe logging system.
+
+It is acceptable to log:
+
+- network ID
+- chain ID
+- endpoint ID
+- public address in a privacy-conscious way
+- method
+- operation duration
+- success/failure category
+
+Never log:
+
+- private keys
+- recovery phrases
+- PINs
+- biometric information
+- signing secrets
+
+The account-state service must not import or depend on secret-management modules.
+
+14. BIGINT SAFETY
+
+Blockchain quantities must remain lossless.
+
+Audit all conversions involving:
+
+- balances
+- block numbers
+- nonces
+- chain IDs where applicable
+
+Do not use Number for values that may exceed JavaScript's safe integer range.
+
+UI formatting may produce decimal strings, but internal state must remain lossless.
+
+15. NETWORK SELECTION
+
+Use the existing NetworkRegistry and EvmRpcProvider.
+
+Do not create a second network registry.
+
+Do not allow arbitrary RPC URLs to be passed directly into account-state methods.
+
+The account-state service should operate through configured network definitions.
+
+16. PRIMEWAVE MAINNET
+
+PrimeWave Mainnet remains intentionally unconfigured.
+
+Account-state requests against the unconfigured PrimeWave Mainnet placeholder must fail safely.
+
+Do not invent:
+
+- chain ID
+- RPC URL
+- explorer URL
+- native currency details
+
+17. TESTING
+
+Add comprehensive offline tests using fake/mock RPC transport.
+
+Do NOT use live public RPC endpoints in tests.
+
+Test at minimum:
+
+- valid EVM address
+- invalid EVM address
+- native balance retrieval
+- zero balance
+- very large balance
+- bigint/lossless balance handling
+- chain ID retrieval
+- chain ID mismatch
+- block number retrieval
+- nonce retrieval
+- contract-code detection
+- EOA/no-code detection
+- latest block snapshot
+- snapshot network identity
+- stale-result/network-change protection
+- provider timeout
+- provider error propagation
+- malformed responses
+- PrimeWave unconfigured rejection
+- no persistent state
+- multiple account-state requests
+
+18. REGRESSION TESTS
+
+Existing tests must continue passing.
+
+Do not break:
+
+- wallet creation
+- recovery phrase handling
+- secure vault
+- PIN authentication
+- biometric authentication
+- network registry
+- RPC provider
+
+19. DOCUMENTATION
+
+Update the architecture/development documentation to explain:
+
+- Account State Service
+- public-address-only boundary
+- native balance retrieval
+- nonce retrieval
+- chain state
+- contract-code observation
+- snapshot model
+- bigint safety
+- network consistency
+- read-only nature of this phase
+
+Clearly mark transaction construction/signing/sending as future phases.
+
+20. VALIDATION
+
+After implementation run:
+
+- pnpm run typecheck
+- pnpm test
+- CI=1 pnpm exec expo install --check
+- pnpm dlx expo-doctor@latest
+- Expo configuration validation
+- git diff --check
+- Expo workflow validation where available
+
+Report exact results.
+
+FINAL REPORT
+
+Do NOT continue automatically into Phase 2.4.
+
+Return a concise completion report containing:
+
+1. What was implemented
+2. Account-state architecture
+3. Native balance handling
+4. Chain-state handling
+5. Nonce handling
+6. Contract-code handling
+7. Snapshot design
+8. BigInt/lossless-number strategy
+9. Network consistency protection
+10. Security boundary
+11. Tests added
+12. Exact test results
+13. TypeScript result
+14. Expo validation result
+15. Any warnings
+16. Any assumptions
+17. Anything intentionally NOT implemented
+18. Any changes made to existing wallet/security code
+19. Confirmation that no private keys, recovery phrases, PINs, biometric secrets, signing secrets, transactions, token discovery, swaps, DApps, indexing, or backend custody were introduced.
+
+STOP after Phase 2.3.
