@@ -1,0 +1,250 @@
+WAVEX — FIX APPROVED
+PHYSICAL ANDROID AUTHENTICATION → WALLET RESTORATION APPSTATE RACE
+
+The diagnostic is approved.
+
+Implement ONLY the smallest safe fix for the identified native Android authentication/restoration race.
+
+ROOT CAUSE CONFIRMED:
+
+The authentication itself succeeds.
+
+The failure is a race between:
+
+authentication
+→ wallet restoration
+→ stable unlocked state
+
+and the global AppState background/inactive auto-lock path.
+
+The existing protection only covers biometricPromptInFlight. PIN authentication and the post-authentication wallet restoration interval are not protected.
+
+When Android emits inactive/background during or immediately after authentication:
+
+AppState
+→ lockForBackground()
+→ scheduleAutoLock(0)
+→ lockWallet()
+→ WalletAccessManager.onLock()
+→ engine.discard()
+→ currentWallet = null
+→ status = locked
+
+while FoundationScreen may already have:
+
+view === 'wallet'
+
+This produces:
+
+authentication succeeds
+→ wallet restoration
+→ AppState auto-lock
+→ currentWallet cleared
+→ FoundationScreen sees wallet view + null wallet
+→ "Preparing local vault"
+→ eventually Locked.
+
+IMPLEMENT THE FIX WITH THESE REQUIREMENTS:
+
+1. Serialize the COMPLETE unlock transaction for BOTH PIN and biometric:
+
+authentication start
+→ authentication result
+→ wallet restoration
+→ currentWallet assignment
+→ unlocked state stable.
+
+2. AppState background/inactive locking must not interrupt the unlock transaction while it is actively authenticating/restoring the wallet.
+
+3. Do NOT simply disable background locking.
+
+4. If the application is still backgrounded when the unlock/restoration transaction completes, apply the pending background lock BEFORE exposing the wallet as unlocked.
+
+5. Preserve the existing default auto-lock policy.
+
+6. Preserve immediate in-memory secret clearing whenever a real lock is applied.
+
+7. Preserve WalletAccessManager as the authoritative access/security boundary.
+
+8. Fix the React/UI state synchronization so FoundationScreen receives an authoritative access-state update after unlock/restoration.
+
+The UI must never remain in:
+
+view === 'wallet'
+AND
+currentWallet === null
+
+as a stable state.
+
+Prefer a small subscription/state-version/event mechanism inside the existing WalletAccessManager boundary rather than introducing a new wallet state architecture.
+
+IMPORTANT SECURITY REQUIREMENTS:
+
+Do NOT:
+- modify SecureStore configuration
+- add AsyncStorage
+- add localStorage
+- add plaintext wallet persistence
+- cache mnemonic/private key in UI state
+- expose private keys
+- expose mnemonic
+- modify PIN cryptography
+- modify biometric implementation
+- modify wallet derivation
+- modify transaction signing
+- modify RPC/blockchain behavior
+- weaken authentication
+- bypass authentication
+- retain wallet secrets after a real background lock
+- add a storage fallback.
+
+Do NOT make changes to swap, Activity, tokens, portfolio, or transaction execution.
+
+FILES TO FOCUS ON:
+
+- src/core/security/authentication.ts
+- src/core/security/wallet-access.ts
+- src/app/index.tsx
+
+Only modify other files if genuinely required by the minimal fix.
+
+IMPLEMENTATION GUIDANCE:
+
+Use a single explicit unlock-in-progress state/guard owned by the security/access layer.
+
+The guard must cover the entire operation, not just the biometric native prompt.
+
+PIN and biometric must both use the same protection mechanism.
+
+AppState handling should:
+
+A. If no unlock transaction is active:
+   preserve existing background-lock behavior.
+
+B. If unlock transaction is active:
+   record that a background/inactive event occurred and defer the lock.
+
+C. After authentication + wallet restoration completes:
+   - if the app is safely active, complete unlock normally;
+   - if the app remains backgrounded/inactive according to the existing AppState policy, lock immediately before exposing the wallet.
+
+Avoid creating multiple competing lock timers or duplicate lock callbacks.
+
+Ensure the guard is cleared in all success, failure, cancellation, timeout, and exception paths.
+
+UI STATE:
+
+FoundationScreen should react to the authoritative access-state transition.
+
+Do not solve this by polling getWallet().
+
+Do not introduce arbitrary setTimeout delays.
+
+Do not hide the Loading screen with a cosmetic change.
+
+The actual access state must become consistent.
+
+TESTS REQUIRED:
+
+Add regression coverage for WalletAccessManager/security flow:
+
+TEST 1 — PIN unlock + AppState race
+- persisted wallet
+- begin PIN unlock
+- defer authentication/restoration
+- emit inactive/background during unlock
+- complete authentication/restoration
+- assert authentication succeeds
+- assert manager ends unlocked
+- assert getWallet() returns the wallet
+- assert stale AppState event does not clear the wallet after restoration
+
+TEST 2 — biometric unlock + AppState race
+- same scenario using biometric authentication
+- assert manager ends unlocked when app is active
+
+TEST 3 — backgrounded through completion
+- begin unlock
+- emit inactive/background
+- complete authentication/restoration while still backgrounded
+- assert wallet is locked BEFORE it can be exposed to the UI
+
+TEST 4 — normal background lock remains intact
+- manager already unlocked
+- emit background/inactive
+- assert existing auto-lock policy still locks normally
+
+TEST 5 — failed authentication
+- authentication fails/cancels
+- assert no unlocked wallet state
+- assert guard is cleared
+
+TEST 6 — restoration failure
+- authentication succeeds
+- wallet restoration fails
+- assert manager returns to safe locked state
+- assert guard is cleared
+
+TEST 7 — repeated unlock attempts
+- prevent concurrent unlock operations from corrupting state.
+
+TEST 8 — UI transition
+- verify that successful authentication/restoration produces an authoritative state update
+- verify FoundationScreen does not settle in wallet view with null currentWallet.
+
+SECURITY TESTS:
+
+Verify:
+- no secret values in logs
+- no new persistence
+- no SecureStore bypass
+- engine.discard() still occurs on actual lock
+- no private key/mnemonic enters React state
+- no authentication bypass.
+
+LOGGING:
+
+Temporary diagnostic logs may be added only if necessary.
+
+If adding logs, log ONLY:
+- authentication start/completion
+- unlock transaction start/completion
+- AppState event type
+- manager status
+- whether public wallet state is present
+
+Never log:
+- PIN
+- mnemonic
+- private key
+- encrypted vault contents
+- encryption keys
+- signing material.
+
+After implementation, REMOVE unnecessary temporary diagnostic logs.
+
+VALIDATION REQUIRED:
+
+Run:
+- focused security/access tests
+- full test suite
+- TypeScript
+- Expo validation
+- Android/iOS static build validation
+- git diff/security inspection
+- existing workflow checks.
+
+Report:
+
+1. Files changed
+2. Exact root-cause fix implemented
+3. How PIN and biometric now share the same unlock guard
+4. How backgrounding during unlock is handled
+5. How the UI receives authoritative unlocked state
+6. Test results
+7. Security inspection results
+8. Any limitations
+
+DO NOT move to any new WaveX feature or phase.
+
+STOP after the fix and report.
