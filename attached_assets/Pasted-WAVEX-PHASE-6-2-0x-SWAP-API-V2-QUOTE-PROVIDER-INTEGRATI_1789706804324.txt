@@ -1,0 +1,1141 @@
+WAVEX — PHASE 6.2: 0x SWAP API V2 QUOTE PROVIDER INTEGRATION
+
+We are now implementing Phase 6.2 of the WaveX wallet roadmap.
+
+Phase 6.1 — Swap Architecture & Quote Model — is already implemented and approved.
+
+For Phase 6.2, integrate the current 0x EVM Swap API v2 as the first real swap quote provider.
+
+IMPORTANT:
+
+0x must be implemented ONLY as a provider behind the existing WaveX SwapQuoteProvider abstraction.
+
+Do NOT redesign the swap architecture around 0x.
+
+Do NOT bypass WaveX validation.
+
+Do NOT allow 0x transaction data to directly reach signing or broadcasting.
+
+This phase is primarily about obtaining and safely normalizing REAL quotes.
+
+Do NOT implement the final Swap UI yet.
+
+Do NOT execute swaps.
+
+Do NOT sign swaps.
+
+Do NOT broadcast swaps.
+
+Do NOT add token approval execution yet.
+
+Do NOT add Permit2 signing.
+
+Do NOT add allowance transactions.
+
+Do NOT add backend swap execution.
+
+Do NOT add affiliate fees or WaveX swap fees.
+
+Do NOT implement cross-chain swaps.
+
+Do NOT create fake production quotes.
+
+STOP after Phase 6.2 and wait for review.
+
+
+==================================================
+1. CURRENT 0x INTEGRATION
+==================================================
+
+Use the CURRENT 0x Swap API v2 EVM API.
+
+Use the unified API host:
+
+https://api.0x.org
+
+Use the v2 Swap API endpoint architecture.
+
+For this phase, use the AllowanceHolder quote endpoint:
+
+/swap/allowance-holder/quote
+
+Required headers include:
+
+0x-api-key
+0x-version: v2
+
+Do NOT use the deprecated v1 API.
+
+Do NOT use old chain-specific API hostnames.
+
+Do NOT hardcode an API key anywhere in source code.
+
+
+==================================================
+2. API KEY SECURITY
+==================================================
+
+The 0x API key is NOT a wallet secret.
+
+However, it is still an application credential and must not be committed to source control.
+
+Create the provider configuration so the key can be supplied through environment configuration.
+
+Use an environment variable such as:
+
+ZEROEX_API_KEY
+
+Do not invent a production secret.
+
+If the environment variable is missing:
+
+Return a clear configuration error.
+
+Do NOT silently disable security.
+
+Do NOT fall back to a fake API key.
+
+Do NOT expose the API key in:
+
+- logs
+- errors
+- UI
+- transaction activity
+- quote models
+- analytics
+- screenshots
+- test output
+
+IMPORTANT:
+
+Do not put the 0x API key into a client-side persistent wallet store.
+
+Do not store it in SecureStore as a wallet secret.
+
+Do not store it alongside mnemonic/private-key material.
+
+Keep the provider credential boundary clearly separated from wallet secrets.
+
+
+==================================================
+3. PROVIDER IMPLEMENTATION
+==================================================
+
+Implement the existing Phase 6.1 interface:
+
+SwapQuoteProvider
+
+Create a concrete provider implementation such as:
+
+ZeroExSwapQuoteProvider
+
+Suggested structure:
+
+src/core/swaps/providers/
+  zeroex/
+    zeroex-provider.ts
+    zeroex-client.ts
+    zeroex-mapper.ts
+    zeroex-validation.ts
+    zeroex-errors.ts
+    index.ts
+
+Follow existing project conventions if they differ.
+
+Keep the implementation isolated from the rest of the swap domain.
+
+
+==================================================
+4. DO NOT CHANGE PHASE 6.1 DOMAIN MODELS UNNECESSARILY
+==================================================
+
+Reuse:
+
+SwapQuoteRequest
+SwapQuote
+SwapRoute
+SwapTransactionRequest
+SwapQuoteProvider
+SwapQuoteService
+existing asset identity
+existing network registry
+existing validation
+existing error normalization
+
+Only extend Phase 6.1 models if a real 0x response contains information that the provider-neutral architecture genuinely needs.
+
+Do not leak 0x-specific response objects throughout the application.
+
+
+==================================================
+5. SUPPORTED NETWORKS
+==================================================
+
+The existing WaveX NetworkRegistry contains networks including:
+
+Ethereum
+BNB
+Polygon
+Arbitrum
+Base
+Optimism
+PrimeWave placeholder
+
+Do NOT assume every registered WaveX network is supported by 0x.
+
+Before requesting a quote:
+
+1. Resolve the WaveX network.
+2. Confirm it is configured.
+3. Confirm it has a real chain ID.
+4. Confirm 0x supports that chain.
+5. Reject unsupported networks clearly.
+
+Do NOT send requests for the PrimeWave placeholder network.
+
+PrimeWave Mainnet is NOT configured yet.
+
+Do NOT invent PrimeWave 0x support.
+
+Create a provider capability mapping that can be updated later.
+
+Do not hardcode unsupported-chain assumptions throughout the codebase.
+
+
+==================================================
+6. TOKEN REPRESENTATION
+==================================================
+
+0x expects token identifiers.
+
+For ERC-20:
+
+Use the normalized contract address.
+
+For native assets:
+
+Use the provider's documented native-token representation required by the 0x API.
+
+IMPORTANT:
+
+Do not treat the 0x native-token sentinel as the WaveX asset identity.
+
+WaveX asset identity remains:
+
+networkId
+assetType
+assetId
+
+The provider mapping is only an API representation.
+
+Keep the distinction:
+
+WaveX Asset Identity
+        ↓
+0x Token Representation
+        ↓
+0x API
+        ↓
+0x Response
+        ↓
+WaveX Asset Identity
+
+
+==================================================
+7. QUOTE REQUEST MAPPING
+==================================================
+
+Map:
+
+SwapQuoteRequest
+        ↓
+0x quote request
+
+The request must include the correct:
+
+chainId
+sellToken
+buyToken
+sellAmount
+taker
+
+Use the WaveX sender address as the 0x taker.
+
+Do not use a different address.
+
+Do not use a provider-controlled address.
+
+Do not use a hardcoded wallet address.
+
+Use exact base-unit bigint values converted safely to decimal strings for HTTP transport.
+
+Never convert token amounts to JavaScript number.
+
+
+==================================================
+8. SLIPPAGE MAPPING
+==================================================
+
+WaveX uses:
+
+slippageBps
+
+Map it to the 0x v2 API's supported slippage parameter.
+
+Do not convert through floating-point percentages unless the API absolutely requires it.
+
+Prefer integer/basis-point representation throughout the mapping.
+
+Do not silently modify the user's slippage.
+
+Do not automatically increase slippage.
+
+Do not allow the provider to override the user's requested slippage.
+
+
+==================================================
+9. HTTP CLIENT
+==================================================
+
+Create a small dedicated 0x HTTP client.
+
+Responsibilities:
+
+- build URL
+- encode query parameters
+- attach required headers
+- enforce HTTPS
+- send GET request
+- enforce timeout
+- parse response
+- normalize HTTP/provider errors
+- never expose API credentials
+
+Do not scatter fetch() calls throughout SwapQuoteService.
+
+The provider should depend on the dedicated client.
+
+Use an injectable transport if consistent with existing architecture so tests do not require real network access.
+
+
+==================================================
+10. TIMEOUT
+==================================================
+
+Use a bounded request timeout.
+
+Do not allow an indefinitely pending quote request.
+
+Use a reasonable default consistent with existing WaveX RPC timeout philosophy.
+
+Make the timeout configurable internally without allowing arbitrary unbounded values.
+
+Timeout must normalize to:
+
+SWAP_QUOTE_UNAVAILABLE
+
+or another appropriate existing swap-specific error.
+
+
+==================================================
+11. HTTP ERROR HANDLING
+==================================================
+
+Handle at least:
+
+400
+401
+403
+404
+408
+429
+500
+502
+503
+504
+network failure
+timeout
+malformed JSON
+
+Normalize them into safe WaveX swap errors.
+
+Do not expose:
+
+- API key
+- Authorization headers
+- full credential-bearing URLs
+- raw sensitive request headers
+- giant provider response bodies
+
+Do preserve enough sanitized information for debugging.
+
+For rate limiting, preserve a normalized indication that the provider is rate limited.
+
+Do not automatically retry in this phase unless the retry is deterministic, bounded, and clearly justified.
+
+Prefer NO automatic retry for quote requests initially.
+
+
+==================================================
+12. RATE LIMITING
+==================================================
+
+Do not create an aggressive retry loop.
+
+Do not hammer 0x.
+
+A failed request must not recursively trigger additional requests.
+
+If 429 is returned:
+
+Return a normalized provider-rate-limit error/state.
+
+Do not silently retry indefinitely.
+
+
+==================================================
+13. 0x RESPONSE MAPPING
+==================================================
+
+Create a dedicated mapper:
+
+0x response
+    ↓
+WaveX SwapQuote
+
+Do NOT expose raw 0x response objects to the UI or core domain.
+
+Map the fields needed by WaveX, including where available:
+
+- quote identifier
+- chain ID
+- buy token
+- sell token
+- buy amount
+- sell amount
+- gas
+- gas price / fee information
+- protocol fee
+- provider/0x fee information
+- estimated price impact
+- transaction target
+- transaction value
+- transaction calldata
+- allowance information
+- route/source information
+- block context
+- expiration if available
+- liquidity availability
+- provider issues
+
+Preserve unknown/unavailable values explicitly.
+
+Do not replace unavailable values with fake zero values.
+
+
+==================================================
+14. EXPECTED BUY AMOUNT
+==================================================
+
+Map the provider's buy amount into:
+
+expectedBuyAmount
+
+Use bigint.
+
+Never use number.
+
+Never round.
+
+Never truncate.
+
+Never use floating-point arithmetic.
+
+
+==================================================
+15. MINIMUM BUY AMOUNT
+==================================================
+
+Map or calculate minimumBuyAmount ONLY when the provider response and requested slippage semantics allow doing so safely.
+
+IMPORTANT:
+
+Do not blindly calculate minimumBuyAmount from a displayed price.
+
+Do not use floating point.
+
+If the provider response already provides a minimum buy amount, validate and preserve it.
+
+If it does not, use exact integer arithmetic consistent with the provider's documented slippage semantics.
+
+If safe derivation is not possible from the returned data:
+
+mark it unavailable and reject the quote if WaveX requires a minimum amount for execution safety.
+
+Do NOT fabricate it.
+
+
+==================================================
+16. LIQUIDITY AVAILABILITY
+==================================================
+
+If the 0x response indicates:
+
+liquidityAvailable = false
+
+do not construct a usable SwapQuote.
+
+Return a normalized:
+
+SWAP_QUOTE_UNAVAILABLE
+
+or equivalent no-liquidity state.
+
+Do not present a fake quote.
+
+
+==================================================
+17. PROVIDER ISSUES
+==================================================
+
+0x v2 can report issues relating to the quote/request.
+
+Capture and normalize relevant issues.
+
+Examples may include:
+
+- allowance issue
+- balance issue
+- simulation incomplete
+- other provider validation warnings
+
+Do NOT turn provider warnings into silent success.
+
+Do NOT automatically execute approval transactions.
+
+Do NOT automatically request token allowances.
+
+For this phase, preserve allowance requirements as quote metadata only.
+
+
+==================================================
+18. ALLOWANCE HANDLING
+==================================================
+
+IMPORTANT:
+
+Do NOT implement token approval execution in Phase 6.2.
+
+If 0x indicates that an ERC-20 allowance is required:
+
+preserve the requirement in the normalized quote/provider metadata.
+
+Do NOT:
+
+- call approve()
+- call Permit2
+- sign EIP-712
+- send approval transactions
+- modify token allowances
+- automatically approve unlimited amounts
+
+Approval architecture will be handled separately before swap execution.
+
+
+==================================================
+19. TRANSACTION REQUEST MAPPING
+==================================================
+
+Map the provider transaction data into:
+
+SwapTransactionRequest
+
+At minimum:
+
+from
+to
+value
+data
+
+Use exact string representations for transport.
+
+Normalize addresses.
+
+Validate:
+
+from === taker/sender
+to is valid
+value is valid
+data is valid hex calldata
+
+IMPORTANT:
+
+This transaction request is UNTRUSTED PROVIDER OUTPUT.
+
+It is NOT yet authorized for signing.
+
+
+==================================================
+20. PROVIDER TRUST BOUNDARY
+==================================================
+
+Maintain this exact security model:
+
+0x
+ ↓
+Untrusted provider response
+ ↓
+ZeroEx mapper
+ ↓
+WaveX provider validation
+ ↓
+WaveX SwapQuote
+ ↓
+Future Swap Review
+ ↓
+WaveX Transaction Construction
+ ↓
+WaveX Local Signing
+ ↓
+WaveX Broadcast
+
+Never:
+
+0x
+ ↓
+Wallet signer
+
+That shortcut is forbidden.
+
+
+==================================================
+21. TRANSACTION TARGET VALIDATION
+==================================================
+
+Validate provider transaction target.
+
+At minimum:
+
+- valid EVM address
+- not malformed
+- sender must match WaveX taker
+- transaction value must be valid
+- calldata must be valid hex
+- chain must match
+- transaction must belong to the requested quote
+
+Do not blindly trust the provider.
+
+Do not allow provider output to change the user's:
+
+- sender
+- sell asset
+- buy asset
+- amount
+- network
+- chain
+- slippage
+
+
+==================================================
+22. CALldata SAFETY
+==================================================
+
+Do NOT attempt to fully decode every possible swap calldata format in Phase 6.2.
+
+However:
+
+- require valid hex calldata
+- require valid transaction target
+- preserve exact calldata
+- bind the transaction request to the quote
+- ensure it cannot silently be replaced after review
+
+Document that deeper contract-interaction decoding/semantic validation will be handled during Swap Review.
+
+Do not mark unknown calldata as trusted merely because it is valid hex.
+
+
+==================================================
+23. ROUTE MAPPING
+==================================================
+
+Map available 0x route/source information into the provider-neutral:
+
+SwapRoute
+
+If 0x provides detailed liquidity/source information:
+
+preserve useful provider metadata.
+
+If it does not provide a clean route:
+
+use a valid "unknown/unavailable" representation.
+
+Do NOT invent pool names or protocols.
+
+Do NOT pretend a route is known when it is not.
+
+
+==================================================
+24. PRICE IMPACT
+==================================================
+
+Map provider price impact into the WaveX priceImpact model.
+
+Do not fabricate it.
+
+If unavailable:
+
+mark unavailable.
+
+If malformed:
+
+reject the provider response.
+
+Do not convert a malformed value into zero.
+
+
+==================================================
+25. FEES
+==================================================
+
+Preserve fee categories separately.
+
+At minimum distinguish:
+
+network/gas fee
+protocol fee
+provider/0x fee
+integrator fee
+
+IMPORTANT:
+
+WaveX must NOT add an integrator fee in Phase 6.2.
+
+Do not configure:
+
+swapFeeRecipient
+swapFeeBps
+tradeSurplusRecipient
+
+Do not monetize swaps yet.
+
+If 0x itself reports fees, map them accurately without modifying them.
+
+
+==================================================
+26. GAS DATA
+==================================================
+
+0x may return gas estimates and gas-related values.
+
+Treat them as provider quote information.
+
+Do NOT make them authoritative over WaveX's own transaction construction.
+
+Future flow:
+
+0x quote gas information
+        ↓
+Swap Review
+        ↓
+WaveX gas/fee validation
+        ↓
+Final transaction construction
+
+Do not duplicate the Gas/Fee Engine.
+
+
+==================================================
+27. QUOTE EXPIRATION
+==================================================
+
+Use provider expiration information if available.
+
+If the provider does not provide an explicit expiration timestamp:
+
+create a clearly documented bounded quote-validity policy ONLY if required by the provider integration.
+
+Do not pretend a quote is valid indefinitely.
+
+Do not silently reuse stale quotes.
+
+The quote must be rejected once expired.
+
+
+==================================================
+28. QUOTE CONTEXT BINDING
+==================================================
+
+A returned quote must remain bound to:
+
+accountId
+senderAddress
+networkId
+chainId
+sellAsset
+buyAsset
+sellAmount
+slippageBps
+
+If any of these change:
+
+the quote must no longer be usable.
+
+Do not let a quote generated for:
+
+Account A
+
+be used by:
+
+Account B.
+
+Do not let a quote generated for:
+
+Token A → Token B
+
+be reused for:
+
+Token A → Token C.
+
+
+==================================================
+29. NETWORK SAFETY
+==================================================
+
+Before quote request:
+
+validate WaveX network.
+
+After provider response:
+
+validate returned chainId.
+
+If returned chainId differs:
+
+reject.
+
+Do not automatically switch networks.
+
+Do not modify the active network.
+
+Do not silently retry against another chain.
+
+
+==================================================
+30. PRIMEWAVE NETWORK
+==================================================
+
+PrimeWave Mainnet is still a placeholder/unconfigured network.
+
+Do NOT send 0x requests for PrimeWave.
+
+Do NOT invent PrimeWave chain IDs, RPCs, token addresses, or provider support.
+
+When PrimeWave Mainnet becomes configured later, provider support can be added through the provider capability mapping.
+
+
+==================================================
+31. TEST MODE
+==================================================
+
+Do not use fake quotes in production.
+
+For automated tests:
+
+create injectable mock HTTP responses.
+
+Tests must operate without internet.
+
+Do not require a real 0x API key to run the test suite.
+
+Do not hit the real 0x API during unit tests.
+
+
+==================================================
+32. REQUIRED TEST COVERAGE
+==================================================
+
+Add focused tests for:
+
+CONFIGURATION
+
+- missing API key
+- valid API key configuration
+- API key never appears in error output
+- API key never appears in logs
+
+NETWORK
+
+- supported chain
+- unsupported chain
+- PrimeWave placeholder rejected
+- chain mismatch rejected
+- network mismatch rejected
+
+REQUEST
+
+- valid native → ERC20
+- valid ERC20 → native
+- valid ERC20 → ERC20
+- exact bigint sell amount
+- correct taker
+- correct chain ID
+- correct token mapping
+- correct slippage mapping
+
+HTTP
+
+- successful response
+- 400
+- 401
+- 403
+- 404
+- 408
+- 429
+- 500
+- 502
+- 503
+- 504
+- timeout
+- malformed JSON
+- network failure
+
+RESPONSE VALIDATION
+
+- valid 0x response
+- invalid chain
+- wrong buy token
+- wrong sell token
+- wrong sell amount
+- wrong taker
+- invalid recipient
+- invalid calldata
+- invalid transaction value
+- invalid gas
+- malformed fee
+- malformed price impact
+- expired quote
+- liquidity unavailable
+- provider issue response
+- allowance requirement
+
+AMOUNTS
+
+Test:
+
+0
+1
+999999999999999999
+1000000000000000000
+very large uint256-compatible values
+
+Ensure no precision loss.
+
+SECURITY
+
+Verify:
+
+- no SecureStore
+- no mnemonic access
+- no private-key access
+- no PIN access
+- no biometric access
+- no signing
+- no broadcasting
+- no approval execution
+- no Permit2 signing
+- no backend wallet secret access
+
+BOUNDARY
+
+Verify:
+
+0x response
+→ mapper
+→ WaveX SwapQuote
+
+and never:
+
+0x response
+→ signer
+
+
+==================================================
+33. REAL API SMOKE TEST
+==================================================
+
+If a ZEROEX_API_KEY is actually available in the Replit environment, you MAY perform one controlled real quote smoke test.
+
+IMPORTANT:
+
+Only perform this if the environment already contains the key.
+
+Do NOT ask me to paste the key into chat.
+
+Do NOT print the key.
+
+Do NOT commit the key.
+
+Do NOT expose the key in the final report.
+
+Use a harmless, read-only quote request on a supported public network.
+
+The smoke test must:
+
+- request a quote
+- validate the response
+- NOT sign
+- NOT approve
+- NOT broadcast
+- NOT modify wallet state
+
+If no API key is available:
+
+skip the real smoke test and clearly report:
+
+"Real 0x API smoke test skipped because ZEROEX_API_KEY was not configured."
+
+
+==================================================
+34. UI
+==================================================
+
+Do NOT build the final Swap screen.
+
+Do NOT redesign the existing Swap tab.
+
+Only ensure the core architecture is ready for Phase 6.3.
+
+
+==================================================
+35. ACTIVITY
+==================================================
+
+Do NOT create Activity records from quotes.
+
+A quote is not an executed swap.
+
+Do not modify Activity state based on quote retrieval.
+
+
+==================================================
+36. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+src/core/swaps/README.md
+
+Document:
+
+- 0x is the current quote provider
+- 0x is behind SwapQuoteProvider
+- API v2 is used
+- provider output is untrusted
+- API key handling
+- supported-network capability mapping
+- same-chain limitation
+- allowance is NOT executed
+- Permit2 is NOT executed
+- no signing
+- no broadcasting
+- no WaveX swap fee yet
+- no cross-chain support
+- PrimeWave remains unsupported until configured
+- relationship between 0x quote data and WaveX transaction construction
+
+
+==================================================
+37. DEPENDENCY DISCIPLINE
+==================================================
+
+Do NOT add a large SDK if a small HTTPS client is sufficient.
+
+Prefer the existing project networking/runtime architecture.
+
+Do not add unnecessary dependencies.
+
+If a dependency is required, explain why before introducing unnecessary abstraction.
+
+
+==================================================
+38. REGRESSION CHECK
+==================================================
+
+Before finishing:
+
+Run:
+
+- TypeScript
+- focused swap tests
+- full regression suite
+- Expo validation
+- iOS static/build validation if available
+- Android static/build validation if available
+- relevant workflows
+- git diff review
+
+The previous full suite had:
+
+227 passing tests
+
+Do not regress existing functionality.
+
+The final report must state the new total.
+
+
+==================================================
+39. FINAL SECURITY AUDIT
+
+Before reporting completion, inspect the Phase 6.2 diff for accidental access to:
+
+- SecureStore
+- mnemonic
+- private key
+- PIN
+- biometric APIs
+- signing engine
+- broadcast engine
+- approval execution
+- Permit2 signing
+- wallet persistence
+- backend secret storage
+- provider API key logging
+
+There must be NO wallet secret handling introduced by this phase.
+
+There must be NO automatic transaction execution.
+
+
+==================================================
+40. FINAL REPORT
+
+When finished, report:
+
+1. Files created/changed
+2. 0x provider implementation
+3. API v2 endpoint used
+4. Supported network mapping
+5. Request mapping
+6. Response mapping
+7. Provider validation
+8. Fee handling
+9. Slippage handling
+10. Allowance handling
+11. Transaction calldata handling
+12. API key security
+13. Focused tests passed
+14. Full regression test count
+15. TypeScript result
+16. iOS/Android validation
+17. Real 0x smoke-test result, if performed
+18. Known warnings/limitations
+
+DO NOT start Phase 6.3.
+
+STOP after Phase 6.2 and wait for my review.
