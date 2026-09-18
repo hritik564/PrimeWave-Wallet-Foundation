@@ -891,10 +891,11 @@ No backend history, external indexer, price API, notification, analytics,
 swap, approval execution, DApp, WalletConnect, replacement, speed-up,
 cancellation, or fee-bumping boundary was added in Phase 5.3.
 
-### Phase 6.1 Swap Architecture security boundary
+### Phase 6.1–6.2 Swap Quote security boundary
 
-Phase 6.1 introduces only provider-neutral quote architecture under
-`src/core/swaps`. A swap provider receives a public
+Phase 6.1 introduces provider-neutral quote architecture under
+`src/core/swaps`; Phase 6.2 adds the current 0x Swap API v2 provider behind
+that same boundary. A swap provider receives a public
 `SwapQuoteRequest` and is never trusted with wallet secrets or signing
 authority. The request contains only account ID, sender public address,
 network/chain context, network-scoped asset identities, exact bigint sell
@@ -914,11 +915,30 @@ remains authoritative for any future execution. A quote is not an approved
 transaction, a signed transaction, a broadcast, a confirmation, or a
 completed swap.
 
+The 0x provider uses only the documented v2 AllowanceHolder quote endpoint.
+Its API key is runtime configuration from `ZEROEX_API_KEY`; it is not a wallet
+secret and must not enter SecureStore, mnemonic/key handling, quote models,
+analytics, logs, error text, screenshots, or UI state. The provider has a
+centralized capability mapping for Ethereum, BNB Smart Chain, Polygon,
+Arbitrum One, Base, and Optimism. PrimeWave and any unconfigured or disabled
+network are rejected before an external request.
+
+0x response objects are untrusted. The mapper validates chain context, token
+identity, exact decimal-string quantities, taker/from, recipient/to, calldata,
+value, gas, fees, route continuity, liquidity, expiration, and reported
+issues through the existing WaveX validation boundary. The 0x native-token
+sentinel is translated only at the provider edge and never replaces the
+network-scoped WaveX native asset identity. Unknown price impact, route,
+liquidity, and fee values stay unavailable; no fake zero is created.
+
 The swap module has no SecureStore, mnemonic, seed, private key, PIN,
 biometric, authentication, signing, broadcasting, wallet persistence,
-backend, external quote API, or provider SDK dependency. It does not execute
-swaps, mutate balances, create Activity records, add WaveX fees, refresh
-quotes automatically, or background-poll. Cross-chain swaps are rejected.
+backend execution, or provider SDK dependency. Allowance requirements and
+Permit2-related concerns are metadata only; this phase does not approve,
+execute Permit2, sign EIP-712 data, sign swaps, or broadcast transactions.
+It does not execute swaps, mutate balances, create Activity records, add
+WaveX fees, refresh quotes automatically, or background-poll. Cross-chain
+swaps are rejected.
 
 The quote lifecycle is limited to idle, requesting, quoted, expired, and
 failed. Expected and minimum received amounts remain separate, exact bigint

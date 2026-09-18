@@ -63,6 +63,7 @@ function quote(overrides: Partial<SwapQuote> = {}): SwapQuote {
     minimumBuyAmount: 1_990_000_000n,
     slippageBps: 50,
     route: {
+      state: 'available',
       hops: [
         {
           inputAsset: native,
@@ -83,6 +84,9 @@ function quote(overrides: Partial<SwapQuote> = {}): SwapQuote {
     },
     protocolFee: null,
     providerFee: null,
+    integratorFee: null,
+    allowanceRequirement: null,
+    providerIssues: [],
     estimatedExecutionTime: 30,
     quotedAt: BASE_TIME,
     expiresAt: BASE_TIME + 30_000,
@@ -392,6 +396,7 @@ test('rejects malformed or untrusted provider quote fields', () => {
       validateSwapQuoteResponse(
         quote({
           route: {
+            state: 'available',
             hops: [
               {
                 ...quote().route.hops[0],
@@ -411,6 +416,7 @@ test('rejects malformed or untrusted provider quote fields', () => {
       validateSwapQuoteResponse(
         quote({
           route: {
+            state: 'available',
             hops: [
               quote().route.hops[0],
               {

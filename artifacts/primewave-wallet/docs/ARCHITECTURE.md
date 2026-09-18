@@ -916,9 +916,9 @@ configured network metadata. Phase 5.3 does not add swap detection or
 execution, approval execution, backend history, external indexing, price APIs,
 notifications, replacement, speed-up, cancellation, or fee bumping.
 
-### Phase 6.1 WAVEX Swap Architecture and Quote Model
+### Phase 6.2 WAVEX Swap Architecture and 0x Quote Provider
 
-Phase 6.1 adds the isolated provider-neutral swap domain under
+Phase 6.1 and 6.2 add the isolated provider-neutral swap domain under
 `src/core/swaps`. It reuses the existing network-scoped `AssetIdentity`,
 ERC-20 address normalization, `NetworkRegistry`, and exact bigint conventions.
 Swap requests are public-only and contain account ID, sender address, network
@@ -945,18 +945,40 @@ Existing Secure Local Signing
 Existing Broadcast Engine
 ```
 
-Phase 6.1 supports same-chain requests only and enforces 0–5000 bps slippage.
+The current real provider is 0x Swap API v2, implemented only behind
+`SwapQuoteProvider`. It uses the unified
+`https://api.0x.org/swap/allowance-holder/quote` endpoint with the `0x-api-key`
+and `0x-version: v2` headers. A small injectable HTTPS client is used instead
+of a large SDK. The API key comes from `ZEROEX_API_KEY` environment
+configuration and is never placed in SecureStore, wallet models, quote data,
+logs, or UI state.
+
+The provider capability mapping currently covers the configured Ethereum
+(1), BNB Smart Chain (56), Polygon (137), Arbitrum One (42161), Base (8453),
+and Optimism (10) networks. PrimeWave remains unsupported until its real chain
+configuration is supplied and 0x support is explicitly reviewed. All quote
+requests remain same-chain and enforce 0–5000 bps slippage. WaveX native
+assets are converted to the documented 0x native-token sentinel only at this
+boundary; the sentinel is never used as a WaveX asset identity.
+
 The quote model keeps expected buy amount separate from minimum buy amount,
 represents multi-hop routes, exposes price impact as available or unavailable,
-and separates network, protocol, and provider fees. Provider transaction
-calldata, recipient, value, and optional gas limit are untrusted and validated
-before a quote is returned.
+separates network, protocol, provider/0x, and integrator fee fields, and
+preserves allowance requirements and provider issues as metadata. Provider
+transaction calldata, recipient, value, and optional gas limit are untrusted
+and validated before a quote is returned. Missing provider values remain
+unavailable; they are not converted to zero or inferred from floating point
+numbers.
 
 `SwapQuoteService` owns the in-memory quote lifecycle
 (`idle`, `requesting`, `quoted`, `expired`, `failed`). It does not persist
 swap state, automatically refresh, background-poll, invent rates or routes, or
-create Activity records. No real provider, SDK, API key, external request,
-swap UI, signing, broadcast, or execution is included in this phase.
+create Activity records. A 0x allowance requirement is metadata only: this
+phase does not execute approvals, Permit2, EIP-712 signing, swap signing,
+broadcasting, or execution. The validated 0x transaction request is a quote
+output for a future review/construction flow; it is not passed directly to
+signing or broadcasting. No Swap UI, WaveX swap fee, backend execution, or
+cross-chain support is included.
 
 ## Design system
 

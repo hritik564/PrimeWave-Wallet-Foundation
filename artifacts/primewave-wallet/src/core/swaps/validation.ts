@@ -4,7 +4,9 @@ import { normalizePublicEvmAddress } from '@/src/core/blockchain/account-state';
 import type { NetworkRegistry } from '@/src/core/networks';
 import type {
   SwapFeeAmount,
+  SwapAllowanceRequirement,
   SwapPriceImpact,
+  SwapProviderIssue,
   SwapQuote,
   SwapQuoteProviderMetadata,
   SwapQuoteRequest,
@@ -197,7 +199,25 @@ function normalizeRoute(
   value: unknown,
   request: ValidatedSwapQuoteRequest,
 ): SwapRoute {
-  if (!isRecord(value) || !Array.isArray(value.hops) || value.hops.length === 0) {
+  if (!isRecord(value)) return fail('SWAP_INVALID_ROUTE');
+  if (value.state === 'unavailable') {
+    if (
+      value.reason !== 'not-provided' &&
+      value.reason !== 'unavailable'
+    ) {
+      return fail('SWAP_INVALID_ROUTE');
+    }
+    return Object.freeze({
+      state: 'unavailable' as const,
+      hops: Object.freeze([]) as readonly [],
+      reason: value.reason,
+    });
+  }
+  if (
+    value.state !== 'available' ||
+    !Array.isArray(value.hops) ||
+    value.hops.length === 0
+  ) {
     return fail('SWAP_INVALID_ROUTE');
   }
   const hops: SwapRouteHop[] = [];
@@ -211,12 +231,28 @@ function normalizeRoute(
     ) {
       return fail('SWAP_INVALID_ROUTE');
     }
+    let proportionBps: number | undefined;
+    if (rawHop.proportionBps !== undefined && rawHop.proportionBps !== null) {
+      if (typeof rawHop.proportionBps !== 'number') {
+        return fail('SWAP_INVALID_ROUTE');
+      }
+      proportionBps = rawHop.proportionBps;
+    }
+    if (
+      proportionBps !== undefined &&
+      (!Number.isSafeInteger(proportionBps) ||
+        proportionBps < 0 ||
+        proportionBps > 10_000)
+    ) {
+      return fail('SWAP_INVALID_ROUTE');
+    }
     hops.push(
       Object.freeze({
         inputAsset,
         outputAsset,
         poolOrVenue: nonEmptyString(rawHop.poolOrVenue, 'SWAP_INVALID_ROUTE'),
         protocol: nonEmptyString(rawHop.protocol, 'SWAP_INVALID_ROUTE'),
+        ...(proportionBps === undefined ? {} : { proportionBps }),
       }),
     );
   }
@@ -236,7 +272,10 @@ function normalizeRoute(
   ) {
     return fail('SWAP_INVALID_ROUTE');
   }
-  return Object.freeze({ hops: Object.freeze(hops) });
+  return Object.freeze({
+    state: 'available' as const,
+    hops: Object.freeze(hops),
+  });
 }
 
 function normalizePriceImpact(value: unknown): SwapPriceImpact {
@@ -273,6 +312,52 @@ function normalizeFee(
     amount: exactNonNegativeBigint(value.amount, 'SWAP_INVALID_FEE'),
     asset: Object.freeze(asset),
   });
+}
+
+function normalizeAllowanceRequirement(
+  value: unknown,
+  request: ValidatedSwapQuoteRequest,
+): SwapAllowanceRequirement | null {
+  if (value === null) return null;
+  if (!isRecord(value)) return fail('SWAP_INVALID_QUOTE');
+  const asset = normalizeProviderAsset(value.asset);
+  if (
+    asset.assetType !== 'fungible_token' ||
+    getAssetIdentityKey(asset) !== getAssetIdentityKey(request.sellAsset)
+  ) {
+    return fail('SWAP_INVALID_QUOTE');
+  }
+  const actualAmount =
+    value.actualAmount === null
+      ? null
+      : exactNonNegativeBigint(value.actualAmount, 'SWAP_INVALID_QUOTE');
+  return Object.freeze({
+    asset: Object.freeze(asset),
+    spender: normalizeAddressOrFail(
+      value.spender,
+      'SWAP_INVALID_TRANSACTION_REQUEST',
+    ),
+    actualAmount,
+    requiredAmount: request.sellAmount,
+  });
+}
+
+function normalizeProviderIssues(value: unknown): readonly SwapProviderIssue[] {
+  if (!Array.isArray(value)) return fail('SWAP_INVALID_QUOTE');
+  const allowed = new Set<SwapProviderIssue['code']>([
+    'allowance-required',
+    'balance-insufficient',
+    'simulation-incomplete',
+    'invalid-sources',
+  ]);
+  return Object.freeze(
+    value.map((issue) => {
+      if (!isRecord(issue) || !allowed.has(issue.code as SwapProviderIssue['code'])) {
+        return fail('SWAP_INVALID_QUOTE');
+      }
+      return Object.freeze({ code: issue.code as SwapProviderIssue['code'] });
+    }),
+  );
 }
 
 function normalizeTransactionRequest(
@@ -425,6 +510,12 @@ export function validateSwapQuoteResponse(
     gasFee: normalizeFee(response.gasFee, request),
     protocolFee: normalizeFee(response.protocolFee, request),
     providerFee: normalizeFee(response.providerFee, request),
+    integratorFee: normalizeFee(response.integratorFee, request),
+    allowanceRequirement: normalizeAllowanceRequirement(
+      response.allowanceRequirement,
+      request,
+    ),
+    providerIssues: normalizeProviderIssues(response.providerIssues),
     estimatedExecutionTime,
     quotedAt,
     expiresAt,

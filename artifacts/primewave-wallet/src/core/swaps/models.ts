@@ -41,10 +41,35 @@ export interface SwapRouteHop {
   readonly outputAsset: AssetIdentity;
   readonly poolOrVenue: string;
   readonly protocol: string;
+  readonly proportionBps?: number;
 }
 
-export interface SwapRoute {
-  readonly hops: readonly SwapRouteHop[];
+export type SwapRoute =
+  | {
+      readonly state: 'available';
+      readonly hops: readonly SwapRouteHop[];
+    }
+  | {
+      readonly state: 'unavailable';
+      readonly hops: readonly [];
+      readonly reason: 'not-provided' | 'unavailable';
+    };
+
+export interface SwapAllowanceRequirement {
+  readonly asset: AssetIdentity;
+  readonly spender: string;
+  readonly actualAmount: bigint | null;
+  readonly requiredAmount: bigint;
+}
+
+export type SwapProviderIssueCode =
+  | 'allowance-required'
+  | 'balance-insufficient'
+  | 'simulation-incomplete'
+  | 'invalid-sources';
+
+export interface SwapProviderIssue {
+  readonly code: SwapProviderIssueCode;
 }
 
 export interface SwapQuote {
@@ -65,6 +90,9 @@ export interface SwapQuote {
   readonly gasFee: SwapFeeAmount | null;
   readonly protocolFee: SwapFeeAmount | null;
   readonly providerFee: SwapFeeAmount | null;
+  readonly integratorFee: SwapFeeAmount | null;
+  readonly allowanceRequirement: SwapAllowanceRequirement | null;
+  readonly providerIssues: readonly SwapProviderIssue[];
   readonly estimatedExecutionTime: number | null;
   readonly quotedAt: number;
   readonly expiresAt: number;

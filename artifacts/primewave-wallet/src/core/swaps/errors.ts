@@ -18,6 +18,8 @@ export type SwapErrorCode =
   | 'SWAP_QUOTE_UNAVAILABLE'
   | 'SWAP_QUOTE_EXPIRED'
   | 'SWAP_PROVIDER_ERROR'
+  | 'SWAP_PROVIDER_CONFIGURATION'
+  | 'SWAP_PROVIDER_RATE_LIMITED'
   | 'SWAP_INVALID_QUOTE'
   | 'SWAP_PROVIDER_ID_MISMATCH'
   | 'SWAP_AMOUNT_MISMATCH'
@@ -46,6 +48,8 @@ const SAFE_MESSAGES: Record<SwapErrorCode, string> = {
   SWAP_QUOTE_UNAVAILABLE: 'A swap quote is unavailable.',
   SWAP_QUOTE_EXPIRED: 'The swap quote has expired.',
   SWAP_PROVIDER_ERROR: 'The swap quote provider could not complete the request.',
+  SWAP_PROVIDER_CONFIGURATION: 'The swap quote provider is not configured.',
+  SWAP_PROVIDER_RATE_LIMITED: 'The swap quote provider is rate limited.',
   SWAP_INVALID_QUOTE: 'The swap quote returned by the provider is invalid.',
   SWAP_PROVIDER_ID_MISMATCH: 'The quote provider identity does not match.',
   SWAP_AMOUNT_MISMATCH: 'The quote amount does not match the request.',

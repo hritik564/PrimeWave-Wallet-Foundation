@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 6.1 — WAVEX Swap Architecture and Quote Model (completed)**
+**Phase 6.2 — 0x Swap API v2 quote provider (completed; awaiting review)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -336,7 +336,20 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 - Added a memory-only `SwapQuoteService` with idle/requesting/quoted/expired/
   failed lifecycle states and sanitized provider error normalization.
 - Added focused swap architecture, validation, lifecycle, large-amount, and
-  security-boundary tests. No real quote provider or external API was added.
+  security-boundary tests.
+- Added the current 0x Swap API v2 AllowanceHolder quote provider behind the
+  existing `SwapQuoteProvider` abstraction using a small injectable HTTPS
+  client. The provider sends exact decimal-string quantities and maps user
+  slippage to the v2 `slippageBps` parameter.
+- Added centralized 0x capability mapping for Ethereum, BNB Smart Chain,
+  Polygon, Arbitrum One, Base, and Optimism. PrimeWave remains unsupported
+  until its chain configuration and 0x support are explicitly reviewed.
+- Added native-token sentinel mapping only at the 0x boundary, exact response
+  normalization, bounded timeout handling, sanitized HTTP errors, liquidity
+  handling, allowance/provider-issue metadata, and unavailable representations
+  for missing route or price-impact data.
+- Added focused 0x HTTP/provider/security tests. Tests use injectable
+  transports and do not require internet access or a real API key.
 
 ## Pending work
 
@@ -346,11 +359,12 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 - External token lists, verification providers, NFTs, portfolio valuation, fiat
   pricing, external indexing, backend asset/history APIs, notifications, and
   full wallet UI remain outside this controlled increment.
-- Phase 6.1 intentionally does not include a real quote provider, external
-  swap API, swap UI, swap execution, signing, broadcasting, persistent quote
-  state, Activity records, swap detection, approvals execution, DApps,
+- Phase 6.2 intentionally includes quote retrieval only. It does not include
+  swap UI, swap execution, signing, broadcasting, persistent quote state,
+  Activity records, swap detection, approvals execution, Permit2, DApps,
   WalletConnect, transaction replacement, speed-up, cancellation, fee bumping,
-  account switching, asset detail, QR scanning, or Settings functionality.
+  WaveX swap fees, backend execution, cross-chain swaps, account switching,
+  asset detail, QR scanning, or Settings functionality.
 - Preview Test Mode is intentionally limited to web UI state testing and is not
   native wallet or security validation.
 - Balance preflight validation is intentionally not implemented because it is
@@ -387,9 +401,10 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 
 ## Phase boundary
 
-Phase 6.1 is complete. Stop here. Later phases may separately define a real
-quote provider, Swap UI, swap review, provider transaction integration, local
-signing/broadcast execution, external indexing, backend history, notifications,
-external verification, token state-changing operations, NFTs, portfolio
-valuation, fiat pricing, DApps, WalletConnect, replacement, speed-up,
-cancellation, automatic fee bumping, and other ecosystem capabilities.
+Phase 6.2 is complete and stops at normalized 0x quote retrieval pending
+review. Later phases may separately define Swap UI, swap review, provider
+transaction integration, local signing/broadcast execution, external
+indexing, backend history, notifications, external verification, token
+state-changing operations, NFTs, portfolio valuation, fiat pricing, DApps,
+WalletConnect, replacement, speed-up, cancellation, automatic fee bumping,
+and other ecosystem capabilities.
