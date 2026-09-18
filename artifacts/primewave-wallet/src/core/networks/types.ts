@@ -1,6 +1,9 @@
 export type NetworkEnvironment = 'development' | 'testnet' | 'mainnet';
 
-export type NetworkConfigurationStatus = 'configured' | 'placeholder';
+export type NetworkConfigurationStatus =
+  | 'configured'
+  | 'unavailable'
+  | 'placeholder';
 
 export interface NativeCurrency {
   readonly name: string;

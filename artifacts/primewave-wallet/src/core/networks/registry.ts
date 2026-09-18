@@ -88,12 +88,12 @@ function validateNativeCurrency(currency: NativeCurrency): void {
 function validateRpcEndpoints(
   endpoints: readonly RpcEndpoint[],
   environment: NetworkEnvironment,
-  isPlaceholder: boolean,
+  allowsMissingEndpoints: boolean,
 ): void {
-  if (isPlaceholder && endpoints.length > 0) {
-    failInvalid('Placeholder networks cannot contain RPC endpoints.');
+  if (allowsMissingEndpoints && endpoints.length > 0) {
+    failInvalid('Unavailable networks cannot contain RPC endpoints.');
   }
-  if (!isPlaceholder && endpoints.length === 0) {
+  if (!allowsMissingEndpoints && endpoints.length === 0) {
     failInvalid('Configured networks must contain at least one RPC endpoint.');
   }
 
@@ -205,6 +205,7 @@ export function validateEvmNetwork(network: EvmNetwork): void {
   validateNativeCurrency(network.nativeCurrency);
 
   const isPlaceholder = network.configurationStatus === 'placeholder';
+  const isUnavailable = network.configurationStatus === 'unavailable';
   if (isPlaceholder && !network.isPrimary) {
     failInvalid('Only the primary network may use placeholder configuration.');
   }
@@ -214,8 +215,15 @@ export function validateEvmNetwork(network: EvmNetwork): void {
   if (isPlaceholder && !network.configurationNote?.trim()) {
     failInvalid('Placeholder networks must explain their missing configuration.');
   }
+  if (isUnavailable && (network.isPrimary || network.enabled)) {
+    failInvalid('Unavailable networks must be disabled and non-primary.');
+  }
+  if (isUnavailable && !network.configurationNote?.trim()) {
+    failInvalid('Unavailable networks must explain their missing configuration.');
+  }
   if (
     network.configurationStatus !== 'configured' &&
+    network.configurationStatus !== 'unavailable' &&
     network.configurationStatus !== 'placeholder'
   ) {
     failInvalid('Network configuration status is invalid.');
@@ -229,7 +237,11 @@ export function validateEvmNetwork(network: EvmNetwork): void {
     failInvalid('Only placeholder networks may omit a chain ID.');
   }
 
-  validateRpcEndpoints(network.rpc.endpoints, network.environment, isPlaceholder);
+  validateRpcEndpoints(
+    network.rpc.endpoints,
+    network.environment,
+    isPlaceholder || isUnavailable,
+  );
   validateExplorer(network.explorer, network.environment, isPlaceholder);
 
   if (network.environment === 'mainnet' && network.chainId === null) {
@@ -304,6 +316,42 @@ function createMainnetNetwork(
   };
 }
 
+function readEnvironmentValue(name: string): string | undefined {
+  if (typeof process === 'undefined') return undefined;
+  const value = process.env[name]?.trim();
+  return value || undefined;
+}
+
+export function createSepoliaNetwork(
+  rpcUrl = readEnvironmentValue('SEPOLIA_RPC_URL'),
+): EvmNetwork {
+  const configured = rpcUrl !== undefined;
+  return {
+    id: 'ethereum-sepolia',
+    displayName: 'Ethereum Sepolia',
+    chainId: 11155111,
+    nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+    rpc: {
+      endpoints: configured
+        ? [createRpcEndpoint('public', rpcUrl)]
+        : [],
+    },
+    explorer: createExplorer(
+      'Sepolia Etherscan',
+      'https://sepolia.etherscan.io',
+      'https://sepolia.etherscan.io/address/{address}',
+      'https://sepolia.etherscan.io/tx/{txHash}',
+    ),
+    environment: 'testnet',
+    isPrimary: false,
+    enabled: configured,
+    configurationStatus: configured ? 'configured' : 'unavailable',
+    configurationNote: configured
+      ? undefined
+      : 'Set SEPOLIA_RPC_URL before selecting Ethereum Sepolia.',
+  };
+}
+
 export const supportedNetworks: readonly EvmNetwork[] = [
   primeWaveNetwork,
   createMainnetNetwork(
@@ -319,6 +367,7 @@ export const supportedNetworks: readonly EvmNetwork[] = [
       'https://etherscan.io/tx/{txHash}',
     ),
   ),
+  createSepoliaNetwork(),
   createMainnetNetwork(
     'bnb-smart-chain',
     'BNB Smart Chain',

@@ -1,5 +1,6 @@
 export {
   defaultNetworkRegistry,
+  createSepoliaNetwork,
   NetworkRegistry,
   NetworkRegistryError,
   supportedNetworks,
