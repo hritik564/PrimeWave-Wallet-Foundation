@@ -24,6 +24,7 @@ import {
 } from '@/src/core/portfolio';
 import type { ActivityReadModelService } from '@/src/core/activity';
 import type { SwapQuote, SwapQuoteService } from '@/src/core/swaps';
+import type { SwapReviewApproval, SwapReviewSnapshot } from '@/src/core/swaps';
 import type { Wallet } from '@/src/core/wallet/models';
 import { ReceiveScreen } from './ReceiveScreen';
 import {
@@ -40,6 +41,7 @@ import { WalletSendScreen } from './WalletSendScreen';
 import { WalletActivityScreen } from './WalletActivityScreen';
 import { WalletSwapScreen } from './WalletSwapScreen';
 import { WalletSwapReviewScreen } from './WalletSwapReviewScreen';
+import { WalletSwapExecutionScreen } from './WalletSwapExecutionScreen';
 import { assetIdentityKey, type PublicSendDraft } from './WalletSendScreen.logic';
 import { copyPublicAddress } from './public-address-actions';
 import {
@@ -1044,6 +1046,8 @@ export function WalletHomeShell({
   const [portfolioError, setPortfolioError] = useState<string | null>(null);
   const [reviewDraft, setReviewDraft] = useState<PublicSendDraft | null>(null);
   const [swapReviewQuote, setSwapReviewQuote] = useState<SwapQuote | null>(null);
+  const [swapReview, setSwapReview] = useState<SwapReviewSnapshot | null>(null);
+  const [swapApproval, setSwapApproval] = useState<SwapReviewApproval | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sendAssetKey, setSendAssetKey] = useState<string | null>(null);
   const account = wallet.accounts[0];
@@ -1105,6 +1109,8 @@ export function WalletHomeShell({
 
   useEffect(() => {
     setSwapReviewQuote(null);
+    setSwapReview(null);
+    setSwapApproval(null);
   }, [network.id]);
 
   return (
@@ -1281,12 +1287,38 @@ export function WalletHomeShell({
             onBack={() => setDestination('home')}
           />
         ) : destination === 'swap' ? (
-          swapReviewQuote ? (
+          swapReviewQuote && swapReview && swapApproval ? (
+            <WalletSwapExecutionScreen
+              approval={swapApproval}
+              createBroadcastDependency={createBroadcastDependency}
+              createConstructionEngine={createConstructionEngine}
+              createSigningDependency={createSigningDependency}
+              network={network}
+              networkRegistry={networkRegistry}
+              onBack={() => {
+                setSwapReview(null);
+                setSwapApproval(null);
+              }}
+              portfolio={portfolio}
+              previewMode={previewMode}
+              quote={swapReviewQuote}
+              quoteService={swapQuoteService ?? null}
+              review={swapReview}
+              wallet={wallet}
+            />
+          ) : swapReviewQuote ? (
             <WalletSwapReviewScreen
               network={network}
               networkRegistry={networkRegistry}
-              onApproved={(_approval) => undefined}
-              onBack={() => setSwapReviewQuote(null)}
+              onApproved={(nextApproval, nextReview) => {
+                setSwapApproval(nextApproval);
+                setSwapReview(nextReview);
+              }}
+              onBack={() => {
+                setSwapReviewQuote(null);
+                setSwapReview(null);
+                setSwapApproval(null);
+              }}
               portfolio={portfolio}
               previewMode={previewMode}
               quote={swapReviewQuote}

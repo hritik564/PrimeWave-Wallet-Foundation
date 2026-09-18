@@ -15,6 +15,7 @@ export type SwapReviewErrorCode =
   | 'SWAP_REVIEW_INSUFFICIENT_BALANCE'
   | 'SWAP_REVIEW_FEE_UNAVAILABLE'
   | 'SWAP_REVIEW_ALLOWANCE_UNSUPPORTED'
+  | 'SWAP_REVIEW_ALLOWANCE_UNAVAILABLE'
   | 'SWAP_REVIEW_PROVIDER_ISSUE'
   | 'SWAP_REVIEW_PORTFOLIO_STALE'
   | 'SWAP_REVIEW_UNSUPPORTED_SIGNING_MECHANISM';
@@ -36,6 +37,7 @@ const MESSAGES: Record<SwapReviewErrorCode, string> = {
   SWAP_REVIEW_INSUFFICIENT_BALANCE: 'The current balance does not cover the reviewed swap and required network fee.',
   SWAP_REVIEW_FEE_UNAVAILABLE: 'Required network fee information is unavailable. Approval is blocked.',
   SWAP_REVIEW_ALLOWANCE_UNSUPPORTED: 'This allowance mechanism is not supported for review.',
+  SWAP_REVIEW_ALLOWANCE_UNAVAILABLE: 'The current token allowance is unavailable. Refresh the quote before approval.',
   SWAP_REVIEW_PROVIDER_ISSUE: 'The quote provider reported an issue that blocks approval.',
   SWAP_REVIEW_PORTFOLIO_STALE: 'The public balance snapshot is stale. Refresh balances before approval.',
   SWAP_REVIEW_UNSUPPORTED_SIGNING_MECHANISM: 'This provider signing mechanism is deferred to a later phase.',

@@ -29,6 +29,7 @@ export {
 export type { ValidatedSwapQuoteRequest } from './validation';
 export type {
   SwapAllowanceRequirement,
+  SwapAllowanceState,
   SwapFeeAmount,
   SwapPriceImpact,
   SwapProviderCapability,
@@ -45,6 +46,19 @@ export type {
   SwapSlippageBps,
   SwapTransactionRequest,
 } from './models';
+export { getSwapAllowanceState } from './models';
+export {
+  SwapExecutionError,
+  SwapExecutionService,
+} from './execution';
+export type {
+  SwapExecutionErrorCode,
+  SwapExecutionBroadcastDependency,
+  SwapExecutionConstructionDependency,
+  SwapExecutionInput,
+  SwapExecutionPlan,
+  SwapExecutionSigningDependency,
+} from './execution';
 export {
   SwapReviewError,
   isSwapReviewError,
@@ -62,3 +76,4 @@ export type {
   SwapReviewServiceOptions,
   SwapReviewSnapshot,
 } from './review';
+export { computeSwapReviewDigest } from './review';

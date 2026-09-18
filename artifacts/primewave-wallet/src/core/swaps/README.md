@@ -77,3 +77,44 @@ blocking reasons. The UI stops at **Approved for Signing** and does not
 authenticate, access SecureStore, access signing services, broadcast, or
 silently refresh a quote. Preview Test Mode uses the same public-only boundary
 and cannot produce a fake successful approval.
+
+## Phase 6.5 secure local execution boundary
+
+`SwapExecutionService` consumes only an approved immutable review and a fresh
+public `SwapReviewInput`. It is not a provider adapter and does not accept raw
+0x responses or executable UI fields. Before transaction construction and
+again immediately before signing, the flow revalidates account, sender,
+network, chain, assets, exact amounts, slippage, provider/quote lifecycle,
+expiry, fee context, allowance context, the review digest, and the exact
+provider transaction target, value, and calldata.
+
+The allowance decision is explicit:
+
+- native sell: `native-not-required`, no approval transaction;
+- ERC-20 with actual allowance at least `requiredAmount`: `sufficient`, no
+  approval transaction;
+- ERC-20 below `requiredAmount`: `insufficient`, dedicated approval review;
+- missing actual allowance: `unavailable`, execution blocked.
+
+For insufficient allowance, only the normalized provider spender is accepted.
+It must be a valid address bound to the reviewed token and network. The
+approval transaction calls standard ERC-20 `approve(spender, requiredAmount)`
+with the exact positive reviewed amount. No unlimited allowance, inferred
+spender, arbitrary UI target, multiplier, Permit2, or automatic submission is
+supported.
+
+The existing transaction construction engine remains authoritative for both
+approval and swap transaction previews. The swap preview must preserve the
+reviewed provider `to`, `value`, and exact calldata bytes. The existing
+WalletAccessManager/Phase 2.6 signer performs local authentication and signing;
+the existing Phase 2.7 broadcast and confirmation engine handles exact signed
+bytes, receipt states, and `unknown` ambiguity. Approval confirmation is
+separate from swap signing, and the UI requires explicit continuation after a
+confirmed approval. There is no automatic retry or rebroadcast.
+
+`WalletSwapExecutionScreen` exposes distinct review, approval required,
+approval signing, approval confirmation, swap signing, swap broadcasting,
+swap confirmation, completed, failed, and unknown states. Phase 6.5 does not
+create Activity records; its public execution results are reserved for Phase
+6.6. Preview Test Mode fails closed before construction and never
+authenticates, signs, broadcasts, or fabricates a result.

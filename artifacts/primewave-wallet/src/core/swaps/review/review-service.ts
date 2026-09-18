@@ -2,7 +2,7 @@ import { keccak256, stringToHex } from 'viem';
 import { normalizePublicEvmAddress } from '@/src/core/blockchain/account-state';
 import { getAssetIdentityKey, type AssetIdentity } from '@/src/core/assets';
 import type { PortfolioAssetViewModel } from '@/src/core/portfolio';
-import type { SwapQuote } from '../models';
+import { getSwapAllowanceState, type SwapQuote } from '../models';
 import { SwapReviewError } from './errors';
 import {
   assetSnapshot,
@@ -222,6 +222,12 @@ function approvalBlockers(
 ): readonly SwapReviewBlocker[] {
   const blockers: SwapReviewBlocker[] = [];
   const quote = input.quote;
+  if (
+    getSwapAllowanceState(quote.sellAsset, quote.allowanceRequirement) ===
+    'unavailable'
+  ) {
+    blockers.push(blocker('SWAP_REVIEW_ALLOWANCE_UNAVAILABLE'));
+  }
   if (!feeIsNativeNetworkFee(input)) {
     blockers.push(blocker('SWAP_REVIEW_FEE_UNAVAILABLE'));
   }
@@ -272,6 +278,7 @@ function bindingContext(snapshot: SwapReviewSnapshot): SwapReviewContext {
     providerFee: snapshot.providerFee,
     integratorFee: snapshot.integratorFee,
     allowanceRequirement: snapshot.allowanceRequirement,
+    allowanceState: snapshot.allowanceState,
     providerIssues: snapshot.providerIssues,
     transactionRequest: snapshot.transactionRequest,
   };
@@ -331,10 +338,18 @@ export class SwapReviewService {
       providerFee: input.quote.providerFee,
       integratorFee: input.quote.integratorFee,
       allowanceRequirement: input.quote.allowanceRequirement,
+      allowanceState: getSwapAllowanceState(
+        input.quote.sellAsset,
+        input.quote.allowanceRequirement,
+      ),
       providerIssues: input.quote.providerIssues,
       transactionRequest: input.quote.transactionRequest,
       portfolioGeneratedAt: input.portfolio?.generatedAt ?? 0,
-      approvalRequired: input.quote.allowanceRequirement !== null,
+      approvalRequired:
+        getSwapAllowanceState(
+          input.quote.sellAsset,
+          input.quote.allowanceRequirement,
+        ) === 'insufficient',
       blockers,
       canApprove: blockers.length === 0,
       reviewDigest: '0x' as `0x${string}`,
@@ -373,6 +388,8 @@ export class SwapReviewService {
       minimumBuyAmount: current.minimumBuyAmount,
       slippageBps: current.slippageBps,
       transactionRequest: current.transactionRequest,
+      allowanceRequirement: current.allowanceRequirement,
+      allowanceState: current.allowanceState,
     });
   }
 }
@@ -383,4 +400,10 @@ export function formatAmount(amount: bigint, decimals: number): string {
   if (decimals === 0) return whole.toString();
   const fraction = (amount % base).toString().padStart(decimals, '0').replace(/0+$/, '');
   return fraction.length === 0 ? whole.toString() : `${whole}.${fraction}`;
+}
+
+export function computeSwapReviewDigest(
+  review: SwapReviewSnapshot,
+): `0x${string}` {
+  return reviewDigest(bindingContext(review));
 }

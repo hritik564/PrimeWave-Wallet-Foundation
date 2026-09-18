@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 6.4 — Swap Review and Approval (completed; awaiting review)**
+**Phase 6.5 — Secure Local Swap Execution (implemented; requires device/testnet/security validation)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -382,12 +382,37 @@ UI testing; it is not a real wallet and does not alter the native boundary.
   transaction validation, account/network/asset/slippage mismatches, fresh
   balance requirements, native fee totals, provider issues, allowance
   metadata, and no-secret/no-execution approval output.
+- Added the Phase 6.5 `SwapExecutionService` final checkpoint over only
+  approved immutable Phase 6.4 reviews. It revalidates the public binding,
+  quote lifecycle, network/account/chain, allowance context, fee context,
+  balance-backed review input, and exact provider transaction target/value/
+  calldata before construction or signing.
+- Added explicit native/sufficient/insufficient/unavailable allowance states.
+  Insufficient ERC-20 allowance produces a separate bounded
+  `approve(spender, requiredAmount)` transaction using only the normalized
+  provider spender and exact reviewed amount; unlimited approval and inferred
+  spenders are not supported.
+- Added `WalletSwapExecutionScreen` with separate approval review,
+  approval authentication/signing, approval broadcast/confirmation, explicit
+  continue, swap authentication/signing, swap broadcast/confirmation, and
+  completed/failed/unknown states. It reuses the existing construction,
+  WalletAccessManager signing, and Phase 2.7 broadcast boundaries.
+- Added execution tests for native swaps, insufficient and sufficient
+  allowance, bounded approval calldata, preview blocking, review digest and
+  expiry, allowance/network/provider transaction changes, and approval
+  binding.
+- Phase 6.5 does not write Activity records, use backend signing, expose the
+  0x API key, implement Permit2/cross-chain execution, or perform real
+  mainnet transactions. Phase 6.6 remains an explicit future consumer of
+  structured public execution results.
 
 ## Pending work
 
 - Production PrimeWave Chain launch configuration must be supplied and reviewed
   before the primary network can be activated.
 - Recovery UX and authentication UI require separate scope and security review.
+- Physical-device authentication/signing validation and an explicitly approved
+  testnet execution plan remain required before any live execution claim.
 - External token lists, verification providers, NFTs, portfolio valuation, fiat
   pricing, external indexing, backend asset/history APIs, notifications, and
   full wallet UI remain outside this controlled increment.

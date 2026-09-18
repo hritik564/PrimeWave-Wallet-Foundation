@@ -110,7 +110,10 @@ export function WalletSwapReviewScreen({
   readonly portfolio: PortfolioReadModel | null;
   readonly previewMode: boolean;
   readonly onBack: () => void;
-  readonly onApproved: (approval: SwapReviewApproval) => void;
+  readonly onApproved: (
+    approval: SwapReviewApproval,
+    review: SwapReviewSnapshot,
+  ) => void;
 }) {
   const account = wallet.accounts[0];
   const reviewService = useMemo(() => new SwapReviewService(networkRegistry), [networkRegistry]);
@@ -175,7 +178,7 @@ export function WalletSwapReviewScreen({
       const nextApproval = reviewService.approveReview({ review, current: input });
       setApproval(nextApproval);
       setState('approved');
-      onApproved(nextApproval);
+      onApproved(nextApproval, review);
     } catch (error: unknown) {
       setErrorMessage(error instanceof SwapReviewError ? error.message : 'The reviewed swap is no longer current.');
     }

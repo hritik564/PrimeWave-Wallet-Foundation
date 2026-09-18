@@ -14,3 +14,4 @@
 - [Expo static build port](expo-static-build-port.md) — the static Expo build script assumes port 8081, so stop competing Metro workflows before running it and restart them afterward.
 - [Expo preview timing](expo-preview-timing.md) — retry screenshots after Metro emits the web bundle if the first post-restart capture is blank.
 - [Swap quote trust boundary](swap-quote-boundary.md) — provider quote data stays untrusted through validation; route continuity and exact public context must hold before any future signing handoff.
+- [Swap execution boundary](swap-execution-boundary.md) — missing allowance blocks token execution; bounded approval and swap authorization remain separate explicit actions.

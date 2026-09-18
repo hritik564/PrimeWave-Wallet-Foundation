@@ -946,7 +946,7 @@ monetary values are never converted through floating point, and network,
 protocol, and provider fees remain separate. Unknown price impact is
 represented as unavailable rather than fabricated as zero.
 
-### Phase 6.4 Swap Review and Approval security boundary
+### Phase 6.4–6.5 Swap Review and Secure Local Execution security boundary
 
 Phase 6.4 adds `src/core/swaps/review` as a separate provider-neutral layer
 above the normalized quote. `SwapReviewService` never consumes raw 0x data and
@@ -985,6 +985,42 @@ authenticate, access wallet secrets, call `eth_sendRawTransaction`, create
 Activity records, execute token approvals, sign EIP-712 data, sign the swap,
 or broadcast. Preview Test Mode uses the same fail-closed public boundary and
 cannot create fake successful approvals.
+
+Phase 6.5 adds a second, still UI-independent boundary at
+`src/core/swaps/execution`. It consumes only the approved immutable review and
+fresh public revalidation input; raw 0x responses and UI fields are not
+executable inputs. Immediately before each signing action it checks the
+review digest, account, sender, selected network, chain, assets, exact sell
+amount, slippage, provider and quote identity/lifecycle/expiry, fee context,
+allowance state, and every provider transaction-critical field. Any mismatch
+stops the flow and requires a fresh quote and review.
+
+For native sells, no approval is possible. For ERC-20 sells, allowance states
+are explicit: sufficient, insufficient, or unavailable. Unavailable allowance
+blocks execution. Insufficient allowance creates a separate approval review
+only when the normalized review contains a valid provider-supplied spender and
+positive required amount bound to the reviewed token and network. The
+transaction is standard bounded `approve(spender, requiredAmount)` calldata;
+unlimited `MaxUint256` approval, arbitrary UI spenders, token-derived
+spenders, safety multipliers, and silent approvals are prohibited.
+
+Approval and swap transactions are independently constructed through the
+existing Phase 2.5 engine, independently authorized through the existing
+WalletAccessManager and Phase 2.6 local signer, and independently submitted
+through the existing Phase 2.7 broadcaster. The swap transaction preserves
+the exact normalized provider `to`, `value`, and calldata bytes. No second
+signing or broadcast implementation exists. The UI requires explicit
+confirmation before approval signing, explicit confirmation before swap
+signing, and explicit continuation after approval confirmation.
+
+Approval confirmation must be confirmed before the swap step is available.
+Reverted, failed, timeout, and unknown approval states stop the swap. A
+broadcast timeout or ambiguous response is `unknown`, never assumed failed and
+never automatically rebroadcast. Signing and broadcasting receive no 0x API
+key. Phase 6.5 writes no Activity records; it exposes only structured public
+results for the separately scoped Phase 6.6 consumer. Preview Test Mode fails
+closed before construction and cannot authenticate, sign, broadcast, or
+fabricate results.
 
 ### Development-only Replit web preview mode
 

@@ -62,6 +62,24 @@ export interface SwapAllowanceRequirement {
   readonly requiredAmount: bigint;
 }
 
+export type SwapAllowanceState =
+  | 'native-not-required'
+  | 'sufficient'
+  | 'insufficient'
+  | 'unavailable';
+
+export function getSwapAllowanceState(
+  sellAsset: AssetIdentity,
+  requirement: SwapAllowanceRequirement | null,
+): SwapAllowanceState {
+  if (sellAsset.assetType === 'native') return 'native-not-required';
+  if (requirement === null) return 'unavailable';
+  if (requirement.actualAmount === null) return 'unavailable';
+  return requirement.actualAmount >= requirement.requiredAmount
+    ? 'sufficient'
+    : 'insufficient';
+}
+
 export type SwapProviderIssueCode =
   | 'allowance-required'
   | 'balance-insufficient'

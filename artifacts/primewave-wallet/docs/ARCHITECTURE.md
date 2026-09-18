@@ -916,7 +916,7 @@ configured network metadata. Phase 5.3 does not add swap detection or
 execution, approval execution, backend history, external indexing, price APIs,
 notifications, replacement, speed-up, cancellation, or fee bumping.
 
-### Phase 6.2–6.4 WAVEX Swap Architecture, Quote Provider, Review, and Presentation
+### Phase 6.2–6.5 WAVEX Swap Architecture, Quote Provider, Review, and Execution
 
 Phase 6.1 and 6.2 add the isolated provider-neutral swap domain under
 `src/core/swaps`. It reuses the existing network-scoped `AssetIdentity`,
@@ -940,11 +940,21 @@ SwapReviewService
       ↓
 Approved for Signing (public context only)
       ↓
-Future Phase 6.5 signing handoff
+SwapExecutionService final checkpoint
       ↓
-Existing Secure Local Signing
-      ↓
-Existing Broadcast Engine
+Explicit allowance decision
+      ├─ sufficient/native → exact provider swap transaction
+      └─ insufficient → dedicated bounded ERC-20 approval review
+                              ↓
+                         explicit approval confirmation
+                              ↓
+                         existing local authentication/signing
+                              ↓
+                         existing broadcast/confirmation
+                              ↓
+                         explicit continue
+                              ↓
+                         exact provider swap transaction
 ```
 
 The current real provider is 0x Swap API v2, implemented only behind
@@ -1012,6 +1022,41 @@ metadata, contract warning, binding digest, and blockers. Phase 6.4 stops at
 **Approved for Signing**. It adds no WaveX swap fee, backend execution,
 approval execution, Permit2, EIP-712 signing, swap signing, broadcast,
 authentication, SecureStore access, Activity record, or cross-chain behavior.
+
+Phase 6.5 adds `src/core/swaps/execution` and
+`WalletSwapExecutionScreen`. It accepts only an approved immutable Phase 6.4
+review plus a fresh public review input for final revalidation. The service
+rechecks the review digest, account, sender, network, chain, quote lifecycle,
+assets, exact amounts, slippage, provider identity, fee context, allowance
+state, and exact provider transaction target/value/calldata before any
+transaction-bound authorization is created.
+
+The execution service delegates both transaction types to the existing
+`TransactionConstructionEngine`. Swap construction receives the reviewed
+provider `to`, `value`, `data`, and optional gas limit; the service does not
+generate replacement swap calldata. For an ERC-20 sell with insufficient
+allowance, the provider-reviewed spender is validated against the reviewed
+token/network and the standard bounded `approve(spender, requiredAmount)`
+calldata is constructed through the same engine. Native sells and sufficient
+allowance never create an approval transaction. Missing allowance, malformed
+spenders, changed review context, changed provider transaction bytes, and
+unavailable public state fail closed.
+
+Approval and swap execution are separate user actions. The UI shows a
+dedicated approval review, authenticates and signs it locally, broadcasts it
+through `TransactionBroadcastEngine`, waits for the existing confirmation
+lifecycle, and only then exposes an explicit continue action for the swap.
+Signing uses the existing `WalletAccessManager`/transaction signing boundary;
+broadcast uses the existing exact-byte broadcaster. Reverted, failed, and
+unknown approval results never submit the swap. Broadcast or confirmation
+timeouts remain `unknown` and are never automatically rebroadcast.
+
+Phase 6.5 returns public execution plans and transaction results for a future
+Activity consumer but does not create or mutate Activity records. It does not
+support Permit2, EIP-712 signing, cross-chain swaps, backend execution, WaveX
+fees, or real mainnet execution. Preview Test Mode blocks execution before
+construction/authentication and fabricates no signatures, hashes, receipts, or
+success states.
 
 ## Design system
 

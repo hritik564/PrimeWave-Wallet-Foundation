@@ -3,6 +3,7 @@ import type { EvmNetwork } from '@/src/core/networks';
 import type { PortfolioAssetViewModel, PortfolioReadModel } from '@/src/core/portfolio';
 import type {
   SwapAllowanceRequirement,
+  SwapAllowanceState,
   SwapFeeAmount,
   SwapPriceImpact,
   SwapProviderIssue,
@@ -45,6 +46,7 @@ export type SwapReviewBlockerCode =
   | 'SWAP_REVIEW_BALANCE_UNAVAILABLE'
   | 'SWAP_REVIEW_INSUFFICIENT_BALANCE'
   | 'SWAP_REVIEW_FEE_UNAVAILABLE'
+  | 'SWAP_REVIEW_ALLOWANCE_UNAVAILABLE'
   | 'SWAP_REVIEW_PROVIDER_ISSUE';
 
 export interface SwapReviewBlocker {
@@ -78,6 +80,7 @@ export interface SwapReviewSnapshot {
   readonly providerFee: SwapFeeAmount | null;
   readonly integratorFee: SwapFeeAmount | null;
   readonly allowanceRequirement: SwapAllowanceRequirement | null;
+  readonly allowanceState: SwapAllowanceState;
   readonly providerIssues: readonly SwapProviderIssue[];
   readonly transactionRequest: SwapTransactionRequest;
   readonly portfolioGeneratedAt: number;
@@ -104,6 +107,8 @@ export interface SwapReviewApproval {
   readonly minimumBuyAmount: bigint;
   readonly slippageBps: number;
   readonly transactionRequest: SwapTransactionRequest;
+  readonly allowanceRequirement: SwapAllowanceRequirement | null;
+  readonly allowanceState: SwapAllowanceState;
 }
 
 export interface SwapReviewServiceOptions {
@@ -135,6 +140,7 @@ export type SwapReviewContext = Pick<
   | 'providerFee'
   | 'integratorFee'
   | 'allowanceRequirement'
+   | 'allowanceState'
   | 'providerIssues'
   | 'transactionRequest'
 >;
