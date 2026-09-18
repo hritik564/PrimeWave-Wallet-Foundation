@@ -150,7 +150,13 @@ function normalizeRecord(input: ActivityRecordInput): ActivityRecord {
     throw new ActivityError('INVALID_RECORD');
   }
   const observedAt = input.observedAt ?? input.confirmedAt ?? input.broadcastAt ?? input.createdAt;
-  if (!Number.isSafeInteger(observedAt) || observedAt < 0) {
+  const blockTimestamp = input.blockTimestamp ?? null;
+  if (
+    !Number.isSafeInteger(observedAt) ||
+    observedAt < 0 ||
+    (blockTimestamp !== null &&
+      (!Number.isSafeInteger(blockTimestamp) || blockTimestamp < 0))
+  ) {
     throw new ActivityError('INVALID_RECORD');
   }
   return Object.freeze({
@@ -173,6 +179,7 @@ function normalizeRecord(input: ActivityRecordInput): ActivityRecord {
     feeModel: input.feeModel ?? null,
     feeAmount: input.feeAmount ?? null,
     createdAt: input.createdAt,
+    blockTimestamp,
     broadcastAt: input.broadcastAt ?? null,
     confirmedAt: input.confirmedAt ?? null,
     status: input.status,
@@ -282,6 +289,7 @@ export class InMemoryActivityRepository implements ActivityRepository {
           feeModel: record.feeModel ?? matching.feeModel,
           feeAmount: record.feeAmount ?? matching.feeAmount,
           createdAt: matching.createdAt,
+          blockTimestamp: record.blockTimestamp ?? matching.blockTimestamp,
           broadcastAt: record.broadcastAt ?? matching.broadcastAt,
           confirmedAt: record.confirmedAt ?? matching.confirmedAt,
           confirmation: record.confirmation ?? matching.confirmation,
@@ -375,6 +383,10 @@ export class InMemoryActivityRepository implements ActivityRepository {
       gasLimit: current.gasLimit,
       feeModel: current.feeModel,
       feeAmount: current.feeAmount,
+      blockTimestamp:
+        update.blockTimestamp === undefined
+          ? current.blockTimestamp
+          : update.blockTimestamp,
       direction: current.direction,
       transactionType: current.transactionType,
       recipient: current.recipient,

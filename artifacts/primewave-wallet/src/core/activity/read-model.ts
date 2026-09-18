@@ -4,12 +4,19 @@ import type {
   ActivityScope,
 } from './models';
 import type { ActivityRepository } from './repository';
+import { defaultNetworkRegistry } from '@/src/core/networks';
+import {
+  toActivityPresentationModel,
+  type ActivityPresentationModel,
+  type ActivityPresentationOptions,
+} from './presentation-model';
 
 export interface ActivityReadModelItem
   extends Omit<ActivityRecord, 'kind' | 'chainId'> {
   readonly kind: 'activity-item';
   readonly chainId: bigint;
   readonly identity: string;
+  readonly presentation: ActivityPresentationModel;
 }
 
 export interface ActivityReadModel {
@@ -30,16 +37,30 @@ function identityFor(record: ActivityRecord): string {
     : `hash:${record.networkId}:${record.chainId.toString()}:${record.transactionHash}`;
 }
 
-function toItem(record: ActivityRecord): ActivityReadModelItem {
+function toItem(
+  record: ActivityRecord,
+  presentationOptions: ActivityPresentationOptions,
+): ActivityReadModelItem {
   return Object.freeze({
     ...record,
     kind: 'activity-item',
     identity: identityFor(record),
+    presentation: toActivityPresentationModel(record, presentationOptions),
   });
 }
 
 export class ActivityReadModelService {
-  constructor(private readonly repository: ActivityRepository) {}
+  constructor(
+    private readonly repository: ActivityRepository,
+    presentationOptions: ActivityPresentationOptions = {},
+  ) {
+    this.presentationOptions = {
+      networkRegistry: defaultNetworkRegistry,
+      ...presentationOptions,
+    };
+  }
+
+  private readonly presentationOptions: ActivityPresentationOptions;
 
   getActivity(query: ActivityReadModelQuery): ActivityReadModel {
     const limit = query.limit ?? 50;
@@ -47,7 +68,7 @@ export class ActivityReadModelService {
     const items = this.repository.listByAccountAndNetwork(query, {
       limit,
       offset,
-    }).map(toItem);
+    }).map((record) => toItem(record, this.presentationOptions));
     return Object.freeze({
       kind: 'activity-read-model',
       scope: Object.freeze({

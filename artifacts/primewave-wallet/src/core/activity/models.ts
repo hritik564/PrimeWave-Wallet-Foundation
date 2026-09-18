@@ -72,6 +72,7 @@ export interface ActivityRecord extends ActivityScope {
   readonly feeModel: 'legacy' | 'eip1559' | null;
   readonly feeAmount: bigint | null;
   readonly createdAt: number;
+  readonly blockTimestamp: number | null;
   readonly broadcastAt: number | null;
   readonly confirmedAt: number | null;
   readonly status: ActivityStatus;
@@ -99,6 +100,7 @@ export interface ActivityRecordInput extends ActivityScope {
   readonly feeModel?: 'legacy' | 'eip1559' | null;
   readonly feeAmount?: bigint | null;
   readonly createdAt: number;
+  readonly blockTimestamp?: number | null;
   readonly broadcastAt?: number | null;
   readonly confirmedAt?: number | null;
   readonly status: ActivityStatus;
@@ -120,6 +122,7 @@ export interface ActivityStatusUpdate {
   readonly transactionHash?: ActivityTransactionHash | null;
   readonly broadcastAt?: number | null;
   readonly confirmedAt?: number | null;
+  readonly blockTimestamp?: number | null;
   readonly confirmation?: ActivityConfirmation | null;
   readonly explorerUrl?: string | null;
   readonly provenance?: ActivityProvenance;
@@ -161,6 +164,7 @@ export interface ActivityExternalInput extends ActivityScope {
   readonly feeModel?: 'legacy' | 'eip1559' | null;
   readonly feeAmount?: bigint | null;
   readonly status?: Extract<ActivityStatus, 'broadcasted' | 'confirming' | 'confirmed' | 'reverted' | 'unknown'>;
+  readonly blockTimestamp?: number | null;
   readonly confirmation?: ActivityConfirmation | null;
   readonly explorerUrl?: string | null;
   readonly observedAt?: number;

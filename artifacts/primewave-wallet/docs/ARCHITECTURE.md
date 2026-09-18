@@ -825,6 +825,36 @@ analytics. Reads are bounded and deterministic: block-known activity first,
 hash-known pending activity next, and local-only activity last. Exact amounts,
 fees, gas, nonce, and block values remain `bigint` or exact strings.
 
+### Phase 5.1A asset-first activity presentation amendment
+
+The activity read model now attaches a derived `ActivityPresentationModel` to
+each item. The activity record and repository remain authoritative. The
+presentation model adds UI-ready structure without adding UI components or
+duplicating transaction execution data.
+
+Each presentation item exposes a primary asset and optional secondary asset,
+network-scoped asset identity, symbol/name/decimals, reused `AssetIcon`
+fallback metadata, independent verification status, network badge metadata,
+action, counterparty, exact signed amount presentation, optional fiat value,
+timestamp source, provenance, lifecycle status, and explorer availability.
+
+Default action mapping is conservative: native and ERC-20 transfers become
+`sent` or `received` from the scoped direction; contract interactions become
+`contract_interaction`; and unsupported events remain `unknown`. `swapped`
+and `approved` are representable only through an explicit future trusted
+interpretation. The system never infers a swap from multiple transfers or
+arbitrary logs.
+
+The existing `NetworkRegistry`, `AssetIcon`/`TokenLogo` types, and exact asset
+formatter are reused. Network badges expose deterministic identity and fallback
+metadata rather than downloaded logos. Fiat values are null unless an approved
+future resolver supplies an exact display value. Block timestamps are marked
+as blockchain-derived; otherwise observation timestamps are preserved honestly.
+
+This amendment does not implement Activity UI, transaction detail UI, swap or
+approval execution, swap detection, external indexing, price APIs, backend
+history, notifications, analytics, or any signing/broadcasting behavior.
+
 ## Design system
 
 WAVEX uses a centralized dark foundation with blue, cyan, and violet

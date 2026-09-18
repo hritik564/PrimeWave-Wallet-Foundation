@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 5.1 — WAVEX activity and transaction history architecture (completed)**
+**Phase 5.1A — WAVEX asset-first activity presentation amendment (completed)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -297,6 +297,14 @@ UI testing; it is not a real wallet and does not alter the native boundary.
   records without adding a second broadcast or receipt-polling engine.
 - Added focused repository, lifecycle, ordering, read-model, and security
   regression tests.
+- Added the UI-independent asset-first `ActivityPresentationModel`.
+- Added reused asset icon/fallback metadata, network badge metadata, explicit
+  action classification, counterparty presentation, and optional secondary
+  asset/amount representation.
+- Added exact signed amount presentation, timestamp provenance, optional fiat
+  values, and validated explorer availability.
+- Added conservative action rules: swaps and approvals are only accepted from
+  explicit future trusted interpretations and are never inferred.
 
 ## Pending work
 
@@ -307,7 +315,7 @@ UI testing; it is not a real wallet and does not alter the native boundary.
   pricing, transaction history, transfers, approvals, permits, swaps, DApps,
   backend asset APIs, notifications, and full wallet UI remain outside this
   controlled increment.
-- Phase 5.1 intentionally does not include the polished Activity UI,
+- Phase 5.1A intentionally does not include the polished Activity UI,
   transaction detail UI, account switching, asset detail, QR scanning, Swap,
   or Settings functionality.
 - Preview Test Mode is intentionally limited to web UI state testing and is not
@@ -346,7 +354,7 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 
 ## Phase boundary
 
-Phase 5.1 is complete. Stop here. Later phases may separately define the
+Phase 5.1A is complete. Stop here. Later phases may separately define the
 Activity UI, transaction detail UI, external indexing, backend history,
 notifications, external verification, token state-changing operations, NFTs,
 portfolio valuation, fiat pricing, swaps, DApps, WalletConnect, replacement,

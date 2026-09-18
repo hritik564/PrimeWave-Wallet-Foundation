@@ -793,6 +793,38 @@ is introduced. The read model is bounded, deterministic, public-only, and
 preserves bigint quantities. Preview Test Mode does not create fake production
 activity or fake transaction hashes.
 
+### Phase 5.1A presentation-model security boundary
+
+Phase 5.1A derives an asset-first `ActivityPresentationModel` from the existing
+public activity records. It does not add a second authoritative transaction
+store. The presentation model contains only public fields: scoped identity,
+asset metadata, icon fallback metadata, network badge metadata, action,
+counterparty address, exact amount presentation, optional fiat display,
+timestamp source, provenance, status, and explorer availability.
+
+Asset identity remains network-bound. ERC-20 identity is the network plus
+contract address, and native identity is the authoritative native asset for
+the selected network. Same-symbol assets are never merged. Icon availability
+and verification status are independent; an icon or fallback never implies
+trust, safety, or verification.
+
+Network badges use the existing `NetworkRegistry` and deterministic fallback
+metadata. Explorer URLs are exposed only for enabled, configured networks
+whose chain ID matches the record and whose validated transaction template
+produces a valid URL. No external logo, explorer, price, or indexer request is
+introduced.
+
+Actions are conservative. Existing transfers map to sent/received, contract
+interactions map to `contract_interaction`, and unsupported activity remains
+unknown. Swap and approval values are only representable when supplied by a
+future explicit trusted interpretation; they are not inferred from logs or
+multiple transfers. Fiat remains null without an approved exact data source.
+
+The presentation resolver accepts public records and returns public metadata
+only. It has no access to SecureStore, mnemonics, private keys, PINs,
+biometrics, signing capabilities, transaction submission, backend history,
+analytics, or notification services.
+
 ### Development-only Replit web preview mode
 
 The Replit web preview cannot use native SecureStore, so it fails closed for

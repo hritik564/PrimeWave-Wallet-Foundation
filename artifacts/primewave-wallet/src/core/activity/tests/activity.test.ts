@@ -6,7 +6,10 @@ import {
   ActivityService,
   InMemoryActivityRepository,
 } from '@/src/core/activity';
+import { createAssetIcon } from '@/src/core/portfolio';
+import { NetworkRegistry, supportedNetworks } from '@/src/core/networks';
 import type {
+  ActivityAssetPresentation,
   ActivityRecordInput,
   ActivityScope,
 } from '@/src/core/activity';
@@ -332,4 +335,195 @@ test('read model is bounded, scoped, ordered, and public-only', () => {
   assert.equal(readModel.items[0]?.identity, `local:read-1`);
   assert.equal('privateKey' in (readModel.items[0] ?? {}), false);
   assert.equal(readModel.scope.chainId, 1n);
+});
+
+test('presents native assets with reused icon fallback, network metadata, and exact signed amounts', () => {
+  const repository = new InMemoryActivityRepository();
+  repository.add(
+    recordInput({
+      localTransactionId: 'presentation-native',
+      amountRaw: 1250000000000000000n,
+      amountDecimals: 18,
+      amountDisplay: null,
+      blockTimestamp: 1700000000,
+      status: 'confirmed',
+    }),
+  );
+  const readModel = new ActivityReadModelService(repository, {
+    networkRegistry: new NetworkRegistry(supportedNetworks),
+  }).getActivity(scope);
+  const presentation = readModel.items[0]!.presentation;
+
+  assert.equal(presentation.action, 'sent');
+  assert.equal(presentation.primaryAsset?.symbol, 'ETH');
+  assert.equal(presentation.primaryAsset?.name, 'Ether');
+  assert.equal(presentation.primaryAsset?.icon.fallback.type, 'native_currency');
+  assert.equal(presentation.primaryAsset?.verificationStatus, 'unknown');
+  assert.equal(presentation.network.name, 'Ethereum');
+  assert.equal(presentation.network.badgeId, 'network:ethereum');
+  assert.equal(presentation.network.configured, true);
+  assert.equal(presentation.network.chainId, 1n);
+  assert.equal(presentation.primaryAmount.display, '1.25');
+  assert.equal(presentation.primaryAmount.signedDisplay, '-1.25 ETH');
+  assert.equal(presentation.primaryAmount.raw, 1250000000000000000n);
+  assert.equal(presentation.timestamp.source, 'blockchain');
+  assert.equal(presentation.timestamp.timestamp, 1700000000);
+});
+
+test('presents ERC-20 metadata without coupling icon availability to verification', () => {
+  const repository = new InMemoryActivityRepository();
+  const identity = {
+    assetType: 'fungible_token' as const,
+    networkId: 'ethereum',
+    assetId: token,
+  };
+  const icon = createAssetIcon(identity, 'Test Token', 'TST');
+  repository.add(
+    recordInput({
+      localTransactionId: 'presentation-token',
+      assetIdentity: identity,
+      transactionType: 'erc20-transfer',
+      amountRaw: 1005000n,
+      amountDecimals: 6,
+      amountDisplay: null,
+      tokenContractAddress: token,
+      direction: 'incoming',
+    }),
+  );
+  const presentation = new ActivityReadModelService(repository, {
+    assetResolver: (assetIdentity) =>
+      assetIdentity.assetId === token
+        ? {
+            name: 'Test Token',
+            symbol: 'TST',
+            decimals: 6,
+            icon,
+            metadataStatus: 'complete',
+            verificationStatus: 'unverified',
+          }
+        : null,
+  }).getActivity(scope).items[0]!.presentation;
+
+  assert.equal(presentation.action, 'received');
+  assert.equal(presentation.primaryAsset?.identity.assetId, token);
+  assert.equal(presentation.primaryAsset?.symbol, 'TST');
+  assert.equal(presentation.primaryAsset?.icon.fallback.initials, 'TS');
+  assert.equal(presentation.primaryAsset?.icon.status, 'unavailable');
+  assert.equal(presentation.primaryAsset?.verificationStatus, 'unverified');
+  assert.equal(presentation.counterparty.type, 'from');
+  assert.equal(presentation.counterparty.displayAddress, '0x1111...1111');
+  assert.equal(presentation.primaryAmount.signedDisplay, '+1.005 TST');
+});
+
+test('keeps future multi-asset and action representations explicit', () => {
+  const repository = new InMemoryActivityRepository();
+  repository.add(
+    recordInput({
+      localTransactionId: 'future-swap',
+      transactionType: 'contract-interaction',
+      direction: 'unknown',
+      assetIdentity: null,
+      amountRaw: null,
+      amountDecimals: null,
+      amountDisplay: null,
+    }),
+  );
+  const secondaryIdentity = {
+    assetType: 'fungible_token' as const,
+    networkId: 'ethereum',
+    assetId: token,
+  };
+  const secondaryAsset: ActivityAssetPresentation = {
+    identity: secondaryIdentity,
+    assetType: 'fungible_token',
+    networkId: 'ethereum',
+    assetId: token,
+    symbol: 'TST',
+    name: 'Test Token',
+    decimals: 6,
+    icon: createAssetIcon(secondaryIdentity, 'Test Token', 'TST'),
+    metadataStatus: 'complete',
+    verificationStatus: 'unverified',
+  };
+  const presentation = new ActivityReadModelService(repository, {
+    interpretationResolver: () => ({
+      action: 'swapped',
+      secondaryAsset,
+      secondaryAmount: {
+        raw: 1065500n,
+        decimals: 6,
+        symbol: 'TST',
+        display: '1.0655',
+        signedDisplay: '+1.0655 TST',
+        sign: 'positive',
+      },
+    }),
+  }).getActivity(scope).items[0]!.presentation;
+
+  assert.equal(presentation.action, 'swapped');
+  assert.equal(presentation.primaryAsset, null);
+  assert.equal(presentation.secondaryAsset?.symbol, 'TST');
+  assert.equal(presentation.secondaryAmount?.raw, 1065500n);
+  assert.equal(presentation.secondaryAmount?.signedDisplay, '+1.0655 TST');
+
+  const untrusted = new ActivityReadModelService(repository).getActivity(scope)
+    .items[0]!.presentation;
+  assert.equal(untrusted.action, 'contract_interaction');
+});
+
+test('preserves approved and unknown future actions without inferring swaps', () => {
+  const repository = new InMemoryActivityRepository();
+  repository.add(
+    recordInput({
+      localTransactionId: 'approved',
+      transactionType: 'contract-interaction',
+      direction: 'unknown',
+    }),
+  );
+  const approved = new ActivityReadModelService(repository, {
+    interpretationResolver: () => ({ action: 'approved' }),
+  }).getActivity(scope).items[0]!.presentation;
+  assert.equal(approved.action, 'approved');
+
+  const unknownRepository = new InMemoryActivityRepository();
+  unknownRepository.add(
+    recordInput({
+      localTransactionId: 'unknown-event',
+      transactionType: 'unknown',
+      direction: 'unknown',
+    }),
+  );
+  const unknown = new ActivityReadModelService(unknownRepository)
+    .getActivity(scope).items[0]!.presentation;
+  assert.equal(unknown.action, 'unknown');
+  assert.equal(unknown.direction, 'unknown');
+  assert.equal(unknown.fiatValue, null);
+});
+
+test('exposes explorer and fiat presentation only when explicitly available', () => {
+  const repository = new InMemoryActivityRepository();
+  repository.add(recordInput({ localTransactionId: 'explorer', transactionHash: hash }));
+  const withMetadata = new ActivityReadModelService(repository, {
+    fiatValueResolver: () => ({
+      currencyCode: 'USD',
+      display: '$1.25',
+    }),
+  }).getActivity(scope).items[0]!.presentation;
+  assert.equal(withMetadata.explorerAvailability.available, true);
+  assert.equal(withMetadata.explorerAvailability.url, `https://etherscan.io/tx/${hash}`);
+  assert.equal(withMetadata.fiatValue?.display, '$1.25');
+
+  const placeholderScope = { accountId: 'account-a', networkId: 'primewave', chainId: 0n };
+  const placeholderRepository = new InMemoryActivityRepository();
+  placeholderRepository.add(recordInput({
+    ...placeholderScope,
+    localTransactionId: 'placeholder',
+    assetIdentity: { assetType: 'native', networkId: 'primewave', assetId: 'native' },
+    transactionHash: hash,
+  }));
+  const placeholder = new ActivityReadModelService(placeholderRepository)
+    .getActivity(placeholderScope).items[0]!.presentation;
+  assert.equal(placeholder.network.configured, false);
+  assert.equal(placeholder.explorerAvailability.available, false);
+  assert.equal(placeholder.explorerAvailability.url, null);
 });

@@ -6,6 +6,7 @@ export {
   activityTransactionTypeFor,
 } from './service';
 export { ActivityReadModelService } from './read-model';
+export { toActivityPresentationModel } from './presentation-model';
 export type {
   ActivityConfirmation,
   ActivityDirection,
@@ -31,3 +32,23 @@ export type {
   ActivityReadModelItem,
   ActivityReadModelQuery,
 } from './read-model';
+export type {
+  ActivityAction,
+  ActivityAmountPresentation,
+  ActivityAmountSign,
+  ActivityAssetMetadata,
+  ActivityAssetPresentation,
+  ActivityAssetResolver,
+  ActivityCounterparty,
+  ActivityCounterpartyType,
+  ActivityExplorerPresentation,
+  ActivityFiatValue,
+  ActivityFiatValueResolver,
+  ActivityInterpretationResolver,
+  ActivityNetworkPresentation,
+  ActivityPresentationInterpretation,
+  ActivityPresentationModel,
+  ActivityPresentationOptions,
+  ActivityTimestampPresentation,
+  ActivityTimestampSource,
+} from './presentation-model';
