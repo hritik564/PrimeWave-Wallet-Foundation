@@ -17,6 +17,8 @@ import {
 } from '@/src/core/transactions/signing';
 import type { UnsignedTransaction } from '@/src/core/transactions/construction';
 
+export type WalletAccessListener = () => void;
+
 export type WalletAccessStatus =
   | 'loading'
   | 'onboarding'
@@ -30,6 +32,7 @@ export class WalletAccessManager {
   private readonly authenticator: AuthenticationManager;
   private status: WalletAccessStatus = 'loading';
   private currentWallet: Wallet | null = null;
+  private readonly listeners = new Set<WalletAccessListener>();
 
   constructor(
     engine = new LocalWalletEngine(),
@@ -43,6 +46,7 @@ export class WalletAccessManager {
           this.engine.discard();
           this.currentWallet = null;
           this.status = 'locked';
+          this.notifyStateChange();
         },
       });
   }
@@ -55,15 +59,22 @@ export class WalletAccessManager {
     return this.authenticator.getLockState();
   }
 
+  subscribe(listener: WalletAccessListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
   async initialize(): Promise<WalletAccessStatus> {
     try {
       if (!(await this.engine.hasPersistedWallet())) {
         this.status = 'onboarding';
+        this.notifyStateChange();
         return this.status;
       }
 
       if (!(await this.authenticator.isPinConfigured())) {
         this.status = 'authentication-setup';
+        this.notifyStateChange();
         return this.status;
       }
 
@@ -71,9 +82,11 @@ export class WalletAccessManager {
       this.engine.discard();
       this.currentWallet = null;
       this.status = 'locked';
+      this.notifyStateChange();
       return this.status;
     } catch {
       this.status = 'unavailable';
+      this.notifyStateChange();
       return this.status;
     }
   }
@@ -92,6 +105,7 @@ export class WalletAccessManager {
     const wallet = await this.engine.persistPreparedWallet();
     this.currentWallet = wallet;
     this.status = 'authentication-setup';
+    this.notifyStateChange();
     return wallet;
   }
 
@@ -103,6 +117,7 @@ export class WalletAccessManager {
     }
     this.currentWallet = wallet;
     this.status = 'unlocked';
+    this.notifyStateChange();
   }
 
   async resetLocalWallet(): Promise<void> {
@@ -116,22 +131,15 @@ export class WalletAccessManager {
     }
     this.currentWallet = null;
     this.status = 'onboarding';
+    this.notifyStateChange();
   }
 
   async unlockWithPin(pin: string): Promise<AuthenticationResult> {
-    const result = await this.authenticator.authenticateWithPin(pin);
-    if (result.authenticated) {
-      await this.restoreUnlockedWallet();
-    }
-    return result;
+    return this.unlock(() => this.authenticator.authenticateWithPin(pin));
   }
 
   async unlockWithBiometrics(): Promise<AuthenticationResult> {
-    const result = await this.authenticator.authenticateWithBiometrics();
-    if (result.authenticated) {
-      await this.restoreUnlockedWallet();
-    }
-    return result;
+    return this.unlock(() => this.authenticator.authenticateWithBiometrics());
   }
 
   async enableBiometricUnlock(
@@ -194,6 +202,7 @@ export class WalletAccessManager {
     this.engine.discard();
     this.currentWallet = null;
     this.status = 'locked';
+    this.notifyStateChange();
   }
 
   async handleAppStateChange(
@@ -204,6 +213,7 @@ export class WalletAccessManager {
       this.engine.discard();
       this.currentWallet = null;
       this.status = 'locked';
+      this.notifyStateChange();
     }
   }
 
@@ -217,14 +227,60 @@ export class WalletAccessManager {
     };
   }
 
-  private async restoreUnlockedWallet(): Promise<void> {
+  private async unlock(
+    authenticate: () => Promise<AuthenticationResult>,
+  ): Promise<AuthenticationResult> {
+    if (!this.authenticator.beginUnlockTransaction()) {
+      return { authenticated: false, reason: 'locked' };
+    }
+
+    try {
+      const result = await authenticate();
+      if (!result.authenticated) {
+        this.authenticator.cancelUnlockTransaction();
+        return result;
+      }
+
+      const wallet = await this.restoreUnlockedWallet();
+      const exposed = await this.authenticator.finishUnlockTransaction(() => {
+        this.currentWallet = wallet;
+        this.status = 'unlocked';
+      });
+
+      if (!exposed) {
+        this.engine.discard();
+        this.currentWallet = null;
+        this.status = 'locked';
+        this.notifyStateChange();
+        return { authenticated: false, reason: 'locked' };
+      }
+
+      this.notifyStateChange();
+      return result;
+    } catch (error) {
+      this.authenticator.cancelUnlockTransaction();
+      this.engine.discard();
+      this.currentWallet = null;
+      this.status = 'locked';
+      this.notifyStateChange();
+      await this.authenticator.lockWallet();
+      throw error;
+    }
+  }
+
+  private async restoreUnlockedWallet(): Promise<Wallet> {
     const wallet = await this.engine.loadWallet();
     if (!wallet) {
       this.status = 'unavailable';
       throw new Error('The wallet could not be restored.');
     }
-    this.currentWallet = wallet;
-    this.status = 'unlocked';
+    return wallet;
+  }
+
+  private notifyStateChange(): void {
+    for (const listener of this.listeners) {
+      listener();
+    }
   }
 
   private requireStatus(expected: WalletAccessStatus): void {

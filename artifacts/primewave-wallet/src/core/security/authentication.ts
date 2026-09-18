@@ -292,6 +292,7 @@ export class AuthenticationManager implements WalletAuthenticator {
   private autoLockTimer: ReturnType<typeof setTimeout> | null = null;
   private isBackgrounded = false;
   private biometricPromptInFlight = false;
+  private unlockTransactionInFlight = false;
   private pendingBackgroundLock = false;
 
   constructor(options?: {
@@ -323,6 +324,35 @@ export class AuthenticationManager implements WalletAuthenticator {
 
   getLockState(): WalletLockState {
     return this.state;
+  }
+
+  beginUnlockTransaction(): boolean {
+    if (this.unlockTransactionInFlight) {
+      return false;
+    }
+
+    this.unlockTransactionInFlight = true;
+    return true;
+  }
+
+  async finishUnlockTransaction(onUnlocked: () => void): Promise<boolean> {
+    const shouldLock = this.pendingBackgroundLock && this.isBackgrounded;
+    this.pendingBackgroundLock = false;
+
+    if (shouldLock) {
+      this.unlockTransactionInFlight = false;
+      await this.lockWallet();
+      return false;
+    }
+
+    onUnlocked();
+    this.unlockTransactionInFlight = false;
+    return true;
+  }
+
+  cancelUnlockTransaction(): void {
+    this.unlockTransactionInFlight = false;
+    this.pendingBackgroundLock = false;
   }
 
   async isPinConfigured(): Promise<boolean> {
@@ -555,13 +585,13 @@ export class AuthenticationManager implements WalletAuthenticator {
     if (nextState === 'active') {
       this.isBackgrounded = false;
       this.clearAutoLockTimer();
-      if (this.biometricPromptInFlight) {
+      if (this.biometricPromptInFlight || this.unlockTransactionInFlight) {
         this.pendingBackgroundLock = false;
       }
       return;
     }
     this.isBackgrounded = true;
-    if (this.biometricPromptInFlight) {
+    if (this.biometricPromptInFlight || this.unlockTransactionInFlight) {
       this.pendingBackgroundLock = true;
       return;
     }
@@ -607,7 +637,10 @@ export class AuthenticationManager implements WalletAuthenticator {
     result: AuthenticationResult,
   ): Promise<AuthenticationResult> {
     this.biometricPromptInFlight = false;
-    const shouldLock = this.pendingBackgroundLock && this.isBackgrounded;
+    const shouldLock =
+      !this.unlockTransactionInFlight &&
+      this.pendingBackgroundLock &&
+      this.isBackgrounded;
     this.pendingBackgroundLock = false;
 
     if (shouldLock) {

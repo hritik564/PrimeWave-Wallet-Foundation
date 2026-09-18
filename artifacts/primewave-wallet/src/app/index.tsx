@@ -751,7 +751,15 @@ export default function FoundationScreen() {
   const [biometricAvailability, setBiometricAvailability] = useState<BiometricAvailability>({ available: false, type: null });
   const [error, setError] = useState('');
   const [backgrounded, setBackgrounded] = useState(false);
+  const [, setAccessRevision] = useState(0);
   const appState = useRef(AppState.currentState);
+
+  useEffect(() => {
+    if (!access) return;
+    return access.subscribe(() => {
+      setAccessRevision((revision) => revision + 1);
+    });
+  }, [access]);
 
   const refreshSettings = async () => {
     if (previewMode) {
