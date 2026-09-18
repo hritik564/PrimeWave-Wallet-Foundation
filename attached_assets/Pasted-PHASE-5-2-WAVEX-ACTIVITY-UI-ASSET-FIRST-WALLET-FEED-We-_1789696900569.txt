@@ -1,0 +1,935 @@
+PHASE 5.2 — WAVEX ACTIVITY UI — ASSET-FIRST WALLET FEED
+
+We have completed and approved:
+
+- Phase 5.1 — Activity / Transaction History Architecture
+- Phase 5.1A — Activity Presentation Model Amendment
+
+Current verified state:
+
+- Full wallet suite: 205/205 tests passing
+- TypeScript passing
+- Static iOS and Android Expo bundle checks passing
+- Activity repository exists
+- ActivityService exists
+- ActivityReadModelService exists
+- ActivityPresentationModel exists
+- Account/network/chain isolation exists
+- Exact bigint quantities are enforced
+- Existing broadcast/confirmation engines remain authoritative
+- No Activity UI has yet been implemented
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Build the WAVEX Activity page using the attached Activity screenshot as the PRIMARY UX / INFORMATION-ARCHITECTURE REFERENCE.
+
+The desired experience is:
+
+A wallet-native, asset-first transaction feed.
+
+The asset/token logo is the primary visual anchor.
+
+A small network icon/badge overlaps the bottom-right corner of the asset logo.
+
+The action appears beside the asset:
+
+- Sent USDT
+- Received USDT
+- Swapped
+- Contract Interaction
+- etc.
+
+The counterparty/action context appears underneath.
+
+The amount is right-aligned.
+
+Optional fiat value appears underneath the amount.
+
+Activities are grouped by date.
+
+==================================================
+2. IMPORTANT DESIGN REFERENCE
+==================================================
+
+Use the attached screenshot for:
+
+- information hierarchy
+- row structure
+- spacing relationships
+- asset icon placement
+- network badge placement
+- action placement
+- counterparty placement
+- right-aligned amount
+- date grouping
+- filter controls
+
+DO NOT copy:
+
+- exact sample addresses
+- exact transaction values
+- exact dates
+- exact token data
+- branding
+- logos
+- colors
+- typography
+
+The final design must be WAVEX.
+
+Continue the established WAVEX visual system:
+
+- dark futuristic background
+- deep navy/black surfaces
+- cyan/electric blue/violet accents
+- restrained glow
+- premium rounded controls
+- clean typography
+- existing theme tokens
+- existing spacing/radius system
+
+Do not create a second design system.
+
+==================================================
+3. ACTIVITY SCREEN
+==================================================
+
+Create:
+
+src/components/WalletActivityScreen.tsx
+
+and appropriate logic/tests, following existing project conventions.
+
+The Activity screen should be accessible from the existing bottom navigation:
+
+Home
+Assets
+Swap
+Activity
+Settings
+
+Activity should become the first fully implemented destination for the Activity tab.
+
+==================================================
+4. HEADER
+==================================================
+
+Header:
+
+- back/navigation behavior consistent with the existing app
+- title: "Activity"
+
+Do not create an unrelated header style.
+
+If Activity is accessed through bottom navigation, maintain the normal WAVEX navigation experience.
+
+==================================================
+5. FILTER CONTROLS
+==================================================
+
+At the top, create two compact controls inspired by the reference:
+
+1. Activity type filter
+
+Default:
+
+"Transactions"
+
+Possible future values may include:
+
+- Transactions
+- Swaps
+- Approvals
+- Contract Interactions
+- All Activity
+
+Do NOT implement filtering for unsupported future event types unless corresponding activity records exist.
+
+2. Network filter
+
+Default:
+
+"All networks"
+
+Allow selecting among registered/enabled networks.
+
+Do not silently change the wallet's active network merely because the Activity filter changes.
+
+IMPORTANT:
+
+Activity network filtering is a DISPLAY FILTER.
+
+It must NOT modify the active wallet network.
+
+Account/network security context remains separate from display filtering.
+
+==================================================
+6. ACTIVITY DATA SOURCE
+==================================================
+
+Activity UI MUST consume:
+
+ActivityReadModelService
+
+and the existing ActivityPresentationModel.
+
+Do NOT:
+
+- directly call RPC from UI
+- directly call blockchain APIs
+- query transaction receipts from UI
+- reconstruct transactions in UI
+- calculate blockchain amounts in UI
+- create a second activity repository
+
+The UI is a presentation layer.
+
+==================================================
+7. ASSET-FIRST ACTIVITY ROW
+==================================================
+
+Create a reusable ActivityRow component.
+
+Conceptual structure:
+
+LEFT:
+
+Large primary asset/token icon.
+
+BOTTOM-RIGHT OVERLAY:
+
+Small network badge/icon.
+
+CENTER:
+
+First line:
+Action + asset
+
+Examples:
+
+"Sent USDT"
+"Received USDT"
+"Sent BNB"
+"Contract Interaction"
+
+Second line:
+
+Counterparty or event context.
+
+Examples:
+
+"To: 0x3bf79...35C96"
+"From: 0x42A1...7B92"
+"Contract: 0x0083...985h"
+
+RIGHT:
+
+Primary amount.
+
+Examples:
+
+"-10 USDT"
+"+25 USDT"
+"-0.01062 BNB"
+
+Second line:
+
+Optional fiat value.
+
+Example:
+
+"-$10.00"
+
+If fiat is unavailable:
+
+Do not invent a value.
+
+The UI may simply omit the fiat line.
+
+==================================================
+8. TOKEN ICON
+==================================================
+
+Reuse existing:
+
+AssetIcon / TokenLogo architecture.
+
+Do NOT create a new icon system.
+
+For missing/unavailable token logos:
+
+use the existing deterministic fallback.
+
+The icon must never be treated as proof of token legitimacy.
+
+==================================================
+9. NETWORK BADGE
+==================================================
+
+Overlay the network badge on the bottom-right of the asset icon.
+
+The visual relationship should closely resemble the attached reference.
+
+The badge should:
+
+- be clearly recognizable
+- remain small relative to the asset icon
+- not obscure the primary asset logo
+- have an appropriate border/background for separation
+- use existing network metadata
+
+Reuse NetworkRegistry.
+
+Do not add an external logo provider.
+
+If a network has no actual icon asset:
+
+use the presentation model's deterministic fallback.
+
+Never fabricate a real logo.
+
+==================================================
+10. SENT ACTIVITY
+==================================================
+
+For outgoing transactions:
+
+Display:
+
+"Sent {ASSET}"
+
+and:
+
+"To: {shortened address}"
+
+Amount:
+
+"-{amount} {symbol}"
+
+Do not infer fiat value without legitimate price data.
+
+==================================================
+11. RECEIVED ACTIVITY
+==================================================
+
+For incoming transactions:
+
+Display:
+
+"Received {ASSET}"
+
+and:
+
+"From: {shortened address}"
+
+Amount:
+
+"+{amount} {symbol}"
+
+Use the existing direction model.
+
+Do not infer received status from UI assumptions.
+
+==================================================
+12. SELF TRANSFER
+==================================================
+
+For self-transfer:
+
+Do not incorrectly label it simply as Sent or Received if the presentation model identifies:
+
+self_transfer
+
+Use a clear label such as:
+
+"Self transfer"
+
+or another neutral presentation.
+
+Preserve the underlying direction.
+
+==================================================
+13. CONTRACT INTERACTION
+==================================================
+
+For generic contract interactions:
+
+Display:
+
+"Contract Interaction"
+
+or an appropriately specific action only when authoritative data supports it.
+
+Show:
+
+"Contract: 0x..."
+
+Do not pretend an unknown contract interaction was a token transfer.
+
+Do not infer Swap.
+
+Do not infer Approval unless authoritative activity data identifies it.
+
+==================================================
+14. SWAP UI PREPARATION
+==================================================
+
+The UI should be capable of rendering future explicit swap presentation records.
+
+For example:
+
+"Swapped"
+
+"BNB → USDT"
+
+Right side:
+
+"+1.0655 USDT"
+"-0.0015 BNB"
+
+The exact visual arrangement can use a compact two-line representation.
+
+IMPORTANT:
+
+Do not create swap detection.
+
+Do not infer swaps from arbitrary transactions.
+
+Only render:
+
+action = swapped
+
+when the ActivityPresentationModel explicitly provides a trusted multi-asset swap representation.
+
+Swap execution remains a future phase.
+
+==================================================
+15. STATUS INDICATORS
+==================================================
+
+Support existing lifecycle states.
+
+At minimum visually distinguish:
+
+- broadcasting
+- broadcasted
+- confirming
+- confirmed
+- reverted
+- failed
+- unknown
+
+Pending states may use subtle status indicators.
+
+Confirmed transactions should look settled.
+
+Reverted/failed transactions must be visually distinguishable without using sensational design.
+
+Unknown must not be shown as failed.
+
+Do not show:
+
+"Success"
+
+unless the underlying state is actually confirmed.
+
+Do not show:
+
+"Sent"
+
+as proof of on-chain confirmation.
+
+==================================================
+16. DATE GROUPING
+==================================================
+
+Group activity chronologically.
+
+Examples:
+
+Today
+
+Yesterday
+
+Sep 16, 2026
+
+Sep 11, 2026
+
+Sep 10, 2026
+
+Use the presentation model's timestamp and timestamp source.
+
+Do not claim a blockchain date if only observation time exists.
+
+Newest activity first.
+
+Use deterministic ordering from the ActivityReadModelService.
+
+==================================================
+17. EMPTY STATES
+==================================================
+
+Implement polished states for:
+
+- no activity
+- no activity on selected network
+- no matching activity filter
+- unavailable activity data
+- loading
+- refresh error
+
+Example:
+
+"No transactions yet"
+
+with a concise WAVEX visual treatment.
+
+Do not create fake activity to make the screen look populated.
+
+==================================================
+18. REFRESH
+==================================================
+
+Provide a user-triggered refresh action.
+
+Use the existing Activity architecture.
+
+Do NOT add:
+
+- infinite polling
+- aggressive background polling
+- automatic rebroadcast
+- direct receipt polling from UI
+
+Activity UI refresh must remain separate from transaction execution.
+
+==================================================
+19. ACCOUNT ISOLATION
+==================================================
+
+The Activity page must always reflect the currently active account.
+
+If the account changes:
+
+- activity read model must update
+- previous account's activity must disappear
+- no cross-account records may remain visible
+
+Do not rely solely on UI filtering.
+
+The service/repository architecture remains authoritative.
+
+==================================================
+20. NETWORK FILTER VS ACTIVE NETWORK
+==================================================
+
+IMPORTANT DISTINCTION:
+
+The Activity network filter is NOT the same as the wallet's active network selector.
+
+For example:
+
+Wallet active network:
+Ethereum
+
+Activity filter:
+All networks
+
+must be allowed.
+
+Activity filter:
+Base
+
+must show Base activity without changing the wallet's active network.
+
+Do not call:
+
+NetworkRegistry.selectActiveNetwork()
+
+when the user changes the Activity display filter.
+
+==================================================
+21. TRANSACTION SELECTION
+==================================================
+
+Each activity row should be tappable.
+
+For now:
+
+tap → controlled transaction detail placeholder
+
+Do NOT build the complete transaction detail page in this phase.
+
+Pass only the activity identifier / safe public context.
+
+Do not pass:
+
+- private key
+- mnemonic
+- signing capability
+- PIN
+- authentication secrets
+
+==================================================
+22. EXPLORER
+==================================================
+
+Where the Activity presentation model provides a valid configured explorer transaction URL:
+
+allow the future detail flow to use it.
+
+Do not open arbitrary URLs from activity data.
+
+Do not invent explorer URLs.
+
+Do not display explorer actions for placeholder/unconfigured networks.
+
+If useful, the Activity row/detail placeholder may indicate explorer availability.
+
+==================================================
+23. FIAT VALUE
+==================================================
+
+The Activity UI must support optional fiat values.
+
+If:
+
+fiatValue != null
+
+display it.
+
+If:
+
+fiatValue == null
+
+omit it cleanly.
+
+Do NOT:
+
+- hardcode $1 = 1 USDT
+- calculate fiat from token symbol
+- use fake sample prices
+- call external price APIs
+
+Price infrastructure will be introduced later.
+
+==================================================
+24. PERFORMANCE
+==================================================
+
+Use bounded ActivityReadModel results.
+
+Do not render unbounded transaction history.
+
+Use efficient list rendering appropriate for React Native.
+
+Avoid unnecessary rerenders.
+
+Do not perform blockchain calls for every ActivityRow.
+
+==================================================
+25. ACCESSIBILITY
+==================================================
+
+Activity rows must have:
+
+- accessible labels
+- readable amounts
+- readable status
+- accessible action descriptions
+- sufficient contrast
+- appropriate touch target
+- meaningful labels for network badge where needed
+
+A screen reader should be able to understand something equivalent to:
+
+"Sent 10 USDT to 0x3bf79...35C96 on Ethereum"
+
+without requiring visual interpretation.
+
+==================================================
+26. RESPONSIVE DESIGN
+==================================================
+
+Verify:
+
+- 390x844
+- 402x874
+
+The Activity feed should remain usable with:
+
+- long token symbols
+- long formatted amounts
+- long addresses
+- missing fiat values
+- multiple network types
+
+Do not allow right-aligned amounts to collide with the counterparty text.
+
+==================================================
+27. TESTS
+==================================================
+
+Add focused tests covering:
+
+SCREEN
+
+- Activity initial state
+- Activity data loading
+- empty state
+- error state
+- refresh
+- bounded results
+
+FILTERS
+
+- Transactions filter
+- network filter
+- All networks
+- specific network
+- filter does not change active wallet network
+- filter combination
+
+ROWS
+
+- sent row
+- received row
+- self transfer
+- contract interaction
+- unknown activity
+- pending state
+- confirmed state
+- reverted state
+- failed state
+- unknown state
+
+ASSETS
+
+- native asset
+- ERC-20
+- asset icon
+- icon fallback
+- verification independence
+
+NETWORK BADGE
+
+- network badge metadata
+- correct network badge
+- missing badge fallback
+- asset/network isolation
+
+COUNTERPARTY
+
+- To
+- From
+- Contract
+- shortened address
+- full address accessibility
+
+AMOUNTS
+
+- exact amount
+- positive received amount
+- negative sent amount
+- no floating point conversion
+
+FIAT
+
+- fiat available
+- fiat unavailable
+- no fabricated value
+
+DATE
+
+- date grouping
+- timestamp source
+- unknown timestamp
+- deterministic ordering
+
+SWAP
+
+- explicit trusted swap presentation renders
+- primary + secondary asset
+- input/output amounts
+- no inferred swap
+
+NAVIGATION
+
+- Activity row → detail placeholder
+- safe activity identifier passing
+- no secret navigation parameters
+
+ACCOUNT
+
+- account change updates activity
+- no cross-account activity
+
+NETWORK
+
+- active network unchanged by filter
+- activity network isolation
+
+SECURITY
+
+- no SecureStore
+- no mnemonic
+- no private key
+- no signing
+- no broadcasting
+- no backend
+- no direct RPC
+- no analytics
+
+Run the full existing test suite.
+
+==================================================
+28. DOCUMENTATION
+==================================================
+
+Update:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- src/core/activity/README.md
+
+Document:
+
+- Activity UI architecture
+- asset-first row design
+- network badge
+- action presentation
+- counterparty presentation
+- multi-asset swap rendering
+- filter vs active-network distinction
+- fiat handling
+- status presentation
+- date grouping
+- account isolation
+- transaction-detail placeholder
+
+Explicitly document that:
+
+Phase 5.2 does NOT implement:
+
+- transaction detail page
+- swap detection
+- swap execution
+- price APIs
+- external indexing
+- backend history
+- notifications
+
+==================================================
+29. SECURITY REGRESSION
+==================================================
+
+Inspect the diff specifically for:
+
+- direct RPC from UI
+- transaction mutation from UI
+- signing imports
+- SecureStore imports
+- secret access
+- backend requests
+- analytics
+- fake transaction data
+- fake fiat data
+- fake swap classification
+- accidental active-network switching through Activity filters
+
+==================================================
+30. VERIFICATION
+==================================================
+
+Run:
+
+- TypeScript
+- complete test suite
+- git diff --check
+- Expo/Metro
+- static iOS bundle/manifest build
+- static Android bundle/manifest build
+- security regression inspection
+
+Preview:
+
+- 390x844
+- 402x874
+
+Manual verification:
+
+1. Open Home
+2. Open Activity
+3. Verify asset-first rows
+4. Verify token icon
+5. Verify network badge overlay
+6. Verify Sent layout
+7. Verify Received layout
+8. Verify counterparty
+9. Verify right-aligned amount
+10. Verify optional fiat omission
+11. Verify date grouping
+12. Verify All Networks filter
+13. Verify specific network filter
+14. Confirm network filter does NOT change active wallet network
+15. Verify empty state
+16. Verify refresh
+17. Verify row tap → detail placeholder
+18. Verify account isolation
+19. Verify long amounts/addresses
+20. Verify no fake activity
+
+Use the attached Activity screenshot as the visual reference during Preview validation.
+
+==================================================
+31. SCOPE CONTROL
+==================================================
+
+STOP after Phase 5.2.
+
+DO NOT implement:
+
+- transaction detail page
+- Swap
+- DApps
+- WalletConnect
+- price APIs
+- external indexing
+- backend history
+- notifications
+- transaction replacement
+- speed-up
+- cancellation
+
+Wait for approval before the next phase.
+
+==================================================
+32. FINAL REPORT
+==================================================
+
+Report:
+
+- files created/changed
+- Activity UI architecture
+- asset-first row implementation
+- network badge implementation
+- filters
+- status presentation
+- date grouping
+- account/network isolation
+- explorer handling
+- fiat handling
+- accessibility
+- responsive validation
+- test count
+- TypeScript result
+- Expo/build result
+- Preview result
+- security regression result
+- known warnings
+- anything deferred
+
+STOP after Phase 5.2.
