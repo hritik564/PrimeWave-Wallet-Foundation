@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 6.2 — 0x Swap API v2 quote provider (completed; awaiting review)**
+**Phase 6.3 — Swap UI and quote presentation (completed; awaiting review)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -350,6 +350,21 @@ UI testing; it is not a real wallet and does not alter the native boundary.
   for missing route or price-impact data.
 - Added focused 0x HTTP/provider/security tests. Tests use injectable
   transports and do not require internet access or a real API key.
+- Added the production WaveX Swap screen over the existing portfolio and
+  selected-network state with sell/receive asset selectors, searchable modal
+  sheets, exact amount and MAX handling, pair reversal, bounded slippage
+  controls, token trust warnings, quote details, countdown expiry, refresh,
+  and explicit loading/error/unavailable states.
+- Added UI-side quote lifecycle coordination with 550 ms debounce, request
+  version stale-response protection, account/network/pair/amount/slippage
+  invalidation, and a nullable real 0x service boundary when provider
+  configuration is unavailable.
+- Kept Review Swap disabled without a current unexpired normalized quote. The
+  Phase 6.4 transition is controlled and does not sign, approve, execute,
+  broadcast, add fees, add cross-chain behavior, or write Activity records.
+- Added focused Swap UI logic tests for network-scoped selection, exact amount
+  and MAX validation, pair/network gating, slippage bounds, public-only quote
+  requests, and review gating.
 
 ## Pending work
 
@@ -359,8 +374,8 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 - External token lists, verification providers, NFTs, portfolio valuation, fiat
   pricing, external indexing, backend asset/history APIs, notifications, and
   full wallet UI remain outside this controlled increment.
-- Phase 6.2 intentionally includes quote retrieval only. It does not include
-  swap UI, swap execution, signing, broadcasting, persistent quote state,
+- Phase 6.3 intentionally stops at quote presentation. It does not include
+  swap review/approval, swap execution, signing, broadcasting, persistent quote state,
   Activity records, swap detection, approvals execution, Permit2, DApps,
   WalletConnect, transaction replacement, speed-up, cancellation, fee bumping,
   WaveX swap fees, backend execution, cross-chain swaps, account switching,
@@ -401,8 +416,8 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 
 ## Phase boundary
 
-Phase 6.2 is complete and stops at normalized 0x quote retrieval pending
-review. Later phases may separately define Swap UI, swap review, provider
+Phase 6.3 is complete and stops at normalized quote presentation pending
+review. Later phases may separately define Swap review/approval, provider
 transaction integration, local signing/broadcast execution, external
 indexing, backend history, notifications, external verification, token
 state-changing operations, NFTs, portfolio valuation, fiat pricing, DApps,

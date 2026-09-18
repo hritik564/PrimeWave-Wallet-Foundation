@@ -45,6 +45,10 @@ import {
 } from '@/src/core/security';
 import type { WalletSetupResult } from '@/src/core/wallet/contracts';
 import type { Wallet } from '@/src/core/wallet/models';
+import {
+  createZeroExSwapQuoteProvider,
+  SwapQuoteService,
+} from '@/src/core/swaps';
 
 const iconSource = require('../../assets/images/icon.png');
 const confirmationPositions = [4, 9, 12];
@@ -623,6 +627,16 @@ export default function FoundationScreen() {
     () => createAppPortfolioReadModelService(),
     [],
   );
+  const swapQuoteService = useMemo(() => {
+    try {
+      return new SwapQuoteService(
+        defaultNetworkRegistry,
+        createZeroExSwapQuoteProvider({ networkRegistry: defaultNetworkRegistry }),
+      );
+    } catch {
+      return null;
+    }
+  }, []);
   const activityService = useMemo(
     () => (previewMode ? null : new ActivityService()),
     [previewMode],
@@ -914,7 +928,7 @@ export default function FoundationScreen() {
     setConfirmPin('');
     setView('welcome');
   })} />;
-  else if (view === 'wallet' && currentWallet) content = <WalletHomeShell activityService={activityService} activityReadModelService={activityReadModelService} createConstructionEngine={createConstructionEngine} createSigningDependency={createSigningDependency} createBroadcastDependency={createBroadcastDependency} previewMode={previewMode} wallet={currentWallet} network={selectedNetwork} networkRegistry={defaultNetworkRegistry} readModelService={portfolioReadModelService} onNetworkSelect={handleNetworkSelect} onComingSoon={(message) => setError(message)} onLock={() => void run(async () => {
+  else if (view === 'wallet' && currentWallet) content = <WalletHomeShell activityService={activityService} activityReadModelService={activityReadModelService} createConstructionEngine={createConstructionEngine} createSigningDependency={createSigningDependency} createBroadcastDependency={createBroadcastDependency} previewMode={previewMode} wallet={currentWallet} network={selectedNetwork} networkRegistry={defaultNetworkRegistry} readModelService={portfolioReadModelService} swapQuoteService={swapQuoteService} onNetworkSelect={handleNetworkSelect} onComingSoon={(message) => setError(message)} onLock={() => void run(async () => {
     if (previewMode) {
       previewTestMode.lockPreviewWallet();
     } else {

@@ -28,6 +28,24 @@ provider errors, liquidity, route, fee, price-impact, allowance, and issue
 metadata are handled explicitly. Missing values remain unavailable rather
 than becoming fabricated zeroes.
 
+## Phase 6.3 presentation boundary
+
+`WalletSwapScreen` is the presentation layer above `SwapQuoteService`. It
+consumes the already-scoped `PortfolioReadModel`, selected `EvmNetwork`, public
+wallet account, and an injected quote service. It never calls 0x, fetch, RPC,
+SecureStore, signing, approval, or broadcast APIs directly.
+
+The screen performs exact sell-amount/MAX validation, same-network asset
+selection, same-asset rejection, bounded 550 ms quote debounce, stale-response
+protection, refresh, expiry countdown, explicit unavailable/error states,
+slippage controls from 0 to 5000 bps, and neutral unknown/unverified-token
+warnings. A quote is only displayed when its normalized context matches the
+current account, network, pair, amount, and slippage.
+
+The `Review Swap` control is intentionally enabled only for a current,
+unexpired quote. Its Phase 6.3 action stops at a controlled Phase 6.4 message;
+it does not sign, approve, execute, broadcast, add fees, or create activity.
+
 The normalized transaction request is quote data only. It does not go directly
 to signing or broadcasting, and existing WaveX transaction construction
 remains authoritative for any future execution. Phase 6.2 does not execute

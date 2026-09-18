@@ -23,6 +23,7 @@ import {
   type PortfolioReadModelService,
 } from '@/src/core/portfolio';
 import type { ActivityReadModelService } from '@/src/core/activity';
+import type { SwapQuoteService } from '@/src/core/swaps';
 import type { Wallet } from '@/src/core/wallet/models';
 import { ReceiveScreen } from './ReceiveScreen';
 import {
@@ -37,6 +38,7 @@ import type {
 } from './TransactionReviewScreen.logic';
 import { WalletSendScreen } from './WalletSendScreen';
 import { WalletActivityScreen } from './WalletActivityScreen';
+import { WalletSwapScreen } from './WalletSwapScreen';
 import { assetIdentityKey, type PublicSendDraft } from './WalletSendScreen.logic';
 import { copyPublicAddress } from './public-address-actions';
 import {
@@ -109,7 +111,7 @@ function Header({
   onSettingsPress,
 }: {
   wallet: Wallet;
-  detailMode: 'receive' | 'send' | 'activity' | null;
+  detailMode: 'receive' | 'send' | 'swap' | 'activity' | null;
   onBack: () => void;
   onAccountPress: () => void;
   onSettingsPress: () => void;
@@ -1004,6 +1006,7 @@ export function WalletHomeShell({
   createBroadcastDependency,
   activityService,
   activityReadModelService,
+  swapQuoteService,
   onNetworkSelect,
   onLock,
   onComingSoon,
@@ -1026,6 +1029,7 @@ export function WalletHomeShell({
   ) => Promise<TransactionBroadcastDependency | null>;
   activityService?: TransactionActivityDependency | null;
   activityReadModelService?: Pick<ActivityReadModelService, 'getActivity'> | null;
+  swapQuoteService?: SwapQuoteService | null;
   onNetworkSelect: (networkId: string) => NetworkSelectionResult;
   onLock: () => void;
   onComingSoon: (label: string) => void;
@@ -1115,6 +1119,8 @@ export function WalletHomeShell({
               ? 'receive'
               : destination === 'send'
                 ? 'send'
+                : destination === 'swap'
+                  ? 'swap'
                 : destination === 'activity'
                   ? 'activity'
                   : null
@@ -1267,6 +1273,17 @@ export function WalletHomeShell({
             createBroadcastDependency={createBroadcastDependency}
             networkRegistry={networkRegistry}
             onBack={() => setDestination('home')}
+          />
+        ) : destination === 'swap' ? (
+          <WalletSwapScreen
+            network={network}
+            onBack={() => setDestination('home')}
+            onComingSoon={onComingSoon}
+            onNetworkPress={() => setNetworkSelectorVisible(true)}
+            portfolio={portfolio}
+            portfolioState={portfolioState}
+            quoteService={swapQuoteService ?? null}
+            wallet={wallet}
           />
         ) : (
           <PlaceholderDestination

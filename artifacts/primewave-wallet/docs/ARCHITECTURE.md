@@ -916,7 +916,7 @@ configured network metadata. Phase 5.3 does not add swap detection or
 execution, approval execution, backend history, external indexing, price APIs,
 notifications, replacement, speed-up, cancellation, or fee bumping.
 
-### Phase 6.2 WAVEX Swap Architecture and 0x Quote Provider
+### Phase 6.2/6.3 WAVEX Swap Architecture, Quote Provider, and Presentation
 
 Phase 6.1 and 6.2 add the isolated provider-neutral swap domain under
 `src/core/swaps`. It reuses the existing network-scoped `AssetIdentity`,
@@ -977,8 +977,21 @@ create Activity records. A 0x allowance requirement is metadata only: this
 phase does not execute approvals, Permit2, EIP-712 signing, swap signing,
 broadcasting, or execution. The validated 0x transaction request is a quote
 output for a future review/construction flow; it is not passed directly to
-signing or broadcasting. No Swap UI, WaveX swap fee, backend execution, or
-cross-chain support is included.
+signing or broadcasting.
+
+Phase 6.3 adds `WalletSwapScreen` as a UI-only consumer of the shared
+portfolio/read-model state and injected `SwapQuoteService`. Asset selectors are
+scoped to the selected account/network context. Exact decimal parsing and
+balance-based MAX happen in UI logic before quote requests. Network, account,
+asset-pair, amount, and slippage changes invalidate the current quote; a
+bounded debounce and request version protect the visible state from stale
+responses. The screen presents only normalized values actually available from
+the quote and keeps missing route, impact, fee, and metadata states explicit.
+
+The screen's `Review Swap` action is gated by a valid unexpired quote and stops
+at a controlled Phase 6.4 placeholder. Phase 6.3 adds no WaveX swap fee,
+backend execution, approval execution, signing, broadcasting, activity record,
+or cross-chain behavior.
 
 ## Design system
 
