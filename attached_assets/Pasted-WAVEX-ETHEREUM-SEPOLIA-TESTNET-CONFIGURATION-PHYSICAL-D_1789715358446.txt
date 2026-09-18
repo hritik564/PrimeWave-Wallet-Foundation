@@ -1,0 +1,340 @@
+WAVEX — ETHEREUM SEPOLIA TESTNET CONFIGURATION
+PHYSICAL-DEVICE VALIDATION PREPARATION
+
+IMPORTANT:
+This is a TESTNET CONFIGURATION ONLY.
+
+Phase 6.5 implementation is complete.
+Phase 6.5 physical-device validation has NOT yet been performed.
+
+DO NOT implement Phase 6.6.
+DO NOT execute any transaction.
+DO NOT sign anything.
+DO NOT broadcast anything.
+DO NOT request PIN/biometric authentication.
+DO NOT modify the existing 0x mainnet integration.
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Add Ethereum Sepolia as a dedicated development/testnet network so we can later validate the native WaveX wallet execution stack on physical devices without using real funds.
+
+The future validation path will be:
+
+Physical Device
+    ↓
+WaveX SecureStore
+    ↓
+Wallet Authentication
+    ↓
+Local Signing
+    ↓
+Ethereum Sepolia
+    ↓
+Broadcast
+    ↓
+Confirmation
+
+This task ONLY configures the network.
+
+==================================================
+2. ETHEREUM SEPOLIA NETWORK
+==================================================
+
+Add Ethereum Sepolia to the existing NetworkRegistry using the project's existing EvmNetwork model.
+
+Required network properties:
+
+Display name:
+Ethereum Sepolia
+
+Environment:
+testnet
+
+Chain ID:
+11155111
+
+Native currency:
+ETH
+
+Native currency decimals:
+18
+
+Network ID:
+Use the project's existing stable network-ID convention.
+Do not create a conflicting or duplicate identifier.
+
+Do not modify Ethereum mainnet chain ID 1.
+
+Do not replace or alter the existing Ethereum mainnet configuration.
+
+==================================================
+3. RPC CONFIGURATION
+==================================================
+
+DO NOT invent or guess an RPC endpoint.
+
+Use an environment-based RPC configuration.
+
+Create/use an environment secret named:
+
+SEPOLIA_RPC_URL
+
+The application must read the RPC URL through the existing network configuration boundary.
+
+Do not hardcode:
+
+- API-provider RPC keys
+- private RPC credentials
+- authenticated RPC URLs
+- secrets
+- wallet credentials
+
+Do not print the value in logs.
+
+Only report:
+
+configured / missing
+
+If the project already has an approved public HTTPS Sepolia RPC endpoint mechanism, use the existing architecture instead of introducing a new provider.
+
+The final network configuration must fail closed if the RPC endpoint is missing.
+
+==================================================
+4. EXPLORER
+==================================================
+
+Configure Ethereum Sepolia explorer metadata using:
+
+https://sepolia.etherscan.io
+
+Use the existing explorer URL/template architecture.
+
+Support:
+
+- address URL
+- transaction URL
+
+Do not hardcode transaction hashes.
+
+Do not create fake explorer links.
+
+==================================================
+5. 0x BOUNDARY — CRITICAL
+==================================================
+
+DO NOT add Ethereum Sepolia to the current 0x Swap API provider capability map.
+
+The current 0x integration must remain limited to the chains already explicitly supported by the existing provider configuration.
+
+Ethereum Sepolia must NOT be presented as a 0x-supported swap network.
+
+Do not:
+
+- call 0x for Sepolia
+- fabricate Sepolia 0x quotes
+- reuse Ethereum mainnet quotes on Sepolia
+- bypass the provider capability check
+- add a fake provider
+
+For Sepolia, swap functionality should remain unavailable/unsupported.
+
+The purpose of Sepolia is native wallet execution validation, not 0x swap validation.
+
+==================================================
+6. NETWORK SELECTION
+==================================================
+
+Add Sepolia to the existing network selector using the same registry architecture.
+
+It must display clearly as:
+
+Ethereum Sepolia
+Testnet
+
+It must not silently replace Ethereum mainnet.
+
+Do not change the existing primary network.
+
+Do not change the default production network.
+
+Do not automatically switch to Sepolia.
+
+The user must explicitly select it.
+
+==================================================
+7. PRODUCTION SAFETY
+==================================================
+
+Sepolia must be explicitly represented as:
+
+environment = testnet
+
+Do not allow testnet configuration to masquerade as mainnet.
+
+Ensure:
+
+- chain ID validation
+- environment validation
+- RPC validation
+- explorer validation
+- network isolation
+
+remain enforced.
+
+Do not modify existing mainnet network definitions unnecessarily.
+
+==================================================
+8. TEST WALLET / SECRETS
+==================================================
+
+Do not create a test wallet automatically.
+
+Do not hardcode:
+
+- mnemonic
+- private key
+- funded address
+- test wallet credentials
+
+The project owner will create a dedicated test wallet manually later on the physical device.
+
+==================================================
+9. UI
+==================================================
+
+Only make the minimum UI change necessary for the network to appear in the existing network selector.
+
+Do not redesign the wallet.
+
+Do not modify Swap UI except to ensure that Sepolia cannot be treated as a supported 0x swap network.
+
+If the current UI already correctly displays unsupported swap-network state, reuse it.
+
+==================================================
+10. TESTING
+==================================================
+
+Add/update tests for:
+
+A. Sepolia network registration
+
+B. Chain ID = 11155111
+
+C. Environment = testnet
+
+D. Native currency = ETH
+
+E. 18 decimals
+
+F. Stable network ID
+
+G. Duplicate network prevention
+
+H. Invalid RPC configuration rejection
+
+I. Missing RPC configuration fails closed
+
+J. Sepolia explorer metadata
+
+K. Sepolia address URL generation
+
+L. Sepolia transaction URL generation
+
+M. Explicit network selection
+
+N. Mainnet remains unchanged
+
+O. Sepolia does not become a primary production network
+
+P. Sepolia is NOT accepted by the 0x provider
+
+Q. No 0x quote request is made for Sepolia
+
+R. Preview Test Mode remains isolated
+
+S. No secrets appear in logs/results
+
+==================================================
+11. SECURITY CHECK
+==================================================
+
+Confirm the following remain unchanged:
+
+- private keys never leave device
+- recovery phrases never leave device
+- SecureStore remains native-only
+- signing remains local
+- broadcast remains through Phase 2.7
+- 0x API key remains isolated
+- no backend signing
+- no Activity writes
+- no automatic transactions
+- no automatic network switching
+
+==================================================
+12. DOCUMENTATION
+==================================================
+
+Update:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+
+Document:
+
+- Ethereum Sepolia is a development/testnet network
+- chain ID 11155111
+- native wallet validation purpose
+- 0x Swap API is NOT enabled for Sepolia
+- testnet RPC must be configured separately
+- physical-device validation is still pending
+
+==================================================
+13. NO TRANSACTION
+==================================================
+
+Absolutely no:
+
+- wallet creation using funded credentials
+- signing
+- approval
+- swap
+- broadcast
+- eth_sendRawTransaction
+- real funds
+- testnet funds movement
+
+This task ends after configuration and automated validation.
+
+==================================================
+14. FINAL REPORT
+==================================================
+
+Return:
+
+1. Files changed
+2. Sepolia network ID
+3. Chain ID
+4. RPC configuration status — configured/missing only
+5. Explorer configuration
+6. Network selector behavior
+7. Production/mainnet isolation
+8. 0x capability behavior
+9. Confirmation that no 0x request was made
+10. Tests added/results
+11. TypeScript result
+12. Expo/build result
+13. git diff --check
+14. Any warnings
+15. Any blocker for physical-device testing
+
+CRITICAL STOP CONDITION:
+
+Do not implement or execute Phase 6.5 testing in this task.
+
+Do not implement Phase 6.6.
+
+STOP after the configuration report.
