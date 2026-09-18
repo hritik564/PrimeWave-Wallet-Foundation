@@ -418,6 +418,10 @@ UI testing; it is not a real wallet and does not alter the native boundary.
   placeholder without a chain ID, RPC, or explorer configuration.
 - The current 0x Swap API v2 capability map covers only the configured mainnet
   chain IDs. It does not provide a provider-backed testnet validation path.
+- Ethereum Sepolia is now registered as an explicitly selectable testnet with
+  network ID `ethereum-sepolia`, chain ID `11155111`, ETH, and Sepolia Etherscan
+  metadata. Its RPC endpoint is supplied by `SEPOLIA_RPC_URL`; native wallet
+  validation may use Sepolia, but 0x swaps remain unsupported there.
 - Native development-build configuration is present for `expo-dev-client`,
   SecureStore, and local authentication, with an internal development profile
   in `eas.json`. The workspace has no checked-in `ios/` or `android/` project,

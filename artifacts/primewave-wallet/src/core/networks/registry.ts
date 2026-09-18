@@ -325,7 +325,8 @@ function readEnvironmentValue(name: string): string | undefined {
 export function createSepoliaNetwork(
   rpcUrl = readEnvironmentValue('SEPOLIA_RPC_URL'),
 ): EvmNetwork {
-  const configured = rpcUrl !== undefined;
+  const normalizedRpcUrl = rpcUrl?.trim() || undefined;
+  const configured = normalizedRpcUrl !== undefined;
   return {
     id: 'ethereum-sepolia',
     displayName: 'Ethereum Sepolia',
@@ -333,7 +334,7 @@ export function createSepoliaNetwork(
     nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
     rpc: {
       endpoints: configured
-        ? [createRpcEndpoint('public', rpcUrl)]
+        ? [createRpcEndpoint('public', normalizedRpcUrl)]
         : [],
     },
     explorer: createExplorer(

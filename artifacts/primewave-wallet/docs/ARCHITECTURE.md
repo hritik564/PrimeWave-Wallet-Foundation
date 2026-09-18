@@ -132,11 +132,15 @@ display name, chain ID, native currency, ordered public RPC endpoint metadata,
 block explorer metadata, environment, enabled state, and primary-network
 designation.
 
-The default registry includes PrimeWave Chain, Ethereum, BNB Smart Chain,
-Polygon, Arbitrum, Base, and Optimism. PrimeWave Chain is the single intended
-primary network, but its launch chain ID, RPC endpoints, explorer URLs, and
-native currency symbol remain explicit placeholders until supplied and
-reviewed. No API keys, credentials, or private configuration belong in network
+The default registry includes PrimeWave Chain, Ethereum, Ethereum Sepolia,
+BNB Smart Chain, Polygon, Arbitrum, Base, and Optimism. PrimeWave Chain is the
+single intended primary network, but its launch chain ID, RPC endpoints,
+explorer URLs, and native currency symbol remain explicit placeholders until
+supplied and reviewed. Ethereum Sepolia is an explicitly selectable testnet
+with chain ID `11155111`, ETH, and Sepolia Etherscan explorer metadata. Its RPC
+endpoint is read from the `SEPOLIA_RPC_URL` environment secret; when that
+secret is missing, Sepolia remains disabled and unavailable for activation.
+No API keys, credentials, or private configuration belong in checked-in network
 definitions.
 
 The registry validates IDs, chain IDs, URL safety, native currency metadata,
@@ -152,6 +156,11 @@ disabled and intentionally unconfigured entries, but only calls
 `selectActiveNetwork` for a requested activation. A placeholder or disabled
 entry remains visible as a controlled state and cannot become the active
 blockchain context.
+
+The 0x Swap API v2 capability map remains mainnet-only. Ethereum Sepolia is
+available for future native wallet execution validation, but it is not a
+supported 0x swap network and quote requests are rejected before any provider
+request is made.
 
 The public account panel is limited to account label/index, public address,
 unlocked status, and lock. Copying is an explicit one-way write to the

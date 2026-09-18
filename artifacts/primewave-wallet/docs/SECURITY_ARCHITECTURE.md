@@ -921,7 +921,16 @@ secret and must not enter SecureStore, mnemonic/key handling, quote models,
 analytics, logs, error text, screenshots, or UI state. The provider has a
 centralized capability mapping for Ethereum, BNB Smart Chain, Polygon,
 Arbitrum One, Base, and Optimism. PrimeWave and any unconfigured or disabled
-network are rejected before an external request.
+network are rejected before an external request. Ethereum Sepolia is
+intentionally excluded from that map; selecting Sepolia for native wallet
+validation must never result in a 0x request or a mainnet quote being reused.
+
+The network registry contains Ethereum Sepolia as a testnet with chain ID
+`11155111`, ETH, and Sepolia Etherscan metadata. Its RPC endpoint is supplied
+through the `SEPOLIA_RPC_URL` environment secret rather than checked-in
+configuration. Missing or invalid RPC configuration leaves Sepolia disabled
+and unavailable for activation. The selector keeps this testnet explicit and
+does not change the primary network or automatically switch networks.
 
 0x response objects are untrusted. The mapper validates chain context, token
 identity, exact decimal-string quantities, taker/from, recipient/to, calldata,

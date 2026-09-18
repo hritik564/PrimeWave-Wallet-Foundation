@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
+  createSepoliaNetwork,
   NetworkRegistry,
   NetworkRegistryError,
   defaultNetworkRegistry,
@@ -27,6 +28,7 @@ test('defines the requested enabled networks and one primary placeholder', () =>
     [
       'primewave',
       'ethereum',
+      'ethereum-sepolia',
       'bnb-smart-chain',
       'polygon',
       'arbitrum',
@@ -39,6 +41,7 @@ test('defines the requested enabled networks and one primary placeholder', () =>
     [
       'primewave',
       'ethereum',
+      'ethereum-sepolia',
       'bnb-smart-chain',
       'polygon',
       'arbitrum',
@@ -58,6 +61,8 @@ test('defines the requested enabled networks and one primary placeholder', () =>
 test('supports lookup by stable ID and numeric chain ID', () => {
   assert.equal(defaultNetworkRegistry.getById('base')?.chainId, 8453);
   assert.equal(defaultNetworkRegistry.getByChainId(42161)?.id, 'arbitrum');
+  assert.equal(defaultNetworkRegistry.getById('ethereum-sepolia')?.chainId, 11155111);
+  assert.equal(defaultNetworkRegistry.getByChainId(11155111)?.id, 'ethereum-sepolia');
   assert.equal(defaultNetworkRegistry.getByChainId(999999), undefined);
 });
 
@@ -72,6 +77,55 @@ test('requires explicit selection and rejects unconfigured primary activation', 
 
   defaultNetworkRegistry.clearActiveNetwork();
   assert.equal(defaultNetworkRegistry.getActiveNetwork(), null);
+
+  const selectedSepolia = defaultNetworkRegistry.selectActiveNetwork('ethereum-sepolia');
+  assert.equal(selectedSepolia.displayName, 'Ethereum Sepolia');
+  assert.equal(selectedSepolia.environment, 'testnet');
+  defaultNetworkRegistry.clearActiveNetwork();
+});
+
+test('registers Sepolia with isolated testnet metadata and explorer URLs', () => {
+  const sepolia = defaultNetworkRegistry.getById('ethereum-sepolia') as EvmNetwork;
+  assert.equal(sepolia.chainId, 11155111);
+  assert.equal(sepolia.environment, 'testnet');
+  assert.equal(sepolia.nativeCurrency.symbol, 'ETH');
+  assert.equal(sepolia.nativeCurrency.decimals, 18);
+  assert.equal(sepolia.isPrimary, false);
+  assert.equal(sepolia.configurationStatus, 'configured');
+  assert.equal(sepolia.explorer.baseUrl, 'https://sepolia.etherscan.io');
+  assert.equal(
+    sepolia.explorer.addressUrlTemplate,
+    'https://sepolia.etherscan.io/address/{address}',
+  );
+  assert.equal(
+    sepolia.explorer.transactionUrlTemplate,
+    'https://sepolia.etherscan.io/tx/{txHash}',
+  );
+  assert.equal(sepolia.rpc.endpoints.length, 1);
+  assert.equal(defaultNetworkRegistry.getById('ethereum')?.chainId, 1);
+});
+
+test('fails closed when Sepolia RPC configuration is missing or invalid', () => {
+  const unavailable = createSepoliaNetwork('');
+  assert.equal(unavailable.enabled, false);
+  assert.equal(unavailable.configurationStatus, 'unavailable');
+  assert.deepEqual(unavailable.rpc.endpoints, []);
+  const registry = new NetworkRegistry([
+    defaultNetworkRegistry.getPrimaryNetwork(),
+    unavailable,
+  ]);
+  expectRegistryError(
+    () => registry.selectActiveNetwork('ethereum-sepolia'),
+    'NETWORK_DISABLED',
+  );
+
+  expectRegistryError(
+    () => new NetworkRegistry([
+      defaultNetworkRegistry.getPrimaryNetwork(),
+      createSepoliaNetwork('http://rpc.example.com'),
+    ]),
+    'INVALID_NETWORK',
+  );
 });
 
 test('rejects duplicate IDs, duplicate chain IDs, and invalid primary rules', () => {

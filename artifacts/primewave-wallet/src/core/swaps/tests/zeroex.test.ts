@@ -146,6 +146,44 @@ test('exposes only 0x-supported configured network mappings', () => {
     optimism: 10,
   });
   assert.deepEqual(ZEROEX_SUPPORTED_NETWORKS.includes('primewave'), false);
+  assert.deepEqual(ZEROEX_SUPPORTED_NETWORKS.includes('ethereum-sepolia'), false);
+});
+
+test('rejects Sepolia before making any 0x request', async () => {
+  let calls = 0;
+  const sepoliaNative = createAssetIdentity(
+    'native',
+    'ethereum-sepolia',
+    'native',
+  );
+  const sepoliaToken = createTokenAssetIdentity(
+    'ethereum-sepolia',
+    '0x3333333333333333333333333333333333333333',
+  );
+  const provider = createZeroExSwapQuoteProvider({
+    apiKey: 'test-only-api-key',
+    transport: async () => {
+      calls += 1;
+      return httpResponse(500, {});
+    },
+  });
+  const service = new SwapQuoteService(
+    defaultNetworkRegistry,
+    provider,
+    { now: () => NOW },
+  );
+
+  await assertAsyncCode(
+    service.getQuote({
+      ...request,
+      networkId: 'ethereum-sepolia',
+      chainId: 11155111n,
+      sellAsset: sepoliaNative,
+      buyAsset: sepoliaToken,
+    }),
+    'SWAP_NETWORK_UNSUPPORTED',
+  );
+  assert.equal(calls, 0);
 });
 
 test('requires an API key without storing it in wallet infrastructure', () => {
