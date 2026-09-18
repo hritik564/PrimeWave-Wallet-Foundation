@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 5.1A — WAVEX asset-first activity presentation amendment (completed)**
+**Phase 5.3 — WAVEX Transaction Details and reconciliation (completed)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -308,8 +308,22 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 - Added the WAVEX Activity destination with bounded read-model loading,
   asset-first rows, deterministic network badge overlays, type/network display
   filters, date grouping, refresh and empty/error states.
-- Added safe activity-row selection into a public-context detail placeholder;
-  the full transaction detail page remains deferred.
+- Replaced the activity-row detail placeholder with a read-only WAVEX
+  Transaction Details experience backed by the authoritative activity read
+  model and presentation model.
+- Added honest status, summary, sender/counterparty, exact amount, asset,
+  network, fee/gas, nonce, block, timestamp-source, hash/local-ID, and
+  validated explorer presentation.
+- Added explicit, bounded user-triggered reconciliation through the existing
+  transaction lookup and confirmation infrastructure. Confirmed and reverted
+  receipts update scoped activity records; unknown, pending, and not-found
+  outcomes remain honest.
+- Added external blockchain-read support with neutral origin wording and
+  account/network/chain isolation. No secrets or mutation APIs enter the
+  detail flow.
+- Added focused Transaction Details logic tests for navigation scope, status
+  semantics, exact quantities, lookup context, reconciliation outcomes,
+  external activity, and security-sensitive omissions.
 
 ## Pending work
 
@@ -319,10 +333,10 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 - External token lists, verification providers, NFTs, portfolio valuation, fiat
   pricing, external indexing, backend asset/history APIs, notifications, and
   full wallet UI remain outside this controlled increment.
-- Phase 5.2 intentionally does not include the complete transaction detail
-  page, swap detection/execution, approvals execution, DApps, WalletConnect,
-  transaction replacement, speed-up, cancellation, account switching, asset
-  detail, QR scanning, or Settings functionality.
+- Phase 5.3 intentionally does not include swap detection/execution,
+  approvals execution, DApps, WalletConnect, transaction replacement,
+  speed-up, cancellation, fee bumping, account switching, asset detail,
+  QR scanning, or Settings functionality.
 - Preview Test Mode is intentionally limited to web UI state testing and is not
   native wallet or security validation.
 - Balance preflight validation is intentionally not implemented because it is
@@ -359,8 +373,8 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 
 ## Phase boundary
 
-Phase 5.2 is complete. Stop here. Later phases may separately define the full
-transaction detail UI, external indexing, backend history, notifications,
-external verification, token state-changing operations, NFTs, portfolio
-valuation, fiat pricing, swaps, DApps, WalletConnect, replacement, speed-up,
-cancellation, automatic fee bumping, and other ecosystem capabilities.
+Phase 5.3 is complete. Stop here. Later phases may separately define external
+indexing, backend history, notifications, external verification, token
+state-changing operations, NFTs, portfolio valuation, fiat pricing, swaps,
+DApps, WalletConnect, replacement, speed-up, cancellation, automatic fee
+bumping, and other ecosystem capabilities.

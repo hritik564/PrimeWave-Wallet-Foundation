@@ -223,3 +223,33 @@ network does not redirect confirmation to another chain.
 
 **Phase 2.7 broadcasts already-signed transactions and observes blockchain
 confirmation. It does not construct or sign transactions.**
+
+## Phase 5.3 read-only transaction details
+
+The Activity row opens `TransactionDetailScreen` with only its public activity
+identity and account/network/chain scope. The screen resolves the authoritative
+record through the activity read model and renders its existing presentation
+model. It never imports a signer, wallet secret boundary, or broadcast
+mutation method.
+
+Transaction Details keeps local record, signed, broadcasted, confirming,
+confirmed, reverted, failed, and unknown semantics separate. A local signed
+transaction is not described as broadcasted, a broadcast is not described as
+confirmed, and an unknown result is not described as failed. Exact bigint
+amounts, token transfer amounts, and native network fees remain separate.
+Optional gas, nonce, receipt, block, and timestamp fields are shown only when
+authoritative data exists; timestamp source remains explicit.
+
+Refresh is an explicit, bounded read-only reconciliation action. It calls
+`lookupTransaction()` for the activity hash and uses the existing confirmation
+engine when lookup reports a mined transaction. Confirmed and reverted receipts
+update the activity lifecycle; pending, not-found, and unknown outcomes do not
+rebroadcast, sign, mutate transaction data, or start a background loop.
+Reconciliation remains bound to the activity account, network, and chain. It
+does not switch the active wallet network.
+
+External blockchain-read records may have no local transaction ID. Their
+origin is described neutrally, and explorer actions use only validated
+configured network metadata. No backend history, external indexing, price
+service, notifications, swaps, approval execution, replacement, speed-up,
+cancellation, or fee bumping is part of Phase 5.3.

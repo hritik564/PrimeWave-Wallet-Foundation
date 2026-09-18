@@ -19,6 +19,12 @@ import type {
   ActivityReadModelItem,
   ActivityReadModelService,
 } from '@/src/core/activity';
+import { TransactionDetailScreen } from './TransactionDetailScreen';
+import { createTransactionDetailSelection } from './TransactionDetailScreen.logic';
+import type {
+  TransactionDetailActivityDependency,
+  TransactionDetailBroadcastDependency,
+} from './TransactionDetailScreen.logic';
 import {
   activityActionIcon,
   activityActionLabel,
@@ -42,6 +48,10 @@ type ActivityReadModelDependency = Pick<ActivityReadModelService, 'getActivity'>
 export interface WalletActivityScreenProps {
   readonly accountId: string | null;
   readonly activityReadModelService: ActivityReadModelDependency | null;
+  readonly activityService?: TransactionDetailActivityDependency | null;
+  readonly createBroadcastDependency?: (
+    networkId: string,
+  ) => Promise<TransactionDetailBroadcastDependency | null>;
   readonly networkRegistry: NetworkRegistry;
   readonly onBack: () => void;
 }
@@ -171,7 +181,7 @@ export function ActivityRow({
     presentation.secondaryAmount !== null;
   return (
     <Pressable
-      accessibilityHint="Opens a safe transaction detail placeholder"
+      accessibilityHint="Opens read-only transaction details"
       accessibilityLabel={label}
       accessibilityRole="button"
       onPress={onPress}
@@ -402,95 +412,6 @@ function ActivityFiltersSheet({
   );
 }
 
-function ActivityDetailPlaceholder({
-  item,
-  onClose,
-}: {
-  readonly item: ActivityReadModelItem;
-  readonly onClose: () => void;
-}) {
-  const presentation = item.presentation;
-  return (
-    <Modal
-      animationType="slide"
-      onRequestClose={onClose}
-      transparent
-      visible
-    >
-      <View style={styles.modalRoot}>
-        <Pressable
-          accessibilityLabel="Close activity detail"
-          accessibilityRole="button"
-          onPress={onClose}
-          style={styles.modalBackdrop}
-        />
-        <View accessibilityViewIsModal style={styles.detailSheet}>
-          <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <View>
-              <Text style={styles.cardEyebrow}>ACTIVITY DETAIL</Text>
-              <Text style={styles.sheetTitle}>Coming next</Text>
-            </View>
-            <Pressable
-              accessibilityLabel="Close activity detail"
-              accessibilityRole="button"
-              onPress={onClose}
-              style={({ pressed }) => [styles.sheetClose, pressed && styles.pressed]}
-            >
-              <Ionicons name="close" size={20} color={theme.colors.foreground} />
-            </Pressable>
-          </View>
-          <View style={styles.detailHero}>
-            <View style={styles.detailIcon}>
-              <Ionicons
-                name={activityActionIcon(presentation.action) as keyof typeof Ionicons.glyphMap}
-                size={24}
-                color={theme.colors.accent}
-              />
-            </View>
-            <Text style={styles.detailTitle}>{activityActionLabel(item)}</Text>
-            <Text style={styles.detailBody}>
-              The full transaction detail view will be introduced in a later phase.
-            </Text>
-          </View>
-          <View style={styles.detailRows}>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>ACTIVITY ID</Text>
-              <Text selectable style={styles.detailValue}>{item.identity}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>NETWORK</Text>
-              <Text style={styles.detailValue}>{presentation.network.name}</Text>
-            </View>
-            <View style={styles.detailRow}>
-              <Text style={styles.detailLabel}>STATUS</Text>
-              <Text style={[styles.detailValue, { color: statusColor(presentation.status) }]}>
-                {activityStatusLabel(presentation.status)}
-              </Text>
-            </View>
-            {presentation.explorerAvailability.available ? (
-              <View style={styles.explorerNotice}>
-                <Ionicons name="open-outline" size={16} color={theme.colors.accent} />
-                <Text style={styles.explorerNoticeText}>
-                  Explorer link available for the configured {presentation.explorerAvailability.explorerName} explorer.
-                </Text>
-              </View>
-            ) : null}
-          </View>
-          <Pressable
-            accessibilityLabel="Close activity detail placeholder"
-            accessibilityRole="button"
-            onPress={onClose}
-            style={({ pressed }) => [styles.doneButton, pressed && styles.pressed]}
-          >
-            <Text style={styles.doneButtonText}>Close</Text>
-          </Pressable>
-        </View>
-      </View>
-    </Modal>
-  );
-}
-
 function ActivitySkeleton() {
   return (
     <View accessibilityLabel="Loading activity" style={styles.activityList}>
@@ -546,6 +467,8 @@ function ActivityStateCard({
 export function WalletActivityScreen({
   accountId,
   activityReadModelService,
+  activityService,
+  createBroadcastDependency,
   networkRegistry,
   onBack,
 }: WalletActivityScreenProps) {
@@ -556,7 +479,9 @@ export function WalletActivityScreen({
   const [typeFilter, setTypeFilter] = useState<ActivityTypeFilter>('transactions');
   const [networkFilter, setNetworkFilter] = useState<NetworkFilter>('all');
   const [filterSheetVisible, setFilterSheetVisible] = useState(false);
-  const [selectedItem, setSelectedItem] = useState<ActivityReadModelItem | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<
+    ReturnType<typeof createTransactionDetailSelection> | null
+  >(null);
 
   const enabledNetworks = useMemo(
     () => networkRegistry.listEnabledNetworks(),
@@ -630,7 +555,9 @@ export function WalletActivityScreen({
             <ActivityRow
               item={activity}
               key={activity.identity}
-              onPress={() => setSelectedItem(activity)}
+              onPress={() =>
+                setSelectedActivity(createTransactionDetailSelection(activity))
+              }
             />
           ))}
         </View>
@@ -801,10 +728,17 @@ export function WalletActivityScreen({
         typeOptions={typeOptions}
         visible={filterSheetVisible}
       />
-      {selectedItem ? (
-        <ActivityDetailPlaceholder
-          item={selectedItem}
-          onClose={() => setSelectedItem(null)}
+      {selectedActivity ? (
+        <TransactionDetailScreen
+          accountId={selectedActivity.accountId}
+          activityId={selectedActivity.activityId}
+          activityReadModelService={activityReadModelService}
+          activityService={activityService}
+          chainId={selectedActivity.chainId}
+          createBroadcastDependency={createBroadcastDependency}
+          networkId={selectedActivity.networkId}
+          networkRegistry={networkRegistry}
+          onBack={() => setSelectedActivity(null)}
         />
       ) : null}
     </View>

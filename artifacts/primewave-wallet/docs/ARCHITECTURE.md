@@ -864,7 +864,7 @@ deterministic fallback at the left, overlays the presentation model's network
 badge metadata, shows action and counterparty context in the center, and
 right-aligns exact signed amount strings with optional supplied fiat beneath.
 Rows retain lifecycle state, accessible labels, and a safe activity identifier
-for the controlled detail placeholder.
+for the detail screen to resolve again through the authoritative read model.
 
 Activity type options are data-driven: Transactions is the default, while
 Swaps, Approvals, and Contract interactions appear only when explicit
@@ -879,10 +879,42 @@ error, no activity, no network match, and no filter match states. Refresh
 re-reads the existing service and does not start polling or transaction
 execution.
 
-Phase 5.2 intentionally stops before the complete transaction detail page,
-swap detection or execution, price APIs, external indexing, backend history,
-notifications, transaction replacement, speed-up, cancellation, DApps, and
-WalletConnect.
+Phase 5.2 intentionally stops before reconciliation and the Phase 5.3 detail
+implementation. Swap detection or execution, price APIs, external indexing,
+backend history, notifications, transaction replacement, speed-up,
+cancellation, DApps, and WalletConnect remain outside both phases.
+
+### Phase 5.3 WAVEX Transaction Details and reconciliation
+
+The Activity row now opens `TransactionDetailScreen` with only the public
+activity identity and its account/network/chain scope. The screen resolves
+the authoritative record again through `ActivityReadModelService`, then
+renders the existing `ActivityPresentationModel` plus authoritative record
+metadata. Navigation never carries a private key, mnemonic, PIN, biometric
+credential, SecureStore value, or signing capability.
+
+The detail experience is blockchain-read-only. It shows explicit summary,
+status, sender/counterparty, asset and exact amount, network, fee/gas,
+transaction metadata, timestamp provenance, and validated explorer behavior.
+Signed, broadcasted, confirming, confirmed, reverted, failed, and unknown
+remain distinct; unknown is never relabeled as failed, and a broadcast is not
+presented as confirmation. Missing fee, gas, nonce, block, timestamp, token
+metadata, or explorer data stays unavailable rather than being fabricated.
+
+Refresh is explicit and bounded. For a known hash it uses the existing
+`lookupTransaction()` method and invokes the existing confirmation engine only
+when lookup reports a mined transaction. Confirmed or reverted receipts update
+the scoped activity lifecycle; pending, not-found, and inconclusive results
+remain honest and never trigger automatic rebroadcast, signing, hidden
+polling, or transaction mutation. The provider and activity stay bound to the
+original network and chain; the detail flow never changes the active wallet
+network.
+
+External blockchain-read activity can be shown without a local transaction ID
+and uses neutral origin wording. Explorer links come only from validated
+configured network metadata. Phase 5.3 does not add swap detection or
+execution, approval execution, backend history, external indexing, price APIs,
+notifications, replacement, speed-up, cancellation, or fee bumping.
 
 ## Design system
 

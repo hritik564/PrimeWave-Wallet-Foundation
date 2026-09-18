@@ -619,7 +619,7 @@ Assets has no access to SecureStore, SecureVault, Keychain/Keystore,
 `WalletAuthenticator`, mnemonics, seeds, private keys, PINs, signing
 capabilities, transaction authorization secrets, transaction construction, or
 broadcasting. Asset rows are display/navigation only and lead only to a
-controlled future-detail placeholder.
+read-only transaction detail flow.
 
 The Receive UI consumes only the public account address and selected network
 metadata. Its QR payload is public-address-only, its clipboard operation writes
@@ -844,16 +844,52 @@ The asset icon and network badge are display metadata, not trust signals.
 Verification remains independent from icon availability. Full addresses are
 retained for accessibility while shortened addresses are used visually. Row
 navigation passes only a public activity identity and public context to the
-placeholder detail sheet; no private key, mnemonic, PIN, authentication
-secret, or signing capability can be passed through this flow.
+read-only detail screen; no private key, mnemonic, PIN, authentication secret,
+or signing capability can be passed through this flow.
 
 Pending, confirmed, reverted, failed, and unknown statuses remain separate.
 Unknown is never relabeled as failed, and Sent is not a confirmation claim.
 Fiat is omitted when absent, explorer actions are not invented, and valid
 explorer availability is only surfaced from configured presentation metadata.
-Phase 5.2 does not implement the complete detail page, swap detection or
-execution, price APIs, external indexing, backend history, notifications,
-replacement, speed-up, cancellation, DApps, or WalletConnect.
+Phase 5.2 did not implement reconciliation; the Phase 5.3 boundary below adds
+only the bounded read-only detail flow. Swap detection or execution, price
+APIs, external indexing, backend history, notifications, replacement,
+speed-up, cancellation, DApps, and WalletConnect remain excluded.
+
+### Phase 5.3 Transaction Details security boundary
+
+Transaction Details is a read-only presentation and reconciliation boundary.
+Activity row navigation passes only a public activity identity and
+account/network/chain scope. The detail screen re-reads the scoped item
+through `ActivityReadModelService`; it does not trust a stale navigation
+snapshot and it does not accept or access private keys, mnemonics, PINs,
+biometric credentials, SecureStore values, or signing capabilities.
+
+The screen does not import signing flows or call broadcast mutation methods.
+Its only network operation is the user-triggered, bounded use of the existing
+public transaction lookup and confirmation methods for a known transaction
+hash. It never calls `eth_sendRawTransaction`, signs, rebroadcasts, changes
+transaction data, replaces a transaction, speeds it up, cancels it, or bumps
+fees. There is no background polling loop or automatic retry.
+
+Reconciliation preserves account, network, and exact chain scope. The existing
+provider and broadcast engine may refuse reconciliation when the activity
+network is not the active configured network; the detail flow does not switch
+the active network to make the request work. A pending, not-found, or
+inconclusive response does not become a fabricated confirmation. Unknown
+remains distinct from failed.
+
+Amounts, fees, gas, nonce, block data, and timestamps are rendered only from
+authoritative activity or receipt fields. Bigint quantities are not converted
+through floating-point arithmetic. Explorer URLs are surfaced only from
+validated configured metadata. Copy actions can write public addresses and
+hashes through the existing clipboard boundary but never read or persist
+clipboard contents.
+
+External blockchain-read records are displayed with neutral origin wording.
+No backend history, external indexer, price API, notification, analytics,
+swap, approval execution, DApp, WalletConnect, replacement, speed-up,
+cancellation, or fee-bumping boundary was added in Phase 5.3.
 
 ### Development-only Replit web preview mode
 

@@ -78,6 +78,7 @@ export interface TransactionActivityDependency
     | 'recordBroadcast'
     | 'recordConfirmation'
     | 'recordFailed'
+    | 'recordExternal'
   > {
   readonly createDraft: (input: ActivityDraftInput) => ActivityRecord;
 }

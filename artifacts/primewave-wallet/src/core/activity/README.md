@@ -102,10 +102,44 @@ at the service boundary.
 Statuses remain distinct, including pending, confirmed, reverted, failed, and
 unknown. Unknown is not presented as failed, and a sent label is not treated as
 confirmation. Dates use the presentation timestamp and source, with newest
-activity grouped first. A row opens only a controlled placeholder carrying its
-safe activity identity and public context; the full detail page is deferred.
+activity grouped first. A row opens the read-only Transaction Details surface
+with its safe activity identity and public context; the detail screen resolves
+the authoritative item again through the read model.
 
 The UI supports empty, filtered-empty, unavailable, loading, refresh, and
 refresh-error states. It does not add fake transactions, fiat prices, inferred
 swaps, direct receipt polling, background polling, analytics, backend history,
 notifications, or transaction mutation.
+
+## Phase 5.3 Transaction Details and reconciliation
+
+`TransactionDetailScreen` receives only an activity identity and its public
+account/network/chain scope. It resolves the current item again through
+`ActivityReadModelService`; it does not trust a navigation snapshot and it
+does not duplicate activity models. The screen consumes the existing
+`ActivityPresentationModel` for action, asset, counterparty, network, exact
+amount, timestamp, and explorer presentation.
+
+The detail view is read-only. It distinguishes draft, locally signed,
+broadcasting, broadcasted, confirming, confirmed, reverted, failed, and
+unknown states. Signed does not mean broadcasted, broadcasted does not mean
+confirmed, and unknown does not mean failed. Exact bigint quantities remain
+separate from native network fees; only authoritative gas, nonce, receipt,
+block, and timestamp fields are shown.
+
+For a known hash, a user-triggered refresh calls the existing public
+transaction lookup and, only when the lookup reports mined, the existing
+bounded confirmation engine. A receipt updates a local activity record to
+confirmed or reverted. Pending, not-found, and inconclusive results do not
+trigger a rebroadcast or signing operation. External blockchain-read records
+are presented neutrally and can be reconciled without a local transaction ID.
+The active network is never changed; mismatched or unconfigured network
+contexts fail closed.
+
+Explorer links are displayed only when the presentation model exposes a valid
+configured URL. Copy actions write public addresses or hashes through the
+existing clipboard boundary and never read or persist clipboard contents.
+
+Phase 5.3 does not implement swap detection or execution, approval execution,
+backend history, external indexing, price APIs, notifications, replacement,
+speed-up, cancellation, or fee bumping.

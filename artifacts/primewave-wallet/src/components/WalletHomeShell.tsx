@@ -1262,7 +1262,9 @@ export function WalletHomeShell({
         ) : destination === 'activity' ? (
           <WalletActivityScreen
             accountId={account?.accountId ?? null}
+            activityService={activityService}
             activityReadModelService={activityReadModelService ?? null}
+            createBroadcastDependency={createBroadcastDependency}
             networkRegistry={networkRegistry}
             onBack={() => setDestination('home')}
           />
