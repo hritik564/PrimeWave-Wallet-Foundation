@@ -1,0 +1,384 @@
+WAVEX — CONTROLLED 0x LIVE QUOTE SMOKE TEST
+PHASE 6.4 → PRE-6.5 VALIDATION
+
+Context:
+WaveX Phase 6.1, 6.2, 6.3, and 6.4 are implemented and approved.
+
+The 0x Swap API v2 provider is implemented behind the provider-neutral SwapQuoteProvider boundary.
+
+The Replit environment secret:
+ZEROEX_API_KEY
+
+has already been configured by the project owner.
+
+IMPORTANT:
+This task is ONLY a controlled live 0x quote smoke test.
+
+DO NOT implement Phase 6.5.
+DO NOT add signing.
+DO NOT add authentication.
+DO NOT add token approvals.
+DO NOT add Permit2.
+DO NOT add EIP-712 signing.
+DO NOT broadcast any transaction.
+DO NOT call eth_sendRawTransaction.
+DO NOT spend or move funds.
+DO NOT create Activity records.
+DO NOT add WaveX fees.
+DO NOT add cross-chain swap execution.
+DO NOT modify the production swap execution architecture.
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Make one controlled REAL request to the 0x Swap API v2 using the existing Phase 6.2 provider.
+
+The purpose is to verify:
+
+WaveX
+  ↓
+Phase 6.2 0x provider
+  ↓
+REAL 0x API
+  ↓
+REAL quote response
+  ↓
+normalization
+  ↓
+Phase 6.4 review validation
+  ↓
+Approved-for-Signing state
+  ↓
+STOP
+
+The smoke test must stop before any signing or execution.
+
+==================================================
+2. USE THE EXISTING ARCHITECTURE
+==================================================
+
+Do not bypass existing abstractions.
+
+Use the existing:
+
+- SwapQuoteProvider
+- 0x Swap API v2 provider
+- normalized SwapQuote model
+- SwapQuoteService
+- SwapReviewService
+- Phase 6.3 Swap UI
+- Phase 6.4 Swap Review UI
+
+Do not directly implement a second 0x client.
+
+Do not duplicate quote parsing or normalization.
+
+Do not put 0x-specific logic into generic UI components.
+
+==================================================
+3. API CREDENTIAL SECURITY
+==================================================
+
+Read the API credential only from the existing environment secret:
+
+ZEROEX_API_KEY
+
+Never hardcode the key.
+
+Never print the key.
+
+Never display the key in the UI.
+
+Never expose the key through client-side JavaScript.
+
+Never write the key to source files.
+
+Never write the key to git.
+
+Never include the key in logs.
+
+Never include the key in error messages.
+
+Never return the key from an API response.
+
+If the existing architecture requires a trusted/server-side boundary for the credential, preserve that boundary.
+
+If the current Replit/mobile architecture cannot safely perform a live request without exposing the credential to the client bundle, STOP and report the architectural limitation instead of weakening the security model.
+
+==================================================
+4. CONTROLLED TEST QUOTE
+==================================================
+
+Use a small, harmless quote request.
+
+Preferred test:
+
+Network:
+Ethereum mainnet
+
+Sell token:
+ETH native asset
+
+Buy token:
+USDC
+
+Use a small sell amount equivalent to approximately:
+
+0.001 ETH
+
+The request is QUOTE ONLY.
+
+It must not execute anything.
+
+Use the existing 0x native-token sentinel handling already implemented in Phase 6.2.
+
+Do not invent token addresses if the existing provider configuration already contains the canonical values.
+
+Use the project's existing network/token abstractions wherever possible.
+
+==================================================
+5. LIVE REQUEST REQUIREMENTS
+==================================================
+
+Make exactly one controlled live quote attempt.
+
+The request must use:
+
+Base URL:
+https://api.0x.org
+
+Endpoint:
+ /swap/allowance-holder/quote
+
+Required headers:
+
+0x-api-key: <environment secret>
+0x-version: v2
+
+Do not expose the actual API key anywhere in output.
+
+The request must include the correct chainId and token/amount parameters according to the existing Phase 6.2 provider implementation.
+
+==================================================
+6. RESPONSE VALIDATION
+==================================================
+
+If 0x returns a successful quote:
+
+Pass the response through the EXISTING provider normalization layer.
+
+Verify that WaveX can obtain, where provided:
+
+- provider identity
+- quote identity
+- network/chain
+- sell asset
+- buy asset
+- sell amount
+- expected buy amount
+- minimum buy amount
+- route/source information
+- price impact availability
+- network/provider fees
+- allowance metadata
+- transaction target
+- transaction value
+- transaction calldata
+- quote expiry/lifecycle information
+
+Do not invent missing fields.
+
+If a field is unavailable from 0x, preserve it as unavailable/null/unknown according to the existing models.
+
+==================================================
+7. PHASE 6.4 REVIEW VALIDATION
+==================================================
+
+Take the normalized quote and pass it through the existing Phase 6.4 SwapReviewService.
+
+Verify that the review layer:
+
+- validates the quote lifecycle
+- validates quote expiry
+- validates account context
+- validates sender
+- validates network
+- validates chain
+- validates sell asset
+- validates buy asset
+- validates exact sell amount
+- validates slippage
+- validates provider identity/context
+- validates provider transaction target
+- validates transaction value
+- validates transaction calldata
+- validates required balance
+- validates required network fee
+- preserves allowance metadata
+- creates the canonical review snapshot
+- creates the binding digest
+- reaches Approved-for-Signing ONLY if all required checks pass
+
+Do not sign the transaction.
+
+Do not request PIN/biometric authentication.
+
+Do not create a signing capability.
+
+Do not call any signing engine.
+
+Do not call any broadcast engine.
+
+==================================================
+8. IF THE QUOTE FAILS
+==================================================
+
+A failed live quote is NOT a reason to weaken the architecture.
+
+Report the exact sanitized failure category, for example:
+
+- API key missing
+- unauthorized
+- forbidden
+- rate limited
+- invalid request
+- unsupported chain
+- no liquidity
+- no route
+- provider unavailable
+- malformed provider response
+- network timeout
+- normalized provider error
+- review validation failure
+
+Never expose the API key.
+
+Do not replace the real request with fake/mock production data.
+
+If the failure is caused by an implementation issue, identify the smallest required fix and STOP.
+
+==================================================
+9. UI VERIFICATION
+==================================================
+
+If the real quote succeeds, verify the existing WaveX UI can display:
+
+- sell token
+- sell amount
+- receive token
+- expected receive amount
+- minimum receive
+- route
+- price impact when available
+- fees
+- quote expiry
+- allowance metadata
+- review warnings where applicable
+
+Then verify:
+
+Review Swap
+    ↓
+Approved for Signing
+
+is reachable without signing or broadcasting.
+
+The UI must clearly stop at:
+
+Approved for Signing
+
+==================================================
+10. SECURITY CHECK
+==================================================
+
+After the smoke test, inspect the changed code and confirm:
+
+- ZEROEX_API_KEY is not hardcoded
+- ZEROEX_API_KEY is not logged
+- ZEROEX_API_KEY is not returned to the client
+- private keys are untouched
+- recovery phrases are untouched
+- SecureStore is untouched by the quote provider
+- signing code was not invoked
+- approval code was not invoked
+- Permit2 was not invoked
+- EIP-712 was not invoked
+- eth_sendRawTransaction was not invoked
+- no transaction was broadcast
+- no Activity record was created
+- no WaveX fee was added
+
+==================================================
+11. TESTING
+==================================================
+
+Run:
+
+- existing Phase 6.2 provider tests
+- Phase 6.3 swap UI tests
+- Phase 6.4 review tests
+- full test suite
+- TypeScript typecheck
+- Expo validation/build checks as appropriate
+
+Do not weaken or delete existing tests.
+
+==================================================
+12. IMPORTANT STOP CONDITION
+==================================================
+
+STOP after the live quote + Phase 6.4 review validation.
+
+Do NOT implement:
+
+- Phase 6.5 Swap Execution
+- approvals
+- signing
+- broadcasting
+- Activity integration
+
+Those will be implemented separately only after this smoke test is reviewed and approved.
+
+==================================================
+13. FINAL REPORT
+==================================================
+
+Return a concise report containing:
+
+1. Whether ZEROEX_API_KEY was detected
+   - report only configured/missing
+   - NEVER reveal the key
+
+2. Exact network tested
+
+3. Exact sell asset and amount
+
+4. Exact buy asset
+
+5. Whether the REAL 0x API request succeeded
+
+6. HTTP status category if useful
+
+7. Whether normalization succeeded
+
+8. Whether Phase 6.4 review validation succeeded
+
+9. Whether Approved-for-Signing was reached
+
+10. Confirm explicitly:
+   - no signing
+   - no approval
+   - no Permit2
+   - no EIP-712
+   - no broadcast
+   - no Activity record
+   - no funds moved
+
+11. Test/typecheck/build results
+
+12. Any issue discovered
+
+If anything fails, STOP and explain the smallest corrective action required.
+
+DO NOT proceed into Phase 6.5.
