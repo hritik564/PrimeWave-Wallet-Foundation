@@ -1,0 +1,2512 @@
+VISUAL REFERENCE — IMPORTANT
+
+I am providing a WaveX Swap UI mockup image with this prompt.
+
+Use the provided image as the PRIMARY visual and UX reference for Phase 6.3.
+
+The image establishes the intended:
+- layout hierarchy
+- visual hierarchy
+- spacing
+- card structure
+- token selector presentation
+- Sell / You Receive interaction
+- quote information presentation
+- slippage controls
+- warning presentation
+- Review Swap CTA
+- bottom navigation
+- WAVEX futuristic dark visual language
+- cyan / electric-blue / violet accent treatment
+
+IMPORTANT:
+
+Treat the image as a design reference, NOT as a source of functional data.
+
+Do NOT copy the mockup's:
+- token balances
+- token prices
+- exchange rates
+- gas fees
+- price impact
+- minimum received
+- quote expiry
+- provider values
+
+Those values must come from the real WaveX application state and validated 0x quote architecture.
+
+Do NOT hardcode any values from the image.
+
+Preserve WaveX's existing design system and component architecture.
+
+The final implementation should feel like the provided mockup while remaining responsive, accessible, and functionally connected to the existing Phase 6.1 and 6.2 architecture.
+
+
+
+WAVEX — PHASE 6.3: SWAP UI
+
+
+
+We are now implementing Phase 6.3 of the WaveX wallet roadmap.
+
+
+
+PHASES ALREADY APPROVED:
+
+
+
+- Phase 6.1 — Swap Architecture & Quote Model
+
+- Phase 6.2 — 0x Swap API v2 Quote Provider
+
+
+
+The existing WaveX wallet architecture must remain intact.
+
+
+
+This phase is ONLY the Swap UI and quote presentation layer.
+
+
+
+IMPORTANT:
+
+
+
+Do NOT implement swap signing.
+
+Do NOT implement swap broadcasting.
+
+Do NOT implement token approvals.
+
+Do NOT implement Permit2.
+
+Do NOT implement EIP-712 signing.
+
+Do NOT implement swap execution.
+
+Do NOT add backend swap execution.
+
+Do NOT add cross-chain swaps.
+
+Do NOT add WaveX swap fees.
+
+Do NOT bypass SwapQuoteService.
+
+Do NOT call the 0x API directly from UI components.
+
+Do NOT access SecureStore, mnemonic, private keys, PIN, or biometric APIs.
+
+Do NOT modify existing Send/Review/Signing/Broadcast security architecture.
+
+Do NOT create fake production quotes.
+
+Do NOT fabricate prices, balances, gas fees, price impact, routes, or exchange rates.
+
+
+
+The Swap UI must consume the existing Phase 6.1/6.2 abstractions.
+
+
+
+STOP after Phase 6.3 and wait for my review.
+
+
+
+
+
+==================================================
+
+1. OBJECTIVE
+
+==================================================
+
+
+
+Build the production-quality WaveX Swap screen.
+
+
+
+The screen should feel like a modern self-custodial wallet swap experience while matching the existing WaveX visual language:
+
+
+
+- dark futuristic interface
+
+- cyan / electric blue / violet accents
+
+- rounded cards
+
+- restrained glow
+
+- premium spacing
+
+- strong typography hierarchy
+
+- compact but readable information
+
+- polished loading/error states
+
+- mobile-first
+
+- accessible
+
+- no excessive decoration
+
+
+
+The screen should feel native to WaveX rather than looking like a generic DEX interface.
+
+
+
+
+
+==================================================
+
+2. EXISTING NAVIGATION
+
+
+
+The existing bottom navigation contains:
+
+
+
+Home
+
+Assets
+
+Swap
+
+Activity
+
+Settings
+
+
+
+Replace ONLY the existing Swap placeholder with the real Swap screen.
+
+
+
+Do not redesign the other destinations.
+
+
+
+
+
+==================================================
+
+3. ARCHITECTURE
+
+
+
+The UI must follow:
+
+
+
+Swap Screen
+
+    ↓
+
+Swap UI Logic / Controller
+
+    ↓
+
+SwapQuoteService
+
+    ↓
+
+SwapQuoteProvider
+
+    ↓
+
+0x Provider
+
+    ↓
+
+0x API
+
+
+
+The UI must NEVER call:
+
+
+
+- 0x API
+
+- fetch()
+
+- RPC
+
+- SecureStore
+
+- signing engine
+
+- broadcasting engine
+
+
+
+directly.
+
+
+
+Keep networking and provider behavior outside React components.
+
+
+
+
+
+==================================================
+
+4. CREATE SWAP UI FILES
+
+
+
+Follow existing project conventions.
+
+
+
+Suggested structure:
+
+
+
+src/components/WalletSwapScreen.tsx
+
+src/components/WalletSwapScreen.logic.ts
+
+src/core/swaps/
+
+
+
+Add focused tests for the UI logic.
+
+
+
+Do not duplicate existing asset/network/business logic.
+
+
+
+
+
+==================================================
+
+5. MAIN SWAP SCREEN LAYOUT
+
+
+
+Create a polished mobile-first screen with:
+
+
+
+HEADER
+
+
+
+- "Swap" title
+
+- selected network indicator
+
+- refresh/quote refresh action where appropriate
+
+
+
+MAIN CARD
+
+
+
+"Sell"
+
+
+
+Asset selector
+
+Amount input
+
+Available balance
+
+
+
+↓
+
+
+
+swap-direction button
+
+
+
+"Buy"
+
+
+
+Asset selector
+
+Estimated received amount
+
+
+
+Then:
+
+
+
+Quote information card
+
+Review Swap button
+
+
+
+
+
+==================================================
+
+6. SELL ASSET CARD
+
+
+
+The Sell section must contain:
+
+
+
+- token/asset icon
+
+- asset symbol
+
+- asset name where useful
+
+- amount input
+
+- available balance
+
+- MAX button
+
+
+
+Example visual hierarchy:
+
+
+
+Sell
+
+
+
+[ TOKEN ICON ] USDC          [⌄]
+
+              USD Coin
+
+
+
+        250.00
+
+
+
+Available: 1,240.50     MAX
+
+
+
+
+
+Do not hardcode USDC or any specific token.
+
+
+
+Use the user's actual available assets.
+
+
+
+
+
+==================================================
+
+7. BUY ASSET CARD
+
+
+
+The Buy section must contain:
+
+
+
+- token/asset icon
+
+- asset symbol
+
+- asset name where useful
+
+- estimated received amount
+
+
+
+Example:
+
+
+
+You receive
+
+
+
+[ TOKEN ICON ] ETH          [⌄]
+
+
+
+        ~0.08342 ETH
+
+
+
+The amount must come from a real quote.
+
+
+
+Do NOT show a fake value.
+
+
+
+If no quote exists:
+
+
+
+"--"
+
+
+
+or an equivalent clear unavailable state.
+
+
+
+
+
+==================================================
+
+8. ASSET SELECTOR
+
+
+
+Build a reusable asset-selection interaction.
+
+
+
+It must display assets available for the current:
+
+
+
+account
+
+network
+
+
+
+Use existing PortfolioReadModel / asset architecture where appropriate.
+
+
+
+Do NOT create another token registry.
+
+
+
+The selector should support:
+
+
+
+- search
+
+- token symbol
+
+- token name
+
+- contract address
+
+- native asset
+
+- ERC-20 assets
+
+- balance
+
+- token icon
+
+- fallback icon
+
+
+
+Respect existing:
+
+
+
+- verification status
+
+- metadata status
+
+- visibility
+
+- availability
+
+
+
+Do not imply that an unverified token is trusted.
+
+
+
+The selector must not display assets from another network.
+
+
+
+
+
+==================================================
+
+9. ASSET SELECTION MODAL
+
+
+
+Create a polished modal/bottom-sheet style asset selector consistent with WaveX.
+
+
+
+Include:
+
+
+
+Search input
+
+Asset rows
+
+Token icon
+
+Symbol
+
+Name
+
+Balance
+
+
+
+Optional secondary information:
+
+
+
+network-specific balance
+
+
+
+States:
+
+
+
+- loading
+
+- available assets
+
+- empty
+
+- no search results
+
+- unavailable
+
+- error
+
+- retry
+
+
+
+Selecting an asset closes the selector.
+
+
+
+Do not switch the active wallet network from inside the asset selector.
+
+
+
+
+
+==================================================
+
+10. NETWORK CONTEXT
+
+
+
+The Swap screen must use the existing selected network context.
+
+
+
+Only configured networks can request real quotes.
+
+
+
+If the selected network is:
+
+
+
+PrimeWave placeholder
+
+unconfigured
+
+disabled
+
+unsupported by 0x
+
+
+
+show a clear unavailable state.
+
+
+
+Do NOT fabricate quotes.
+
+
+
+Do NOT silently switch networks.
+
+
+
+Do NOT silently select another network.
+
+
+
+The network selector should use the existing WaveX network experience from Phase 4.3.
+
+
+
+
+
+==================================================
+
+11. NETWORK FILTERING
+
+
+
+Only show swap assets belonging to the selected swap network.
+
+
+
+If the user changes network:
+
+
+
+Clear:
+
+
+
+- sell asset
+
+- buy asset
+
+- sell amount
+
+- current quote
+
+
+
+Do not reuse a quote from another network.
+
+
+
+Do not reuse balances from another network.
+
+
+
+
+
+==================================================
+
+12. SWAP-DIRECTION BUTTON
+
+
+
+Implement a swap-direction button between Sell and Buy.
+
+
+
+When pressed:
+
+
+
+sell asset ↔ buy asset
+
+
+
+If a valid quote exists:
+
+
+
+invalidate it.
+
+
+
+Do NOT assume the old quote remains valid.
+
+
+
+The user must obtain a fresh quote.
+
+
+
+
+
+==================================================
+
+13. AMOUNT INPUT
+
+
+
+Sell amount input must use exact decimal handling.
+
+
+
+Do NOT use floating-point calculations for token amounts.
+
+
+
+Support:
+
+
+
+- empty
+
+- typing
+
+- valid amount
+
+- decimal amount
+
+- zero
+
+- negative
+
+- malformed
+
+- excessive decimals
+
+- insufficient balance
+
+
+
+Use the existing asset decimal metadata.
+
+
+
+Do not duplicate decimal parsing logic if existing utilities can be reused safely.
+
+
+
+
+
+==================================================
+
+14. MAX BUTTON
+
+
+
+Implement MAX.
+
+
+
+For ERC-20:
+
+
+
+MAX = exact available token balance.
+
+
+
+For native assets:
+
+
+
+MAX must initially represent the exact available native balance.
+
+
+
+IMPORTANT:
+
+
+
+Do NOT silently subtract estimated gas from MAX.
+
+
+
+Instead, when a native MAX amount would leave insufficient native balance for the eventual network fee, clearly surface the existing insufficient-funds state during quote/review.
+
+
+
+Do not invent a hidden gas reserve.
+
+
+
+
+
+==================================================
+
+15. VALID SWAP PAIR
+
+
+
+Reject:
+
+
+
+sell asset == buy asset
+
+
+
+Show a clear user-facing state such as:
+
+
+
+"Choose two different assets."
+
+
+
+
+
+==================================================
+
+16. QUOTE REQUEST
+
+
+
+Only request a quote when the request is sufficiently valid.
+
+
+
+A valid quote request requires:
+
+
+
+- valid account
+
+- valid sender
+
+- configured network
+
+- supported 0x chain
+
+- valid sell asset
+
+- valid buy asset
+
+- different assets
+
+- valid positive sell amount
+
+- valid slippage
+
+
+
+Use the existing SwapQuoteService.
+
+
+
+Do not construct provider requests inside the UI.
+
+
+
+
+
+==================================================
+
+17. QUOTE DEBOUNCE
+
+
+
+Do not send a provider request for every keystroke.
+
+
+
+Implement a bounded debounce before requesting a quote.
+
+
+
+Example:
+
+
+
+300–500ms
+
+
+
+Use the smallest sensible debounce consistent with a smooth UX.
+
+
+
+When the user changes:
+
+
+
+- sell amount
+
+- sell token
+
+- buy token
+
+- network
+
+- slippage
+
+
+
+invalidate the previous quote and request a fresh quote when input becomes valid.
+
+
+
+
+
+==================================================
+
+18. QUOTE LOADING STATE
+
+
+
+When a quote is being requested:
+
+
+
+Show a polished loading state.
+
+
+
+Examples:
+
+
+
+"Finding best route..."
+
+"Getting quote..."
+
+
+
+Do not display fake output values while loading.
+
+
+
+Keep the interface responsive.
+
+
+
+Do not allow an old quote to appear as though it belongs to the new request.
+
+
+
+
+
+==================================================
+
+19. QUOTE RESULT
+
+
+
+When a real quote arrives, show useful information.
+
+
+
+At minimum:
+
+
+
+Expected receive
+
+Rate
+
+Minimum received
+
+Network fee
+
+Price impact
+
+Route/provider
+
+Quote expiry
+
+
+
+Only display values actually available from the quote.
+
+
+
+If a value is unavailable:
+
+
+
+use an explicit unavailable representation.
+
+
+
+Do NOT fabricate zero.
+
+
+
+
+
+==================================================
+
+20. RATE DISPLAY
+
+
+
+Display an understandable exchange rate.
+
+
+
+For example:
+
+
+
+1 ETH ≈ 3,420 USDC
+
+
+
+or:
+
+
+
+1 USDC ≈ 0.000292 ETH
+
+
+
+Choose the representation that is clearest for the selected pair.
+
+
+
+IMPORTANT:
+
+
+
+Rate display is presentation only.
+
+
+
+Do not convert token amounts through JavaScript floating-point arithmetic.
+
+
+
+Use exact decimal utilities and safe formatting.
+
+
+
+
+
+==================================================
+
+21. PRICE IMPACT
+
+
+
+Show price impact only when reliably available.
+
+
+
+Example:
+
+
+
+Price impact
+
+0.42%
+
+
+
+If unavailable:
+
+
+
+Price impact
+
+Unavailable
+
+
+
+Do not display:
+
+
+
+0.00%
+
+
+
+when the provider did not actually provide the value.
+
+
+
+
+
+==================================================
+
+22. MINIMUM RECEIVED
+
+
+
+Show:
+
+
+
+Minimum received
+
+
+
+and the exact formatted value when available.
+
+
+
+This should correspond to:
+
+
+
+minimumBuyAmount
+
+
+
+from the normalized quote.
+
+
+
+Do not independently invent a minimum amount in the UI.
+
+
+
+
+
+==================================================
+
+23. NETWORK FEE
+
+
+
+Show the quote's network/gas fee when available.
+
+
+
+Example:
+
+
+
+Network fee
+
+~0.0021 ETH
+
+
+
+Do not invent fiat conversion.
+
+
+
+Do not call a price API in this phase.
+
+
+
+If fiat conversion is unavailable:
+
+
+
+do not display a fake dollar value.
+
+
+
+
+
+==================================================
+
+24. ROUTE / PROVIDER
+
+
+
+Show a compact route/provider detail.
+
+
+
+For example:
+
+
+
+Route
+
+0x Aggregated
+
+
+
+or:
+
+
+
+Route
+
+Multiple liquidity sources
+
+
+
+Only use information actually available in the normalized quote.
+
+
+
+Do not invent protocol names.
+
+
+
+
+
+==================================================
+
+25. QUOTE EXPIRATION
+
+
+
+If the quote has:
+
+
+
+expiresAt
+
+
+
+show a compact expiration indicator.
+
+
+
+For example:
+
+
+
+Quote valid for 18s
+
+
+
+When expired:
+
+
+
+Quote expired
+
+
+
+and disable Review Swap until a fresh quote is obtained.
+
+
+
+Do not silently continue using an expired quote.
+
+
+
+Do not automatically execute a refresh loop.
+
+
+
+A user-triggered refresh is allowed.
+
+
+
+
+
+==================================================
+
+26. REFRESH QUOTE
+
+
+
+Provide a clear refresh action.
+
+
+
+When pressed:
+
+
+
+- invalidate old quote
+
+- request a new quote
+
+- show loading state
+
+- replace only after the new quote has been validated
+
+
+
+Do not show the previous quote as current during refresh.
+
+
+
+
+
+==================================================
+
+27. SLIPPAGE SETTINGS
+
+
+
+Add a compact slippage control.
+
+
+
+Default UI value may use a sensible default such as:
+
+
+
+50 bps
+
+
+
+BUT:
+
+
+
+Use the existing SwapQuoteRequest/validation architecture.
+
+
+
+The user must be able to change slippage.
+
+
+
+Provide options such as:
+
+
+
+0.10%
+
+0.50%
+
+1.00%
+
+2.00%
+
+
+
+and optionally custom input.
+
+
+
+Respect the Phase 6.1 maximum:
+
+
+
+5000 bps
+
+
+
+Do not allow values above it.
+
+
+
+Do not silently increase slippage.
+
+
+
+
+
+==================================================
+
+28. SLIPPAGE WARNING
+
+
+
+If the user chooses unusually high slippage, show a clear warning.
+
+
+
+Do not block merely because the value is high if it remains within the architecture's allowed range.
+
+
+
+Do not make a political/economic judgment about the user's choice.
+
+
+
+Keep the warning factual:
+
+
+
+"High slippage can result in receiving less than expected."
+
+
+
+
+
+==================================================
+
+29. UNVERIFIED ASSET WARNING
+
+
+
+If either selected token is unverified according to existing WaveX metadata:
+
+
+
+show a clear but neutral warning.
+
+
+
+Example:
+
+
+
+"Token verification is unavailable for this asset."
+
+
+
+Do NOT call the token:
+
+
+
+scam
+
+malicious
+
+unsafe
+
+
+
+unless a future trusted security system explicitly provides such evidence.
+
+
+
+Do not confuse verification with ERC-20 compatibility.
+
+
+
+
+
+==================================================
+
+30. INSUFFICIENT BALANCE
+
+
+
+If sell amount exceeds the available sell-token balance:
+
+
+
+show:
+
+
+
+Insufficient balance
+
+
+
+Do not request a quote.
+
+
+
+Do not call the provider with an invalid amount.
+
+
+
+
+
+==================================================
+
+31. NATIVE GAS BALANCE
+
+
+
+For native-token swaps:
+
+
+
+The user needs native balance for network fees.
+
+
+
+Do not silently reserve gas.
+
+
+
+If the quote or later review determines that:
+
+
+
+sell amount + network fee > native balance
+
+
+
+the transaction must be blocked by the review/construction architecture.
+
+
+
+The Swap UI may surface the known issue when it is available.
+
+
+
+Do not create a second independent gas-validation system.
+
+
+
+
+
+==================================================
+
+32. REVIEW SWAP BUTTON
+
+
+
+The primary CTA should be:
+
+
+
+Review Swap
+
+
+
+It must be disabled unless:
+
+
+
+- valid network
+
+- valid sell asset
+
+- valid buy asset
+
+- different assets
+
+- valid amount
+
+- sufficient balance where known
+
+- current valid quote
+
+- quote not expired
+
+- quote context matches current UI state
+
+
+
+Clicking Review Swap must NOT sign or broadcast anything.
+
+
+
+For this phase, it should transition into the future Swap Review architecture only if that architecture does not yet execute anything.
+
+
+
+If the Review destination is not implemented yet, use a clearly controlled placeholder transition.
+
+
+
+Do NOT build Phase 6.4 inside this phase.
+
+
+
+
+
+==================================================
+
+33. QUOTE CONTEXT INVALIDATION
+
+
+
+A quote becomes invalid whenever any quote-affecting input changes:
+
+
+
+- account
+
+- sender
+
+- network
+
+- chain
+
+- sell asset
+
+- buy asset
+
+- sell amount
+
+- slippage
+
+
+
+Do not allow stale quotes to be submitted for review.
+
+
+
+
+
+==================================================
+
+34. ACCOUNT CHANGES
+
+
+
+Use the existing account context.
+
+
+
+If the wallet account changes:
+
+
+
+invalidate:
+
+
+
+- selected assets if necessary
+
+- amount state where appropriate
+
+- current quote
+
+
+
+Do not reuse a quote from another account.
+
+
+
+Do not expose secrets.
+
+
+
+
+
+==================================================
+
+35. LOADING / ERROR / EMPTY STATES
+
+
+
+Implement polished states for:
+
+
+
+No network
+
+Network unavailable
+
+Network unsupported
+
+No sell asset
+
+No buy asset
+
+No amount
+
+Invalid amount
+
+Insufficient balance
+
+Same asset
+
+Quote loading
+
+Quote unavailable
+
+No liquidity
+
+Provider error
+
+Rate limited
+
+Quote expired
+
+Malformed provider data
+
+Unexpected error
+
+
+
+Use existing sanitized error handling.
+
+
+
+
+
+==================================================
+
+36. RETRY BEHAVIOR
+
+
+
+Do not create infinite retry loops.
+
+
+
+Provider failures should allow an explicit:
+
+
+
+Retry
+
+
+
+button.
+
+
+
+Do not automatically hammer the 0x API.
+
+
+
+
+
+==================================================
+
+37. API CREDENTIAL SECURITY
+
+
+
+The UI must never access:
+
+
+
+ZEROEX_API_KEY
+
+
+
+The key must remain inside the provider/configuration boundary.
+
+
+
+No API credential may appear in:
+
+
+
+- component props
+
+- UI state
+
+- logs
+
+- error messages
+
+- activity
+
+- screenshots
+
+- accessibility labels
+
+
+
+
+
+==================================================
+
+38. NO PRICE API
+
+
+
+Do NOT integrate:
+
+
+
+CoinGecko
+
+CoinMarketCap
+
+DexScreener
+
+Binance
+
+or any separate pricing API.
+
+
+
+Phase 6.3 should use only information already available from the swap quote.
+
+
+
+Do not add fiat pricing infrastructure yet.
+
+
+
+
+
+==================================================
+
+39. NO ACTIVITY INTEGRATION
+
+
+
+Do not create Activity records when:
+
+
+
+- opening Swap
+
+- selecting tokens
+
+- requesting quotes
+
+- refreshing quotes
+
+- reviewing quotes
+
+
+
+Activity integration belongs to Phase 6.6.
+
+
+
+Only an actually executed/confirmed swap will later become swap activity.
+
+
+
+
+
+==================================================
+
+40. VISUAL DESIGN
+
+
+
+Use the existing WaveX design system.
+
+
+
+The screen should have:
+
+
+
+- dark background
+
+- cyan/electric-blue/violet accents
+
+- subtle gradients
+
+- restrained glow
+
+- rounded cards
+
+- premium typography
+
+- clear hierarchy
+
+- strong CTA
+
+- comfortable touch targets
+
+- polished token icons
+
+- consistent network indicators
+
+
+
+Reuse:
+
+
+
+- AssetIcon
+
+- TokenLogo
+
+- existing network badge patterns
+
+- existing spacing/radius/typography tokens
+
+- existing bottom navigation
+
+- existing theme primitives
+
+
+
+Do NOT introduce a second design system.
+
+
+
+
+
+==================================================
+
+41. UX DIRECTION
+
+
+
+The overall experience should feel approximately like:
+
+
+
+SWAP
+
+
+
+[ Network: Ethereum ]
+
+
+
+┌──────────────────────────────┐
+
+│ Sell                         │
+
+│                              │
+
+│ [icon] USDC          [MAX]   │
+
+│                              │
+
+│ 250.00                       │
+
+│                              │
+
+│ Available 1,240.50 USDC      │
+
+└──────────────────────────────┘
+
+
+
+              ⇅
+
+
+
+┌──────────────────────────────┐
+
+│ You receive                  │
+
+│                              │
+
+│ [icon] ETH             [⌄]  │
+
+│                              │
+
+│ ~0.0731 ETH                  │
+
+└──────────────────────────────┘
+
+
+
+Quote details
+
+
+
+Rate                 ...
+
+Minimum received     ...
+
+Network fee          ...
+
+Price impact         ...
+
+Route                0x
+
+
+
+Slippage             0.50%
+
+
+
+[        Review Swap        ]
+
+
+
+This is a UX direction, not a requirement to reproduce this exact ASCII layout.
+
+
+
+
+
+==================================================
+
+42. RESPONSIVE DESIGN
+
+
+
+Test at least:
+
+
+
+390 × 844
+
+402 × 874
+
+
+
+Ensure:
+
+
+
+- keyboard does not obscure amount input
+
+- asset selector remains usable
+
+- buttons remain accessible
+
+- long token names do not break layout
+
+- large balances remain readable
+
+- small screens do not overflow
+
+- quote details remain legible
+
+
+
+
+
+==================================================
+
+43. ACCESSIBILITY
+
+
+
+Ensure:
+
+
+
+- accessible labels
+
+- appropriate button roles
+
+- adequate touch targets
+
+- meaningful disabled states
+
+- accessible asset selector
+
+- accessible amount input
+
+- accessible warnings
+
+- no information communicated by color alone
+
+
+
+Do not expose secrets in accessibility labels.
+
+
+
+
+
+==================================================
+
+44. PREVIEW TEST MODE
+
+
+
+The existing development-only Preview Test Mode must remain isolated.
+
+
+
+Do NOT make Preview Test Mode call real 0x APIs.
+
+
+
+If the Preview environment does not have:
+
+
+
+- a real wallet
+
+- configured network
+
+- real provider key
+
+
+
+show controlled unavailable states.
+
+
+
+Do NOT fabricate swap quotes merely to make the UI look complete.
+
+
+
+The Preview must never generate fake successful swaps.
+
+
+
+
+
+==================================================
+
+45. TESTS
+
+
+
+Create focused tests for the Swap UI logic.
+
+
+
+At minimum:
+
+
+
+ASSET SELECTION
+
+
+
+- assets scoped to selected network
+
+- native asset selectable
+
+- ERC20 selectable
+
+- search by symbol
+
+- search by name
+
+- search by contract
+
+- empty search results
+
+- unavailable asset state
+
+
+
+INPUT
+
+
+
+- valid amount
+
+- empty amount
+
+- zero
+
+- negative
+
+- malformed
+
+- excessive decimals
+
+- insufficient balance
+
+- MAX
+
+
+
+PAIR
+
+
+
+- same asset rejected
+
+- valid pair accepted
+
+
+
+NETWORK
+
+
+
+- configured network
+
+- unsupported provider network
+
+- unconfigured network
+
+- network change clears quote
+
+- network change clears affected inputs
+
+
+
+QUOTE
+
+
+
+- valid quote displayed
+
+- quote loading
+
+- quote unavailable
+
+- provider error
+
+- rate limit
+
+- quote expiration
+
+- refresh
+
+- stale quote rejected
+
+- changed amount invalidates quote
+
+- changed token invalidates quote
+
+- changed slippage invalidates quote
+
+- changed account invalidates quote
+
+
+
+SLIPPAGE
+
+
+
+- valid presets
+
+- custom valid
+
+- 5000 bps accepted
+
+- >5000 rejected
+
+- high-slippage warning
+
+
+
+SECURITY
+
+
+
+Verify:
+
+
+
+- UI never accesses SecureStore
+
+- UI never accesses mnemonic
+
+- UI never accesses private key
+
+- UI never accesses PIN
+
+- UI never accesses biometric APIs
+
+- UI never calls signing
+
+- UI never calls broadcasting
+
+- UI never executes approvals
+
+- UI never accesses ZEROEX_API_KEY
+
+- UI never calls 0x directly
+
+
+
+NAVIGATION
+
+
+
+- Swap tab opens
+
+- asset selector opens
+
+- asset selection returns to Swap
+
+- existing tabs remain functional
+
+
+
+
+
+==================================================
+
+46. FULL REGRESSION
+
+
+
+Before finishing, run:
+
+
+
+- focused Swap UI tests
+
+- all existing swap tests
+
+- complete project test suite
+
+- TypeScript
+
+- Expo validation
+
+- iOS static/build validation if available
+
+- Android static/build validation if available
+
+- relevant workflows
+
+- git diff review
+
+
+
+The previous full project suite was:
+
+
+
+238 passing
+
+0 failing
+
+
+
+Do not regress existing functionality.
+
+
+
+
+
+==================================================
+
+47. SECURITY DIFF REVIEW
+
+
+
+Before reporting completion, inspect the Phase 6.3 diff for accidental imports/access to:
+
+
+
+SecureStore
+
+mnemonic
+
+private key
+
+PIN
+
+biometric APIs
+
+TransactionSigningEngine
+
+LocalSigner
+
+TransactionBroadcastEngine
+
+eth_sendRawTransaction
+
+token approval execution
+
+Permit2
+
+backend wallet secrets
+
+ZEROEX_API_KEY
+
+direct 0x fetch calls from UI components
+
+
+
+There must be NO such UI-level access.
+
+
+
+
+
+==================================================
+
+48. DOCUMENTATION
+
+
+
+Update:
+
+
+
+docs/ARCHITECTURE.md
+
+docs/DEVELOPMENT_STATE.md
+
+src/core/swaps/README.md
+
+
+
+Document:
+
+
+
+Phase 6.3 — Swap UI
+
+Status: Implemented
+
+
+
+Include:
+
+
+
+- UI architecture
+
+- asset selection
+
+- quote lifecycle
+
+- quote invalidation
+
+- 0x provider boundary
+
+- network behavior
+
+- slippage
+
+- preview limitations
+
+- security boundaries
+
+- what remains for Phase 6.4
+
+
+
+
+
+==================================================
+
+49. DO NOT IMPLEMENT PHASE 6.4
+
+
+
+Phase 6.4 will separately handle:
+
+
+
+Swap Review & Approval
+
+
+
+That phase will determine exactly how:
+
+
+
+quote
+
+→ transaction request
+
+→ allowance requirements
+
+→ final transaction validation
+
+→ user confirmation
+
+
+
+connect to the existing WaveX signing architecture.
+
+
+
+Do NOT implement that architecture now.
+
+
+
+STOP after Phase 6.3.
+
+
+
+
+
+==================================================
+
+FINAL REPORT
+
+
+
+When finished, report:
+
+
+
+1. Files created/changed
+
+2. Swap screen implementation
+
+3. Asset selector implementation
+
+4. Quote integration
+
+5. Quote loading/error/expiry behavior
+
+6. Slippage implementation
+
+7. Network handling
+
+8. Security boundaries
+
+9. Focused tests passed
+
+10. Full regression test count
+
+11. TypeScript result
+
+12. iOS/Android validation
+
+13. Preview verification
+
+14. Known warnings/limitations
+
+
+
+Do NOT start Phase 6.4.
+
+
+
+STOP and wait for my review.
