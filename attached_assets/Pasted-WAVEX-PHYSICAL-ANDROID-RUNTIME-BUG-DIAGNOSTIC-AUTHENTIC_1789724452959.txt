@@ -1,0 +1,132 @@
+WAVEX — PHYSICAL ANDROID RUNTIME BUG DIAGNOSTIC
+AUTHENTICATION → SECURE VAULT → WALLET HOME
+
+We have now installed the successful EAS Android Development Build on a real physical Android device.
+
+IMPORTANT: The native build itself is successful.
+
+Physical-device behavior:
+
+1. WaveX Development Build launches correctly.
+2. Wallet locked screen appears correctly.
+3. PIN authentication works / accepts the correct PIN.
+4. Android biometric authentication also works and the biometric prompt succeeds.
+5. AFTER successful PIN OR biometric authentication:
+   - the app navigates to:
+     "Preparing local vault
+      Checking platform-secure storage"
+   - this screen remains for a while.
+   - eventually the app returns to the Wallet Locked screen.
+6. Therefore this is NOT an initial biometric availability problem.
+7. The same post-authentication failure occurs with both PIN and biometric authentication.
+
+Metro logs during the physical-device test show:
+
+INFO Wallet vault loaded {"accountCount":1,"vaultVersion":"[REDACTED]"}
+INFO Wallet locked
+
+and after the authentication attempt the app eventually returns to the locked state.
+
+Earlier, Preview Test Mode had a similar transition problem where:
+- PIN verification succeeded
+- setView('wallet') occurred
+- getWallet() was temporarily nullable
+- the generic Loading / "Preparing local vault" state appeared
+- Preview Test Mode was fixed by isolating its state from nullable native wallet state.
+
+We now need to diagnose whether the native authenticated flow has an analogous race/state-transition issue.
+
+TASK: DIAGNOSTIC ONLY FIRST.
+
+Do NOT redesign the wallet architecture.
+Do NOT modify cryptographic architecture.
+Do NOT modify SecureStore configuration.
+Do NOT modify PIN cryptography.
+Do NOT modify biometric implementation.
+Do NOT change wallet derivation.
+Do NOT change signing.
+Do NOT change blockchain/RPC code.
+Do NOT add a workaround that bypasses SecureStore.
+Do NOT weaken security.
+Do NOT use AsyncStorage/localStorage as a fallback.
+Do NOT disable authentication.
+
+Inspect the complete native authentication-to-wallet flow, specifically:
+
+1. src/app/index.tsx
+2. FoundationScreen / Locked / Loading components
+3. WalletAccessManager
+4. AuthenticationManager
+5. WalletAuthenticator
+6. SecureVault / Expo SecureStore adapter
+7. LocalWalletEngine
+8. any wallet initialization/rehydration effects
+9. AppState handling
+10. biometric authentication callback/result handling
+11. PIN authentication callback/result handling
+12. any getWallet()/loadWallet()/hasPersistedWallet() calls
+13. any state variables controlling:
+    - locked
+    - unlocking
+    - authenticated
+    - wallet
+    - loading
+    - initialization
+14. any useEffect/useFocusEffect that can re-run after authentication
+15. any error handling that silently returns to locked state.
+
+IMPORTANT DIAGNOSTIC QUESTION:
+
+Determine the exact sequence after successful authentication:
+
+PIN/biometric success
+→ WalletAccessManager
+→ authentication state
+→ SecureVault
+→ loadWallet
+→ LocalWalletEngine
+→ wallet public state
+→ FoundationScreen
+→ WalletHomeShell
+
+Identify exactly which promise/function/state transition is preventing the authenticated wallet screen from becoming stable.
+
+Pay particular attention to whether:
+
+A. authentication succeeds but wallet state remains null;
+B. loadWallet() is being called again after successful authentication;
+C. WalletAccessManager is being reinitialized;
+D. an initialization useEffect is firing again and resetting the state;
+E. a race exists between authentication completion and wallet loading;
+F. a SecureStore operation is hanging;
+G. an exception is being swallowed and converted into LOCKED;
+H. the app successfully unlocks the vault but the UI immediately calls a second lock/reset path;
+I. the authenticated state is set correctly but FoundationScreen renders Loading because its wallet/public-wallet model is temporarily null;
+J. the biometric callback causes AppState to trigger another initialization cycle.
+
+Add temporary diagnostic logging ONLY if necessary to establish the exact state transition, and ensure logs never contain:
+- mnemonic
+- private key
+- PIN
+- SecureStore values
+- signing secrets
+- encryption keys
+- raw secret material.
+
+If possible, create a deterministic unit/integration regression test reproducing the identified state transition.
+
+DO NOT IMPLEMENT THE FIX YET unless the root cause is completely unambiguous.
+
+REPORT:
+
+1. Exact root cause
+2. Exact file(s) and function(s)
+3. Exact state/promise transition where it fails
+4. Why it happens on the native physical build but Preview Test Mode did not expose it
+5. Whether PIN and biometric share the same failing downstream path
+6. Smallest safe fix you recommend
+7. Security impact, if any
+8. Regression test that should be added
+9. Whether any existing security architecture must remain unchanged
+
+Then STOP and wait for approval before modifying code.
