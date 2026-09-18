@@ -1,0 +1,711 @@
+WAVEX — PHASE 6.5 SWAP EXECUTION
+SECURE LOCAL SIGNING + APPROVAL + BROADCAST
+
+IMPORTANT:
+This is a security-critical implementation phase.
+
+WaveX Phase 6.1, 6.2, 6.3, and 6.4 are approved.
+
+A real 0x Swap API v2 quote has already been successfully validated through the existing provider and Phase 6.4 review layer.
+
+DO NOT redesign the existing architecture.
+
+DO NOT bypass existing wallet, authentication, transaction construction, signing, or broadcast boundaries.
+
+Implement only Phase 6.5.
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Connect the approved Phase 6.4 swap review to secure local execution:
+
+Approved Swap Review
+        ↓
+Final execution checkpoint
+        ↓
+Allowance decision
+        ↓
+Optional approval transaction
+        ↓
+Authentication
+        ↓
+Local signing
+        ↓
+Broadcast
+        ↓
+Existing confirmation engine
+        ↓
+Execution result
+
+The execution must remain strictly non-custodial.
+
+Private keys and recovery phrases must remain on-device.
+
+The 0x API key must never enter the mobile signing flow.
+
+==================================================
+2. SECURITY INVARIANTS — NON-NEGOTIABLE
+==================================================
+
+WaveX remains strictly non-custodial.
+
+NEVER:
+
+- send private keys to 0x
+- send recovery phrases to 0x
+- send private keys to backend
+- send recovery phrases to backend
+- expose secrets to JavaScript UI unnecessarily
+- log private keys
+- log recovery phrases
+- log PINs
+- log signing capabilities
+- log raw sensitive authentication material
+- allow 0x to sign transactions
+- allow the backend to sign transactions
+- silently sign
+- silently approve tokens
+- silently broadcast
+- automatically retry/rebroadcast failed transactions
+
+All transaction signing must happen locally using the existing Phase 2.6 signing architecture.
+
+All broadcasting must happen through the existing Phase 2.7 broadcast architecture.
+
+Do not create a second signing implementation.
+
+Do not create a second broadcast implementation.
+
+==================================================
+3. CONSUME ONLY APPROVED PHASE 6.4 REVIEWS
+==================================================
+
+Execution must begin from an approved immutable Phase 6.4 review.
+
+Do NOT accept raw 0x responses as executable input.
+
+Do NOT construct an executable swap directly from UI fields.
+
+The execution layer must verify the review binding before signing.
+
+Revalidate:
+
+- account
+- sender
+- network
+- chain ID
+- sell asset
+- buy asset
+- exact sell amount
+- slippage
+- provider
+- quote identity
+- quote lifecycle
+- quote expiry
+- transaction target
+- transaction value
+- transaction calldata
+- relevant fee context
+- allowance context
+
+If any binding-relevant value changed:
+
+STOP.
+
+Require a fresh quote/review.
+
+==================================================
+4. 0x TRANSACTION DATA IS UNTRUSTED EXTERNAL INPUT
+==================================================
+
+Treat all provider-generated transaction fields as untrusted external data.
+
+Validate:
+
+- from
+- to
+- value
+- data
+- chain ID
+- account/sender
+- transaction type
+- gas/fee fields
+
+The transaction must be explicitly bound to the reviewed swap.
+
+Never replace provider calldata with UI-generated calldata.
+
+Never modify provider calldata silently.
+
+Never truncate calldata.
+
+Never normalize calldata in a way that changes its bytes.
+
+The exact provider transaction data approved by the review must be the data signed.
+
+If the transaction data changes:
+
+INVALIDATE THE REVIEW.
+
+==================================================
+5. TOKEN APPROVAL / ALLOWANCE HANDLING
+==================================================
+
+This is a critical part of Phase 6.5.
+
+For ERC-20 sells, inspect the allowance information already exposed by the normalized 0x quote/review.
+
+Do not assume an approval is required.
+
+Possible states should be represented explicitly:
+
+- sufficient allowance
+- insufficient allowance
+- allowance unavailable
+- native asset — no token approval required
+
+If allowance is sufficient:
+
+DO NOT submit an approval transaction.
+
+Proceed directly to the swap transaction.
+
+If allowance is insufficient and the 0x quote provides an explicit approval target/allowance requirement:
+
+Present the approval requirement clearly to the user before execution.
+
+The user must explicitly approve the approval transaction.
+
+NEVER silently approve.
+
+==================================================
+6. APPROVAL TARGET SAFETY
+==================================================
+
+The approval spender/target is security-sensitive.
+
+Do not invent an approval target.
+
+Do not derive an approval target from the token address.
+
+Do not accept an arbitrary spender from the UI.
+
+Use only the explicit trusted/provider-supplied allowance target represented by the normalized quote/review.
+
+Validate:
+
+- address format
+- network
+- chain
+- relationship to the reviewed quote/provider metadata
+
+If the approval target is missing, malformed, inconsistent, or cannot be safely bound to the reviewed quote:
+
+BLOCK execution.
+
+==================================================
+7. NO UNLIMITED APPROVAL BY DEFAULT
+==================================================
+
+Do NOT automatically approve an unlimited token allowance.
+
+If an approval transaction is required, preserve the explicit allowance amount represented by the approved execution context.
+
+The approval amount must be understandable and bound to the reviewed swap.
+
+Do not silently increase the allowance.
+
+Do not add arbitrary safety multipliers.
+
+Do not create an unlimited `MaxUint256` approval unless a future explicitly reviewed product/security decision authorizes it.
+
+For Phase 6.5, default to the smallest required allowance supported by the existing provider/review model.
+
+==================================================
+8. APPROVAL TRANSACTION REVIEW
+==================================================
+
+If an ERC-20 approval transaction is required, create a dedicated approval review step.
+
+The user must see:
+
+- token
+- token contract
+- approval target/spender
+- approval amount
+- network
+- sender
+- gas estimate
+- estimated network fee
+- clear explanation that this grants token spending permission
+
+The approval transaction must be independently bound and signed.
+
+Do not combine approval and swap signing into one opaque operation.
+
+The user must explicitly confirm the approval.
+
+==================================================
+9. APPROVAL SIGNING
+==================================================
+
+Use the existing Phase 2.6 secure local signing architecture.
+
+Flow:
+
+Approval Review
+    ↓
+Explicit user confirmation
+    ↓
+Existing authentication
+    ↓
+Transaction-bound authorization
+    ↓
+Local signing
+    ↓
+Existing broadcast engine
+    ↓
+Confirmation
+
+No backend signing.
+
+No 0x signing.
+
+No Permit2 signing unless explicitly required and separately supported by the existing architecture.
+
+==================================================
+10. APPROVAL CONFIRMATION
+==================================================
+
+If an approval transaction is submitted:
+
+Wait for the existing Phase 2.7 confirmation lifecycle.
+
+Do not proceed to the swap transaction until the approval reaches a state that safely permits continuation.
+
+Handle:
+
+- confirmed
+- reverted
+- failed
+- unknown
+- timeout
+
+If approval is:
+
+- reverted
+- failed
+- unknown
+
+DO NOT automatically submit the swap.
+
+Require explicit user action/reconciliation.
+
+Do not rebroadcast automatically.
+
+==================================================
+11. SWAP TRANSACTION
+==================================================
+
+After allowance is sufficient:
+
+Use the exact provider transaction request represented by the approved Phase 6.4 review.
+
+The transaction must preserve:
+
+- sender/from
+- recipient/to
+- value
+- calldata
+- network
+- chain ID
+- gas
+- fee model
+
+Use existing Phase 2.5 transaction validation where applicable.
+
+Use existing Phase 2.6 local signing.
+
+Use existing Phase 2.7 broadcast and confirmation.
+
+Do not directly call `eth_sendRawTransaction` from the UI or swap execution service.
+
+==================================================
+12. FINAL PRE-SIGN CHECKPOINT
+==================================================
+
+Immediately before signing, perform a deterministic final checkpoint.
+
+Verify:
+
+- wallet remains unlocked/authenticated as required
+- account identity unchanged
+- sender unchanged
+- network unchanged
+- chain ID unchanged
+- sell asset unchanged
+- buy asset unchanged
+- exact sell amount unchanged
+- slippage unchanged
+- quote still valid
+- provider unchanged
+- quote identity unchanged
+- review binding digest still matches
+- transaction target unchanged
+- transaction value unchanged
+- transaction calldata unchanged
+- required allowance state remains valid
+- fee context remains acceptable
+- balance remains sufficient
+
+If anything changed:
+
+STOP.
+
+Do not sign.
+
+Require a fresh review/quote.
+
+==================================================
+13. AUTHENTICATION
+==================================================
+
+Use the existing WalletAccessManager / WalletAuthenticator architecture.
+
+Do not create a new authentication system.
+
+Authentication must occur immediately before sensitive signing actions.
+
+For approval:
+
+explicit approval confirmation
+    ↓
+authentication
+    ↓
+sign
+
+For swap:
+
+explicit swap execution confirmation
+    ↓
+authentication
+    ↓
+sign
+
+Preview Test Mode must never perform real signing or real execution.
+
+==================================================
+14. BROADCAST
+==================================================
+
+Use the existing Phase 2.7 TransactionBroadcastEngine.
+
+Do not create a new broadcaster.
+
+Preserve exact signed raw transaction bytes.
+
+Verify:
+
+- local transaction hash
+- broadcast hash
+- network
+- chain
+- sender/context
+
+Use existing lifecycle:
+
+ready
+broadcasting
+broadcasted
+confirming
+confirmed
+reverted
+failed
+unknown
+
+Do not automatically retry or rebroadcast.
+
+If broadcast times out after submission:
+
+mark UNKNOWN.
+
+Do not assume failure.
+
+==================================================
+15. SWAP EXECUTION UI
+==================================================
+
+Replace the controlled Phase 6.4 execution placeholder with an explicit execution flow.
+
+The UI should clearly distinguish:
+
+1. Review
+2. Approval required (if applicable)
+3. Approval signing
+4. Approval confirmation
+5. Swap signing
+6. Swap broadcasting
+7. Swap confirmation
+8. Completed / failed / unknown
+
+Do not use ambiguous buttons such as:
+
+"Swap Now"
+
+unless the action and next step are clearly explained.
+
+Before signing, show the exact transaction-critical information.
+
+For irreversible actions, use neutral confirmation language.
+
+==================================================
+16. NO AUTOMATIC APPROVAL
+==================================================
+
+Never execute an ERC-20 approval merely because:
+
+- allowance is insufficient
+- user pressed Review Swap
+- quote was received
+- user opened the swap screen
+- user approved the quote/review
+
+Approval requires its own explicit user action.
+
+==================================================
+17. NO AUTOMATIC SWAP AFTER APPROVAL
+==================================================
+
+For Phase 6.5, after an approval transaction confirms, do not silently sign the swap.
+
+Require the user to explicitly continue to the swap execution step.
+
+This keeps token permission and swap execution as separate user-authorized actions.
+
+==================================================
+18. FAILURE HANDLING
+==================================================
+
+Normalize and distinguish:
+
+- quote expired
+- review stale
+- balance changed
+- allowance changed
+- network changed
+- account changed
+- provider transaction changed
+- approval rejected
+- approval failed
+- approval reverted
+- approval unknown
+- swap rejected
+- signing failed
+- broadcast failed
+- broadcast unknown
+- swap reverted
+- confirmation timeout
+- provider/API error
+
+Never expose raw secrets, raw authentication details, or sensitive internal stack traces.
+
+==================================================
+19. ACTIVITY BOUNDARY
+==================================================
+
+Do NOT implement full Phase 6.6 Activity integration.
+
+However, execution results must expose enough structured public information for Phase 6.6 to consume later.
+
+Do not directly write swap Activity records from Phase 6.5.
+
+Do not invent swap Activity entries.
+
+==================================================
+20. 0x API KEY BOUNDARY
+==================================================
+
+The existing `ZEROEX_API_KEY` must remain isolated to the existing trusted provider boundary.
+
+The wallet signing/execution layer must not need the API key.
+
+A signed transaction must not contain the API key.
+
+No API key in:
+
+- transaction calldata
+- transaction value
+- transaction metadata sent to blockchain
+- logs
+- Activity
+- UI
+
+==================================================
+21. TESTING REQUIREMENTS
+==================================================
+
+Add comprehensive tests for:
+
+A. Approved review → successful execution path
+
+B. ERC-20 insufficient allowance → approval required
+
+C. ERC-20 sufficient allowance → no approval transaction
+
+D. Explicit approval confirmation required
+
+E. Approval transaction binding
+
+F. Approval target mismatch → blocked
+
+G. Approval amount mutation → blocked
+
+H. Approval confirmation failure → swap blocked
+
+I. Review digest mismatch → blocked
+
+J. Quote expiry → blocked
+
+K. Balance change → blocked
+
+L. Allowance change → revalidation
+
+M. Network change → blocked
+
+N. Account change → blocked
+
+O. Sell amount mutation → blocked
+
+P. Slippage mutation → blocked
+
+Q. Provider transaction target mutation → blocked
+
+R. Provider transaction value mutation → blocked
+
+S. Provider calldata mutation → blocked
+
+T. Signing authorization mismatch → blocked
+
+U. Broadcast hash mismatch → handled safely
+
+V. Broadcast timeout → UNKNOWN
+
+W. No automatic rebroadcast
+
+X. Preview mode cannot execute
+
+Y. API key never appears in output/logs
+
+Z. Native ETH swap path requires no ERC-20 approval
+
+AA. Token swap cannot silently approve unlimited allowance
+
+AB. No Activity records created by Phase 6.5
+
+==================================================
+22. REAL NETWORK TESTING
+==================================================
+
+Do NOT perform a real mainnet transaction during implementation.
+
+The previously completed 0x smoke test is sufficient to prove live quote connectivity.
+
+For execution tests, use mocks/injected transports/test fixtures unless a future explicit testnet plan is approved.
+
+Do not use real user funds.
+
+Do not broadcast a real mainnet approval or swap.
+
+==================================================
+23. ARCHITECTURAL LIMIT
+==================================================
+
+If the existing 0x AllowanceHolder quote provides transaction/allowance information that cannot be represented safely by the current provider-neutral models:
+
+STOP.
+
+Do not invent semantics.
+
+Report exactly which model/boundary needs to be extended.
+
+If Permit2 or another signing mechanism is required but not safely supported:
+
+STOP that path rather than implementing an unsafe shortcut.
+
+==================================================
+24. DOCUMENTATION
+==================================================
+
+Update:
+
+- `docs/ARCHITECTURE.md`
+- `docs/SECURITY_ARCHITECTURE.md`
+- `docs/DEVELOPMENT_STATE.md`
+- `src/core/swap/README.md`
+
+Document:
+
+- execution flow
+- approval flow
+- signing boundary
+- broadcast boundary
+- 0x API-key boundary
+- failure states
+- non-custodial guarantees
+- known limitations
+- explicit Phase 6.6 boundary
+
+==================================================
+25. IMPORTANT STOP CONDITION
+==================================================
+
+Implement ONLY Phase 6.5.
+
+Do not implement:
+
+- Phase 6.6 Activity integration
+- DApp connection
+- WalletConnect
+- Permit2 unless explicitly supported and separately approved
+- cross-chain swaps
+- backend execution
+- WaveX fees
+- price/fiat services
+- notifications
+- analytics
+
+==================================================
+26. FINAL REPORT
+==================================================
+
+Return a detailed implementation report containing:
+
+1. Files/modules created or modified
+2. Execution architecture
+3. Approval architecture
+4. Authentication/signing path
+5. Broadcast path
+6. How exact 0x calldata is preserved
+7. How approval targets are validated
+8. How approval amount is determined
+9. How unlimited approval is prevented
+10. How review binding is revalidated
+11. Failure/UNKNOWN handling
+12. Preview protection
+13. API-key security boundary
+14. Activity boundary
+15. Tests added and results
+16. TypeScript result
+17. Expo/build result
+18. git diff check
+19. Any warnings
+20. Any architectural limitation
+
+CRITICAL:
+
+Do not claim Phase 6.5 is production-ready merely because tests pass.
+
+Clearly identify anything that still requires physical-device, testnet, or security validation.
+
+STOP after the report.
