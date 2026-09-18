@@ -1,0 +1,270 @@
+WAVEX — PHYSICAL DEVICE DEVELOPMENT BUILD PREPARATION
+
+Phase 6.5 implementation is complete.
+Ethereum Sepolia testnet configuration is complete.
+Physical-device validation has NOT yet occurred.
+
+This task is ONLY to prepare and verify EAS development-build configuration.
+
+DO NOT:
+- execute any transaction
+- sign anything
+- broadcast anything
+- create/fund a wallet
+- modify swap execution
+- implement Phase 6.6
+- publish to Google Play
+- publish to Apple App Store
+- submit to TestFlight
+- create production builds
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Prepare WaveX for two installable physical-device development builds:
+
+A. Android development APK
+B. iOS development build
+
+The builds must contain the existing native integrations:
+
+- expo-dev-client
+- expo-secure-store
+- expo-local-authentication
+- WalletAuthenticator
+- WalletAccessManager
+- LocalWalletEngine
+- TransactionSigningEngine
+- TransactionBroadcastEngine
+
+Do not replace native functionality with Preview Test Mode.
+
+==================================================
+2. EAS CONFIGURATION AUDIT
+==================================================
+
+Inspect the existing:
+
+- eas.json
+- app.json/app.config.*
+- package.json
+- Expo configuration
+- native plugins
+- bundle identifier
+- Android package identifier
+
+Confirm the development profile is suitable for physical-device development.
+
+Expected characteristics:
+
+developmentClient: true
+distribution: internal
+
+Do not create unnecessary additional profiles.
+
+If an existing profile already satisfies the requirements, do not duplicate it.
+
+==================================================
+3. ANDROID APK
+==================================================
+
+Ensure the development profile produces an installable APK.
+
+The Android build must NOT default to an AAB for this test.
+
+Verify the profile will produce:
+
+.apk
+
+suitable for direct installation on an Android physical device.
+
+Do not create a production Play Store build.
+
+Do not submit anything to Google Play.
+
+Do not actually trigger the EAS build during this task unless explicitly required to validate configuration.
+
+==================================================
+4. IOS DEVELOPMENT BUILD
+==================================================
+
+Verify the iOS development profile is configured for physical-device installation.
+
+Confirm:
+
+- bundle identifier = com.wavex.app
+- developmentClient = true
+- distribution = internal
+- required Expo native plugins are present
+- Face ID usage description is present
+
+Do not submit to the App Store.
+
+Do not submit to TestFlight.
+
+Do not generate a production distribution profile.
+
+Document that physical iOS installation requires appropriate Apple Developer signing and device provisioning.
+
+==================================================
+5. SIGNING CREDENTIALS
+==================================================
+
+Inspect whether EAS-managed credentials can be used.
+
+Do not expose:
+
+- Apple certificates
+- provisioning profiles
+- Android keystore
+- signing passwords
+- API keys
+
+Do not add credentials to source control.
+
+Do not create fake credentials.
+
+If credentials are not yet configured, report that as a manual prerequisite.
+
+==================================================
+6. APP IDENTITY
+==================================================
+
+Confirm:
+
+iOS:
+com.wavex.app
+
+Android:
+com.wavex.app
+
+Do not change these identifiers unless there is a concrete configuration conflict.
+
+==================================================
+7. ENVIRONMENT VARIABLES
+==================================================
+
+Verify the physical development build has access to the required configuration without exposing secrets to the client unnecessarily.
+
+Important:
+
+ZEROEX_API_KEY must remain isolated to the existing 0x provider boundary.
+
+SEPOLIA_RPC_URL must remain protected according to the existing network configuration architecture.
+
+Do not embed secret values into source code.
+
+Do not print secret values.
+
+Only report:
+
+configured / missing
+
+==================================================
+8. TESTNET SAFETY
+==================================================
+
+Confirm Ethereum Sepolia remains:
+
+chain ID 11155111
+environment = testnet
+
+Confirm Ethereum mainnet remains:
+
+chain ID 1
+environment = mainnet
+
+Do not change the production primary network.
+
+Do not make Sepolia the primary network.
+
+==================================================
+9. PREVIEW TEST MODE
+==================================================
+
+Preview Test Mode must remain isolated.
+
+The physical development build should use the real native wallet path.
+
+Do not allow Preview Test Mode to bypass native security in the development build.
+
+Do not create fake transaction hashes, fake signatures, fake receipts, or fake broadcast results.
+
+==================================================
+10. BUILD VALIDATION
+==================================================
+
+Run configuration validation and existing checks:
+
+- TypeScript
+- Expo config validation
+- Expo doctor if available
+- existing full test suite
+- git diff --check
+
+Do not introduce unnecessary dependencies.
+
+Do not modify business logic merely to satisfy the build.
+
+==================================================
+11. DOCUMENTATION
+==================================================
+
+Update DEVELOPMENT_STATE.md only if needed to document:
+
+- Android development APK readiness
+- iOS development-build readiness
+- required Apple signing/device registration
+- EAS build prerequisites
+
+Do not claim physical-device validation.
+
+==================================================
+12. STOP CONDITION
+==================================================
+
+STOP after configuration audit/preparation.
+
+Do not:
+
+- build and install an app
+- sign a transaction
+- broadcast
+- fund a wallet
+- execute a swap
+- implement Activity integration
+- publish anywhere
+
+==================================================
+13. FINAL REPORT
+==================================================
+
+Return:
+
+1. EAS configuration status
+2. Development profile name
+3. Android APK readiness
+4. iOS development-build readiness
+5. iOS bundle ID
+6. Android package ID
+7. expo-dev-client status
+8. SecureStore plugin status
+9. local-authentication plugin status
+10. Android signing credential status
+11. iOS signing/provisioning status
+12. ZEROEX_API_KEY status — configured/missing only
+13. SEPOLIA_RPC_URL status — configured/missing only
+14. TypeScript result
+15. Expo validation result
+16. Test suite result
+17. git diff --check
+18. Exact manual steps required to trigger the Android APK build
+19. Exact manual prerequisites for the iOS build
+20. Any blocker
+
+CRITICAL:
+This is preparation only.
+Do not execute transactions.
+Do not claim physical-device validation.
+STOP after the report.

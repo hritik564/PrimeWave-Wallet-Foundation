@@ -413,9 +413,9 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 - Recovery UX and authentication UI require separate scope and security review.
 - Physical-device authentication/signing validation and an explicitly approved
   testnet execution plan remain required before any live execution claim.
-- Validation preparation on 2026-09-18 found no configured testnet. All
-  configured public networks are marked `mainnet`; PrimeWave Chain remains a
-  placeholder without a chain ID, RPC, or explorer configuration.
+- PrimeWave Chain remains a placeholder without a chain ID, RPC, or explorer
+  configuration; Ethereum Sepolia is the separately configured testnet for
+  native wallet validation.
 - The current 0x Swap API v2 capability map covers only the configured mainnet
   chain IDs. It does not provide a provider-backed testnet validation path.
 - Ethereum Sepolia is now registered as an explicitly selectable testnet with
@@ -423,10 +423,19 @@ UI testing; it is not a real wallet and does not alter the native boundary.
   metadata. Its RPC endpoint is supplied by `SEPOLIA_RPC_URL`; native wallet
   validation may use Sepolia, but 0x swaps remain unsupported there.
 - Native development-build configuration is present for `expo-dev-client`,
-  SecureStore, and local authentication, with an internal development profile
-  in `eas.json`. The workspace has no checked-in `ios/` or `android/` project,
-  so a physical-device build must be generated outside Replit using Xcode,
-  Android tooling, or an approved cloud native-build service.
+  SecureStore, and local authentication, with the `development` profile in
+  `eas.json` set to `developmentClient: true`, `distribution: internal`, and
+  an explicit Android `buildType: apk`. The workspace has no checked-in `ios/`
+  or `android/` project, so a physical-device build must be generated outside
+  Replit using Xcode, Android tooling, or an approved cloud native-build
+  service.
+- iOS uses bundle ID `com.wavex.app`; Android uses package ID
+  `com.wavex.app`. Apple development signing/device provisioning and Android
+  signing credentials remain manual EAS build prerequisites. Remote EAS
+  credentials were not inspected because the EAS CLI is not installed here.
+- Replit reports both `ZEROEX_API_KEY` and `SEPOLIA_RPC_URL` as configured.
+  Their values remain outside source control and were not displayed. The EAS
+  build environment must be configured separately if it needs those values.
 - `ZEROEX_API_KEY` is configured for the existing provider boundary. Its
   presence was verified without reading or exposing its value.
 - External token lists, verification providers, NFTs, portfolio valuation, fiat
