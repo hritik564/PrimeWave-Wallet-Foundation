@@ -1,0 +1,863 @@
+WAVEX — PHASE 6.1: SWAP ARCHITECTURE & QUOTE MODEL
+
+We are now implementing Phase 6.1 of the WaveX wallet roadmap: Swap Architecture & Quote Model.
+
+WaveX is a strictly non-custodial, MetaMask-like EVM wallet.
+
+IMPORTANT DEVELOPMENT RULES
+
+- Work ONLY on Phase 6.1.
+- Do NOT implement a real swap provider yet.
+- Do NOT call 0x, 1inch, LI.FI, Paraswap, Uniswap APIs, or any other external swap/quote API.
+- Do NOT execute swaps.
+- Do NOT sign transactions.
+- Do NOT broadcast transactions.
+- Do NOT add backend swap execution.
+- Do NOT add fake/demo swap quotes.
+- Do NOT fabricate exchange rates, prices, liquidity, routes, gas costs, or savings.
+- Do NOT modify the existing transaction signing/broadcasting security boundaries.
+- Do NOT introduce custodial behavior.
+- Do NOT add persistent swap state yet.
+- Do NOT build the final Swap UI yet.
+- Reuse the existing WaveX architecture instead of duplicating blockchain/RPC/transaction logic.
+- Keep the implementation small and modular because this project is being developed in Replit Free mode.
+- Before changing code, inspect the existing architecture and identify the existing modules/interfaces that should be reused.
+
+
+1. OBJECTIVE
+
+Create the foundational Swap Domain Architecture that will later support:
+
+1. Token selection
+2. Same-chain swaps
+3. External quote providers
+4. Route/path information
+5. Slippage configuration
+6. Price impact
+7. Minimum received
+8. Network fee/gas information
+9. Provider fees
+10. Provider-generated transaction calldata
+11. Swap review
+12. Existing local transaction signing
+13. Existing transaction broadcasting
+14. Swap activity presentation
+
+For this phase, implement ONLY:
+
+- Domain models
+- Validation
+- Provider abstraction
+- Quote lifecycle
+- Provider response validation
+- Tests
+- Documentation
+
+Do not implement actual swap execution.
+
+
+2. CREATE SWAP CORE MODULE
+
+Create:
+
+src/core/swaps/
+
+Suggested structure:
+
+src/core/swaps/
+  models.ts
+  validation.ts
+  quote-service.ts
+  provider.ts
+  errors.ts
+  index.ts
+  tests/
+    swap-models.test.ts
+    swap-validation.test.ts
+    swap-quote-service.test.ts
+
+Follow existing project conventions if different, but keep the swap domain isolated.
+
+Update relevant architecture documentation.
+
+
+3. SWAP ASSET IDENTITY
+
+Reuse the existing asset identity architecture from Phase 3.
+
+Do NOT create a competing token identity system.
+
+A swap asset must be network-scoped:
+
+networkId
+assetType
+assetId
+
+For ERC-20:
+
+networkId
+fungible_token
+checksum-normalized contract address
+
+For native asset:
+
+networkId
+native
+native
+
+Contract address + network must remain authoritative for ERC-20 identity.
+
+
+4. SWAP REQUEST MODEL
+
+Create a provider-neutral model such as:
+
+SwapQuoteRequest
+
+It must contain at minimum:
+
+accountId
+senderAddress
+networkId
+chainId
+sellAsset
+buyAsset
+sellAmount
+slippage
+
+Requirements:
+
+- accountId identifies the local wallet account.
+- senderAddress is public address only.
+- networkId identifies the swap network.
+- chainId is the expected EVM chain ID.
+- sellAsset and buyAsset use existing network-scoped asset identity.
+- sellAmount uses exact bigint/base-unit representation internally.
+- slippage uses integer basis points.
+
+Do NOT use floating-point arithmetic for token/base-unit amounts.
+
+
+5. SAME-CHAIN ONLY
+
+Phase 6.1 supports same-chain swaps only.
+
+Require:
+
+sellAsset.networkId === buyAsset.networkId
+
+Reject cross-chain requests with a clear normalized error such as:
+
+CROSS_CHAIN_SWAP_UNSUPPORTED
+
+Do NOT implement bridging or cross-chain routing.
+
+
+6. REQUEST VALIDATION
+
+Create deterministic validation.
+
+Reject:
+
+- missing account ID
+- invalid sender address
+- unknown network
+- disabled network
+- unconfigured network
+- chain mismatch
+- invalid sell asset
+- invalid buy asset
+- same sell and buy asset
+- zero sell amount
+- negative sell amount
+- malformed amount
+- invalid slippage
+- excessive slippage
+- cross-chain asset pair
+- unsupported asset type
+- malformed contract address
+
+Reuse existing network and asset validation systems wherever possible.
+
+Do not duplicate validation unnecessarily.
+
+
+7. SLIPPAGE MODEL
+
+Represent slippage using integer basis points.
+
+Examples:
+
+50 bps = 0.50%
+100 bps = 1.00%
+
+Use:
+
+slippageBps
+
+Initial allowed range:
+
+0 through 5000 bps
+
+This represents:
+
+0% through 50%
+
+Reject values outside this range.
+
+Do NOT silently modify user-provided slippage.
+
+Do NOT automatically increase slippage.
+
+Do NOT hide slippage inside provider logic.
+
+
+8. SWAP QUOTE MODEL
+
+Create a provider-neutral SwapQuote model.
+
+It should contain at minimum:
+
+quoteId
+providerId
+accountId
+networkId
+chainId
+
+sellAsset
+buyAsset
+
+sellAmount
+expectedBuyAmount
+minimumBuyAmount
+
+slippageBps
+
+route
+priceImpact
+
+gasEstimate
+gasFee
+protocolFee
+providerFee
+
+estimatedExecutionTime
+
+quotedAt
+expiresAt
+
+transactionRequest
+
+Use strict types.
+
+Avoid any.
+
+
+9. EXACT AMOUNT SAFETY
+
+Use bigint for token/base-unit monetary values.
+
+This includes:
+
+sellAmount
+expectedBuyAmount
+minimumBuyAmount
+gas-related integer values where appropriate
+gasFee
+protocolFee
+providerFee
+
+Never use JavaScript number for token/base-unit monetary values.
+
+Never use floating-point arithmetic for token amounts.
+
+Tests must include very large bigint values.
+
+
+10. EXPECTED VS MINIMUM RECEIVED
+
+Keep these values separate:
+
+expectedBuyAmount
+minimumBuyAmount
+
+They are NOT interchangeable.
+
+minimumBuyAmount represents the minimum amount acceptable under the requested slippage protection.
+
+Do not invent or calculate fake quote values during Phase 6.1.
+
+The future provider integration will supply the quote data.
+
+
+11. ROUTE MODEL
+
+Create a provider-neutral route model that supports future multi-hop swaps.
+
+For example:
+
+SwapRoute
+  hops[]
+
+Each hop should support fields conceptually equivalent to:
+
+inputAsset
+outputAsset
+poolOrVenue
+protocol
+
+The model must support:
+
+Token A → Token B
+
+and future:
+
+Token A → Token X → Token B
+
+Do not hardcode Uniswap-specific structures.
+
+Do not assume every provider exposes identical route information.
+
+
+12. PRICE IMPACT
+
+Create a priceImpact field.
+
+Do NOT fabricate price impact.
+
+Do NOT infer price impact from incomplete information.
+
+The architecture must allow:
+
+unknown / unavailable
+
+when the provider does not provide reliable information.
+
+Do not replace unknown with a fake zero.
+
+
+13. FEE MODEL
+
+Create a structured fee model that distinguishes:
+
+network fee
+protocol fee
+provider fee
+
+Do not merge all fees into one unexplained number.
+
+Do not introduce any WaveX markup.
+
+WaveX must never silently add a fee to a provider quote.
+
+
+14. GAS MODEL
+
+The swap architecture must integrate conceptually with the existing Gas/Fee Engine from Phase 2.4.
+
+Do NOT duplicate gas estimation logic.
+
+A future provider may provide:
+
+gas estimate
+gas-related transaction information
+
+However:
+
+- Existing WaveX transaction construction remains authoritative.
+- Provider output is untrusted.
+- Final transaction data must be validated before signing.
+- A quote is NOT an approved transaction.
+
+Document this boundary.
+
+
+15. PROVIDER TRANSACTION REQUEST
+
+Create a provider-neutral transaction request model for future execution.
+
+Conceptually:
+
+SwapTransactionRequest
+
+Fields:
+
+from
+to
+value
+data
+
+Optionally:
+
+gasLimit
+
+Treat every provider-generated transaction field as untrusted.
+
+The provider must NEVER:
+
+- sign
+- access wallet secrets
+- access SecureStore
+- access mnemonic
+- access private keys
+- access PIN
+- access biometrics
+- broadcast transactions
+
+
+16. PROVIDER ABSTRACTION
+
+Create an abstraction such as:
+
+SwapQuoteProvider
+
+It should expose functionality conceptually equivalent to:
+
+getQuote(request): Promise<SwapQuote>
+
+Also define provider metadata such as:
+
+providerId
+displayName
+supportedNetworks
+supportedCapabilities
+
+Keep the abstraction provider-neutral.
+
+Do NOT implement a real provider yet.
+
+Do NOT install a provider SDK yet.
+
+
+17. QUOTE SERVICE
+
+Create:
+
+SwapQuoteService
+
+Responsibilities:
+
+1. Validate the swap request.
+2. Validate account/network context.
+3. Ensure same-chain operation.
+4. Validate sell and buy asset identities.
+5. Pass the validated request to the configured provider abstraction.
+6. Validate provider response.
+7. Reject malformed/untrusted quote data.
+8. Return a normalized SwapQuote.
+
+It must NOT:
+
+- sign
+- broadcast
+- access private keys
+- access mnemonic
+- access SecureStore
+- access PIN
+- access biometrics
+- modify wallet balances
+- persist wallet secrets
+- execute swaps.
+
+
+18. PROVIDER RESPONSE VALIDATION
+
+Treat provider responses as untrusted input.
+
+Validate:
+
+- quote ID
+- provider ID
+- network ID
+- chain ID
+- sell asset
+- buy asset
+- sell amount
+- expected buy amount
+- minimum buy amount
+- slippage
+- route
+- transaction recipient
+- transaction calldata
+- transaction value
+- expiration
+- fee fields
+- numeric ranges
+- address validity
+
+Reject:
+
+- chain mismatch
+- network mismatch
+- asset mismatch
+- amount mismatch
+- invalid addresses
+- malformed calldata
+- expired quote
+- negative values
+- impossible values
+- unsupported networks
+- unsupported assets
+- provider identity mismatch
+
+Never silently repair malformed provider data.
+
+
+19. QUOTE EXPIRATION
+
+Quotes must contain:
+
+quotedAt
+expiresAt
+
+The service must be able to determine:
+
+active
+expired
+
+Do NOT automatically refresh or re-quote in this phase.
+
+Do NOT background-poll.
+
+Do NOT silently replace an expired quote.
+
+The future Swap UI can explicitly request a fresh quote.
+
+
+20. QUOTE LIFECYCLE
+
+Define a clean lifecycle:
+
+idle
+requesting
+quoted
+expired
+failed
+
+Do NOT add execution states here.
+
+Execution belongs to later phases.
+
+Do NOT mix quote state with:
+
+signed
+broadcasted
+confirmed
+
+
+21. PROVIDER ERRORS
+
+Create swap-specific normalized errors.
+
+Include appropriate errors such as:
+
+SWAP_NETWORK_UNSUPPORTED
+SWAP_ASSET_UNSUPPORTED
+SWAP_QUOTE_UNAVAILABLE
+SWAP_QUOTE_EXPIRED
+SWAP_PROVIDER_ERROR
+SWAP_INVALID_QUOTE
+SWAP_CHAIN_MISMATCH
+SWAP_ASSET_MISMATCH
+SWAP_AMOUNT_MISMATCH
+SWAP_CROSS_CHAIN_UNSUPPORTED
+SWAP_INVALID_SLIPPAGE
+SWAP_INVALID_TRANSACTION_REQUEST
+
+Errors must be sanitized.
+
+Never expose:
+
+- API keys
+- provider secrets
+- authorization headers
+- private keys
+- seed phrases
+- SecureStore contents
+- raw sensitive request payloads
+
+
+22. NO REAL PROVIDER
+
+Do NOT:
+
+- install swap provider SDKs
+- add API keys
+- add provider environment variables
+- make external quote requests
+- create real API integrations
+- create fake production quotes
+
+For unit testing only, you may create a deterministic in-memory test provider.
+
+Clearly mark it as test-only.
+
+It must never be used by production runtime.
+
+
+23. ACTIVITY COMPATIBILITY
+
+Do not modify Activity execution.
+
+However, ensure the swap domain models can later expose:
+
+primary asset
+secondary asset
+sell amount
+buy amount
+network
+provider
+route/protocol
+
+This must remain compatible with the existing Phase 5.1A Activity Presentation Model.
+
+IMPORTANT:
+
+A quote is NOT a completed swap.
+
+Do not create Activity records merely because a quote exists.
+
+Do not infer that a quote was executed.
+
+
+24. NO UI REBUILD
+
+Do not build the final Swap screen yet.
+
+Do not rebuild or redesign:
+
+- Home
+- Assets
+- Activity
+- Send
+- Receive
+- Transaction Review
+- Authentication
+- Signing
+- Broadcast
+
+The Swap tab may remain the existing placeholder.
+
+Only add minimal type/test scaffolding required by the architecture.
+
+
+25. SECURITY BOUNDARY
+
+Update:
+
+docs/SECURITY_ARCHITECTURE.md
+docs/ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+
+Document this architecture:
+
+Swap Provider
+      ↓
+Untrusted Quote Data
+      ↓
+WaveX SwapQuoteService
+      ↓
+Validated Swap Quote
+      ↓
+Future Swap Review
+      ↓
+Existing Transaction Construction
+      ↓
+Existing Secure Local Signing
+      ↓
+Existing Broadcast Engine
+
+Explicitly document:
+
+"A swap provider is never trusted with wallet secrets and never receives signing authority."
+
+Also document:
+
+"Provider transaction calldata is untrusted input and must be validated before it can enter the transaction signing flow."
+
+
+26. TESTS
+
+Create comprehensive unit tests.
+
+REQUEST VALIDATION:
+
+- valid native → ERC20
+- valid ERC20 → native
+- valid ERC20 → ERC20
+- invalid sender
+- invalid network
+- disabled network
+- unconfigured network
+- chain mismatch
+- same asset rejected
+- zero amount rejected
+- negative amount rejected
+- malformed amount rejected
+- invalid slippage
+- excessive slippage
+- cross-chain rejected
+
+ASSET IDENTITY:
+
+- same token on different networks is NOT the same asset
+- checksum normalization
+- native asset identity
+- ERC20 identity
+- malformed contract address
+
+SLIPPAGE:
+
+- 0 bps accepted
+- 50 bps accepted
+- 100 bps accepted
+- 5000 bps accepted
+- >5000 rejected
+- negative rejected
+
+QUOTE VALIDATION:
+
+- valid quote
+- sell asset mismatch
+- buy asset mismatch
+- sell amount mismatch
+- chain mismatch
+- network mismatch
+- invalid recipient
+- invalid calldata
+- invalid transaction value
+- expired quote
+- malformed fee
+- malformed route
+- invalid provider data
+
+QUOTE LIFECYCLE:
+
+- idle
+- requesting
+- quoted
+- expired
+- failed
+
+PROVIDER ABSTRACTION:
+
+- deterministic test provider works
+- provider failure normalized
+- malformed provider response rejected
+
+SECURITY:
+
+Verify tests demonstrate:
+
+- no SecureStore access
+- no mnemonic access
+- no private-key access
+- no PIN access
+- no biometric access
+- no signing
+- no broadcast
+- no direct wallet mutation
+- no backend dependency
+- no real external API call
+
+
+27. LARGE AMOUNT SAFETY TESTS
+
+Explicitly test large bigint values including:
+
+0
+1
+999999999999999999
+1000000000000000000
+
+and very large uint256-compatible values.
+
+Verify:
+
+- no precision loss
+- no floating-point conversion
+- no scientific notation
+- no rounding.
+
+
+28. DOCUMENTATION
+
+Update DEVELOPMENT_STATE.md with:
+
+Phase 6.1 — Swap Architecture & Quote Model
+Status: Implemented
+
+Document:
+
+- what was implemented
+- what was intentionally NOT implemented
+- provider abstraction
+- quote validation
+- same-chain limitation
+- slippage model
+- security boundary
+- relationship with transaction construction/signing/broadcasting
+- testing status
+- known limitations
+
+
+29. REGRESSION SAFETY
+
+Before finishing:
+
+Run the complete existing test suite.
+
+Do not only run the new swap tests.
+
+The entire project must continue passing.
+
+Verify:
+
+- TypeScript
+- existing unit tests
+- new swap tests
+- Expo/Metro validation
+- iOS/Android static/build validation if already available
+- relevant project workflows
+- git diff review
+
+Do not leave debug logging, temporary files, dead code, or unused dependencies.
+
+
+30. FINAL SECURITY CHECK
+
+Before reporting completion, inspect the Phase 6.1 diff specifically for accidental access to:
+
+SecureStore
+mnemonic
+private key
+PIN
+biometric APIs
+signing engine
+broadcast engine
+backend APIs
+external swap APIs
+wallet persistence
+
+There must be NO secret-handling or transaction-execution capability introduced by Phase 6.1.
+
+
+FINAL REPORT
+
+When finished, report:
+
+1. Files created/changed
+2. Swap models implemented
+3. Validation implemented
+4. Provider abstraction implemented
+5. Quote lifecycle implemented
+6. Security boundaries verified
+7. Tests passed
+8. Full regression test result
+9. TypeScript result
+10. Expo/build validation
+11. Any warnings or limitations
+
+Do NOT start Phase 6.2.
+
+STOP after Phase 6.1 and wait for my review.
