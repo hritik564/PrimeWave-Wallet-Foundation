@@ -766,6 +766,33 @@ or secret vault content enters broadcast or confirmation state.
 The browser Preview Test Mode remains unable to sign, broadcast, or monitor
 transactions and does not create fake transaction hashes.
 
+### Phase 5.1 activity and transaction history boundary
+
+Phase 5.1 adds `src/core/activity` as a public, UI-independent activity
+boundary. It accepts account metadata, network and chain context, public
+transaction fields, existing broadcast results, and existing confirmation
+results. It never accepts or accesses mnemonics, private keys, SecureStore
+values, PINs, biometric credentials, signing capabilities, or wallet engines.
+
+Every activity record is scoped by account ID, network ID, and exact chain ID.
+Repository reads enforce that scope instead of relying on a future Activity
+screen to filter records. Local transaction IDs and blockchain hashes remain
+distinct identities; a hash-known record is never treated as confirmed merely
+because it was signed or broadcast.
+
+The lifecycle service consumes the existing broadcast and confirmation engines
+without duplicating them. It preserves ambiguous submission and confirmation
+outcomes as `unknown`, never rebroadcasts, and prepares records for explicit
+future reconciliation. Provenance distinguishes local wallet creation,
+broadcast, confirmation, public blockchain reads, and a future external
+indexer without claiming unsupported history.
+
+The Phase 5.1 repository is in-memory/session-only. No AsyncStorage,
+localStorage, SecureStore, database, backend, analytics, or cloud persistence
+is introduced. The read model is bounded, deterministic, public-only, and
+preserves bigint quantities. Preview Test Mode does not create fake production
+activity or fake transaction hashes.
+
 ### Development-only Replit web preview mode
 
 The Replit web preview cannot use native SecureStore, so it fails closed for

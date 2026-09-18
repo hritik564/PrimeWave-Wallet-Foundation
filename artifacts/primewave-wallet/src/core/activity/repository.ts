@@ -11,6 +11,20 @@ import type {
 
 const DEFAULT_LIMIT = 50;
 const MAX_LIMIT = 100;
+const STATUS_TRANSITIONS: Record<
+  ActivityRecord['status'],
+  readonly ActivityRecord['status'][]
+> = {
+  draft: ['signed', 'broadcasting', 'failed', 'unknown'],
+  signed: ['broadcasting', 'broadcasted', 'failed', 'unknown'],
+  broadcasting: ['broadcasted', 'failed', 'unknown'],
+  broadcasted: ['confirming', 'confirmed', 'reverted', 'unknown'],
+  confirming: ['confirmed', 'reverted', 'unknown'],
+  confirmed: [],
+  reverted: [],
+  failed: [],
+  unknown: ['confirmed', 'reverted', 'unknown'],
+};
 
 function scopeKey(scope: ActivityScope): string {
   return `${scope.accountId}|${scope.networkId}|${scope.chainId.toString()}`;
@@ -93,6 +107,9 @@ function normalizeRecord(input: ActivityRecordInput): ActivityRecord {
   const transactionHash = input.transactionHash
     ? hashKey(input.transactionHash) as `0x${string}`
     : null;
+  if (transactionHash && !/^0x[0-9a-f]{64}$/i.test(transactionHash)) {
+    throw new ActivityError('INVALID_RECORD');
+  }
   const localTransactionId =
     input.localTransactionId === undefined ? null : input.localTransactionId;
   if (
@@ -246,8 +263,33 @@ export class InMemoryActivityRepository implements ActivityRepository {
     if (matching) {
       this.deleteRecord(matching);
     }
-    this.records.set(identityKey(record), record);
-    return cloneRecord(record);
+    const merged = matching
+      ? normalizeRecord({
+          ...record,
+          localTransactionId:
+            matching.localTransactionId ?? record.localTransactionId,
+          transactionHash: record.transactionHash ?? matching.transactionHash,
+          assetIdentity: record.assetIdentity ?? matching.assetIdentity,
+          recipient: record.recipient ?? matching.recipient,
+          amountRaw: record.amountRaw ?? matching.amountRaw,
+          amountDecimals: record.amountDecimals ?? matching.amountDecimals,
+          amountDisplay: record.amountDisplay ?? matching.amountDisplay,
+          nativeValue: record.nativeValue ?? matching.nativeValue,
+          tokenContractAddress:
+            record.tokenContractAddress ?? matching.tokenContractAddress,
+          nonce: record.nonce ?? matching.nonce,
+          gasLimit: record.gasLimit ?? matching.gasLimit,
+          feeModel: record.feeModel ?? matching.feeModel,
+          feeAmount: record.feeAmount ?? matching.feeAmount,
+          createdAt: matching.createdAt,
+          broadcastAt: record.broadcastAt ?? matching.broadcastAt,
+          confirmedAt: record.confirmedAt ?? matching.confirmedAt,
+          confirmation: record.confirmation ?? matching.confirmation,
+          explorerUrl: record.explorerUrl ?? matching.explorerUrl,
+        })
+      : record;
+    this.records.set(identityKey(merged), merged);
+    return cloneRecord(merged);
   }
 
   getById(localTransactionId: string, scope: ActivityScope): ActivityRecord | null {
@@ -264,9 +306,16 @@ export class InMemoryActivityRepository implements ActivityRepository {
 
   getByHash(transactionHash: string, scope: ActivityScope): ActivityRecord | null {
     const validatedScope = validateScope(scope);
-    const record = this.records.get(
+    const directRecord = this.records.get(
       `hash|${scopeKey(validatedScope)}|${hashKey(transactionHash)}`,
     );
+    const record =
+      directRecord ??
+      [...this.records.values()].find(
+        (candidate) =>
+          candidate.transactionHash?.toLowerCase() === hashKey(transactionHash) &&
+          sameScope(candidate, validatedScope),
+      );
     if (!record) return null;
     if (!sameScope(record, validatedScope)) {
       throw new ActivityError('SCOPE_MISMATCH');
@@ -297,6 +346,12 @@ export class InMemoryActivityRepository implements ActivityRepository {
     const validatedScope = validateScope(scope);
     const current = this.getById(localTransactionId, validatedScope);
     if (!current) throw new ActivityError('RECORD_NOT_FOUND');
+    if (
+      current.status !== update.status &&
+      !STATUS_TRANSITIONS[current.status].includes(update.status)
+    ) {
+      throw new ActivityError('INVALID_STATUS_TRANSITION');
+    }
     const next = normalizeRecord({
       ...current,
       ...update,

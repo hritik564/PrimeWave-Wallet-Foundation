@@ -24,6 +24,11 @@ import type {
   BiometricAvailability,
 } from '@/src/core/security';
 import type { PortfolioAssetViewModel, PortfolioReadModel } from '@/src/core/portfolio';
+import type {
+  ActivityDraftInput,
+  ActivityRecord,
+  ActivityService,
+} from '@/src/core/activity';
 import {
   assetIdentityKey,
   validateRecipient,
@@ -62,6 +67,19 @@ export interface TransactionBroadcastDependency {
   readonly broadcast: (signed: SignedTransaction) => Promise<BroadcastResult>;
   readonly confirm: (broadcast: BroadcastResult) => Promise<ConfirmationResult>;
   readonly lookup: (broadcast: BroadcastResult) => Promise<TransactionLookupResult>;
+}
+
+export interface TransactionActivityDependency
+  extends Pick<
+    ActivityService,
+    | 'createDraft'
+    | 'recordSigned'
+    | 'recordBroadcasting'
+    | 'recordBroadcast'
+    | 'recordConfirmation'
+    | 'recordFailed'
+  > {
+  readonly createDraft: (input: ActivityDraftInput) => ActivityRecord;
 }
 
 export type ReviewErrorCode =

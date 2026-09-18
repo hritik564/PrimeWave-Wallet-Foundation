@@ -152,6 +152,32 @@ existing transaction lookup method. Hash copying uses the public clipboard
 boundary, and explorer actions are created only from valid configured-network
 transaction templates.
 
+## Phase 5.1 activity and transaction history architecture
+
+`src/core/activity` provides the foundational public activity model without
+building the Activity UI. The model distinguishes local transaction identity
+from blockchain hash identity and scopes every record to account ID, network
+ID, and exact chain ID. External blockchain observations may omit the local
+ID but must carry a scoped hash.
+
+The lifecycle model preserves draft, signed, broadcasting, broadcasted,
+confirming, confirmed, reverted, failed, and unknown. `ActivityService`
+consumes the existing signed, broadcast, and confirmation results; it never
+creates a second broadcaster, receipt poller, signer, or reconciliation loop.
+Unknown outcomes remain unknown until a future explicit reconciliation updates
+the record.
+
+`InMemoryActivityRepository` is the Phase 5.1 persistence decision. It is
+bounded, session-only, and enforces account/network/chain isolation. It does
+not use AsyncStorage, localStorage, SecureStore, a database, backend
+persistence, analytics, or external indexers. `ActivityReadModelService`
+provides deterministic bounded presentation data with provenance and explorer
+availability while preserving exact bigint quantities.
+
+Phase 5.1 does not implement Activity UI, transaction detail UI, external
+indexing, backend history, notifications, Swap, DApps, WalletConnect,
+replacement, speed-up, cancellation, or fee bumping.
+
 ## Phase 2.7 broadcast and confirmation
 
 `src/core/transactions/broadcast` accepts only the public `SignedTransaction`

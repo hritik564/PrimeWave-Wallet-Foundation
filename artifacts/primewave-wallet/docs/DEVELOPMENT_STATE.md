@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 4.8 — WAVEX transaction broadcast and confirmation lifecycle (completed)**
+**Phase 5.1 — WAVEX activity and transaction history architecture (completed)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -289,6 +289,14 @@ UI testing; it is not a real wallet and does not alter the native boundary.
   submission, network/account guards, bounded monitoring, and reconciliation.
 - Added honest broadcast, confirmation, reverted, failed, and unknown states.
 - Added public hash copy and validated configured-network explorer links.
+- Added the UI-independent `src/core/activity` model, lifecycle service,
+  in-memory repository, and bounded read model.
+- Added account/network/chain isolation, local ID versus transaction-hash
+  identity, provenance, exact bigint handling, and explicit unknown states.
+- Integrated signed, broadcast, and confirmation results into session activity
+  records without adding a second broadcast or receipt-polling engine.
+- Added focused repository, lifecycle, ordering, read-model, and security
+  regression tests.
 
 ## Pending work
 
@@ -299,8 +307,9 @@ UI testing; it is not a real wallet and does not alter the native boundary.
   pricing, transaction history, transfers, approvals, permits, swaps, DApps,
   backend asset APIs, notifications, and full wallet UI remain outside this
   controlled increment.
-- Phase 4.8 placeholders remain for account switching, asset detail, QR
-  scanning, Swap, Activity, and Settings functionality.
+- Phase 5.1 intentionally does not include the polished Activity UI,
+  transaction detail UI, account switching, asset detail, QR scanning, Swap,
+  or Settings functionality.
 - Preview Test Mode is intentionally limited to web UI state testing and is not
   native wallet or security validation.
 - Balance preflight validation is intentionally not implemented because it is
@@ -337,8 +346,9 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 
 ## Phase boundary
 
-Phase 4.8 is complete. Stop here. Later phases may separately define external
-verification, token state-changing operations, NFTs, portfolio valuation, fiat
-pricing, transaction history, UI activity, swaps, DApps, WalletConnect,
-notifications, backend indexing, replacement, speed-up, cancellation,
-automatic fee bumping, full wallet UI, and other ecosystem capabilities.
+Phase 5.1 is complete. Stop here. Later phases may separately define the
+Activity UI, transaction detail UI, external indexing, backend history,
+notifications, external verification, token state-changing operations, NFTs,
+portfolio valuation, fiat pricing, swaps, DApps, WalletConnect, replacement,
+speed-up, cancellation, automatic fee bumping, full wallet UI, and other
+ecosystem capabilities.

@@ -16,6 +16,10 @@ import type {
   BroadcastResult,
   ConfirmationResult,
 } from '@/src/core/transactions/broadcast';
+import {
+  activityDirection,
+  activityTransactionTypeFor,
+} from '@/src/core/activity';
 import { formatNativeUnits } from '@/src/core/blockchain/gas-fee';
 import type { PortfolioAssetViewModel, PortfolioReadModel } from '@/src/core/portfolio';
 import type { Wallet } from '@/src/core/wallet/models';
@@ -31,6 +35,7 @@ import {
   TransactionReviewError,
   type PreparedTransactionReview,
   type PublicReviewConfirmationResult,
+  type TransactionActivityDependency,
   type TransactionBroadcastDependency,
   type TransactionConstructionDependency,
   type TransactionSigningDependency,
@@ -97,6 +102,7 @@ export function TransactionReviewScreen({
   createConstructionEngine,
   createSigningDependency,
   createBroadcastDependency,
+  activityService,
   onBack,
   onConfirmed,
   onSigned,
@@ -117,6 +123,7 @@ export function TransactionReviewScreen({
   readonly createBroadcastDependency: (
     networkId: string,
   ) => Promise<TransactionBroadcastDependency | null>;
+  readonly activityService?: TransactionActivityDependency | null;
   readonly onBack: () => void;
   readonly onConfirmed: (result: PublicReviewConfirmationResult) => void;
   readonly onSigned?: (result: SignedTransaction) => void;
@@ -142,6 +149,8 @@ export function TransactionReviewScreen({
   const [pin, setPin] = useState('');
   const [biometricAvailable, setBiometricAvailable] = useState(false);
   const [hashCopyState, setHashCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
+  const [activityLocalTransactionId, setActivityLocalTransactionId] =
+    useState<string | null>(null);
 
   const selectedAsset = useMemo(
     () => portfolio?.assets.find(
@@ -165,6 +174,7 @@ export function TransactionReviewScreen({
     setHashCopyState('idle');
     setConfirmation(null);
     setErrorMessage(null);
+    setActivityLocalTransactionId(null);
     if (!account) {
       setState('error');
       setErrorMessage('The public account is unavailable. Return to Send.');
@@ -247,6 +257,14 @@ export function TransactionReviewScreen({
       .then((result) => {
         if (cancelled) return;
         setConfirmationResult(result);
+        if (activityService && activityLocalTransactionId) {
+          activityService.recordConfirmation(activityLocalTransactionId, result, {
+            explorerUrl: createTransactionExplorerUrl(
+              network,
+              result.transactionHash,
+            ),
+          });
+        }
         setState(
           result.state === 'confirmed'
             ? 'confirmed'
@@ -273,7 +291,13 @@ export function TransactionReviewScreen({
     return () => {
       cancelled = true;
     };
-  }, [broadcastDependency, broadcastResult, state]);
+  }, [
+    activityLocalTransactionId,
+    activityService,
+    broadcastDependency,
+    broadcastResult,
+    state,
+  ]);
 
   const handleCopy = async () => {
     try {
@@ -312,7 +336,18 @@ export function TransactionReviewScreen({
         network,
         activeNetworkId: networkRegistry.getActiveNetwork()?.id ?? null,
       });
+      if (activityService && activityLocalTransactionId) {
+        activityService.recordBroadcasting(activityLocalTransactionId);
+      }
       const result = await broadcastDependency.broadcast(signedTransaction);
+      if (activityService && activityLocalTransactionId) {
+        activityService.recordBroadcast(activityLocalTransactionId, result, {
+          explorerUrl: createTransactionExplorerUrl(
+            network,
+            result.transactionHash,
+          ),
+        });
+      }
       setBroadcastResult(result);
       if (result.state === 'unknown') {
         setState('unknown');
@@ -323,6 +358,9 @@ export function TransactionReviewScreen({
         setState('broadcasted');
       }
     } catch (error: unknown) {
+      if (activityService && activityLocalTransactionId) {
+        activityService.recordFailed(activityLocalTransactionId);
+      }
       setState('broadcast-failed');
       setErrorMessage(
         error instanceof Error
@@ -396,6 +434,35 @@ export function TransactionReviewScreen({
         throw new TransactionReviewError('STALE_REVIEW');
       }
       const result = createPublicReviewConfirmation(refreshed);
+      if (activityService && !activityLocalTransactionId) {
+        const activity = activityService.createDraft({
+          accountId: refreshed.draft.accountId,
+          senderAddress: refreshed.draft.senderPublicAddress,
+          networkId: refreshed.draft.networkId,
+          chainId: refreshed.preview.chainId,
+          transactionType: activityTransactionTypeFor(
+            refreshed.asset.assetType,
+            refreshed.preview.hasCalldata,
+          ),
+          direction: activityDirection(
+            refreshed.draft.senderPublicAddress,
+            refreshed.draft.recipient,
+          ),
+          assetIdentity: refreshed.asset.identity,
+          recipient: refreshed.draft.recipient,
+          amountRaw: refreshed.rawAmount,
+          amountDecimals: refreshed.asset.decimals,
+          amountDisplay: refreshed.draft.amount,
+          nativeValue:
+            refreshed.asset.assetType === 'native' ? refreshed.rawAmount : 0n,
+          tokenContractAddress: refreshed.asset.contractAddress,
+          nonce: refreshed.preview.unsignedTransaction.nonce,
+          gasLimit: refreshed.preview.unsignedTransaction.gasLimit,
+          feeModel: refreshed.preview.feeModel,
+          feeAmount: refreshed.preview.estimatedNetworkFee,
+        });
+        setActivityLocalTransactionId(activity.localTransactionId);
+      }
       setReview(refreshed);
       setConfirmation(result);
       onConfirmed(result);
@@ -438,6 +505,7 @@ export function TransactionReviewScreen({
     setErrorMessage(null);
     const enteredPin = pin;
     setPin('');
+    let signingStarted = false;
     try {
       const authentication = method === 'pin'
         ? await signingDependency.authenticateWithPin(enteredPin)
@@ -474,6 +542,7 @@ export function TransactionReviewScreen({
       }
 
       setState('signing');
+      signingStarted = true;
       const authorization = createTransactionSigningAuthorization(
         createReviewSigningAuthorization(latest),
       );
@@ -483,9 +552,20 @@ export function TransactionReviewScreen({
       );
       setReview(latest);
       setSignedTransaction(signed);
+      if (activityService && activityLocalTransactionId) {
+        activityService.recordSigned(activityLocalTransactionId, signed, {
+          explorerUrl: createTransactionExplorerUrl(
+            network,
+            signed.transactionHash,
+          ),
+        });
+      }
       setState('signed');
       onSigned?.(signed);
     } catch (error: unknown) {
+      if (signingStarted && activityService && activityLocalTransactionId) {
+        activityService.recordFailed(activityLocalTransactionId);
+      }
       setState(error instanceof TransactionReviewError ? 'error' : 'awaiting-auth');
       setErrorMessage(
         error instanceof TransactionReviewError || error instanceof Error

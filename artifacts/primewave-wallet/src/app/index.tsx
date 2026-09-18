@@ -16,6 +16,7 @@ import {
 import {
   createAppPortfolioReadModelService,
 } from '@/src/core/portfolio';
+import { ActivityService } from '@/src/core/activity';
 import {
   defaultNetworkRegistry,
   NetworkRegistryError,
@@ -619,6 +620,10 @@ export default function FoundationScreen() {
     () => createAppPortfolioReadModelService(),
     [],
   );
+  const activityService = useMemo(
+    () => (previewMode ? null : new ActivityService()),
+    [previewMode],
+  );
   const createConstructionEngine = useCallback(
     async (wallet: Wallet, networkId: string): Promise<TransactionConstructionDependency | null> => {
       const activeNetwork = defaultNetworkRegistry.getActiveNetwork();
@@ -891,12 +896,13 @@ export default function FoundationScreen() {
       if (!access) return;
       await nativeAccess().resetLocalWallet();
     }
+    activityService?.getRepository().clear();
     setSettings({ biometricEnabled: false, autoLockPolicy: 0, pinConfigured: false });
     setPin('');
     setConfirmPin('');
     setView('welcome');
   })} />;
-  else if (view === 'wallet' && currentWallet) content = <WalletHomeShell createConstructionEngine={createConstructionEngine} createSigningDependency={createSigningDependency} createBroadcastDependency={createBroadcastDependency} previewMode={previewMode} wallet={currentWallet} network={selectedNetwork} networkRegistry={defaultNetworkRegistry} readModelService={portfolioReadModelService} onNetworkSelect={handleNetworkSelect} onComingSoon={(message) => setError(message)} onLock={() => void run(async () => {
+  else if (view === 'wallet' && currentWallet) content = <WalletHomeShell activityService={activityService} createConstructionEngine={createConstructionEngine} createSigningDependency={createSigningDependency} createBroadcastDependency={createBroadcastDependency} previewMode={previewMode} wallet={currentWallet} network={selectedNetwork} networkRegistry={defaultNetworkRegistry} readModelService={portfolioReadModelService} onNetworkSelect={handleNetworkSelect} onComingSoon={(message) => setError(message)} onLock={() => void run(async () => {
     if (previewMode) {
       previewTestMode.lockPreviewWallet();
     } else {

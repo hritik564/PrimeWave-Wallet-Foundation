@@ -798,6 +798,33 @@ existing transaction lookup method. Explorer links are created only from
 validated configured-network transaction URL templates. Preview Test Mode
 cannot broadcast or monitor transactions.
 
+### Phase 5.1 WaveX activity and transaction history architecture
+
+Phase 5.1 adds a UI-independent public activity architecture under
+`src/core/activity`. It defines a session-scoped repository, lifecycle service,
+and bounded read model without building the Activity screen, transaction detail
+UI, backend indexing, external indexers, notifications, analytics, or cloud
+persistence.
+
+Activity records are scoped by `accountId`, `networkId`, and exact `chainId`.
+They distinguish a generated local transaction ID from the blockchain
+transaction hash. A local record can therefore exist as a draft or signed
+transaction before a hash is known. Blockchain-discovered records may omit the
+local ID but must have a scoped hash.
+
+The model preserves `draft`, `signed`, `broadcasting`, `broadcasted`,
+`confirming`, `confirmed`, `reverted`, `failed`, and `unknown` as separate
+states. Provenance identifies local wallet creation, broadcast, confirmation,
+public blockchain reads, or a future external indexer. The lifecycle service
+consumes existing Phase 2.6/2.7 results and never signs, broadcasts, polls,
+or accesses wallet secrets.
+
+Phase 5.1 uses an in-memory/session repository only. It does not add
+AsyncStorage, localStorage, SecureStore, a database, backend persistence, or
+analytics. Reads are bounded and deterministic: block-known activity first,
+hash-known pending activity next, and local-only activity last. Exact amounts,
+fees, gas, nonce, and block values remain `bigint` or exact strings.
+
 ## Design system
 
 WAVEX uses a centralized dark foundation with blue, cyan, and violet
@@ -852,6 +879,9 @@ website layout.
 14. **Phase 4.8 — broadcast and confirmation lifecycle:** explicit broadcast
     confirmation, exact-byte Phase 2.7 submission, bounded monitoring,
     reconciliation, explorer links, and honest unknown/reverted states.
+15. **Phase 5.1 — activity and transaction history architecture:** scoped
+    public activity records, lifecycle integration, provenance, in-memory
+    repository, bounded read model, and future reconciliation preparation.
   12. **Phase 3.1 — asset abstraction and native balance engine:** network-scoped
       native asset identities, exact bigint amount utilities, and read-only
       native balance retrieval. Complete.

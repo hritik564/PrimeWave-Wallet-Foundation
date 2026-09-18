@@ -29,6 +29,7 @@ import {
 } from './TransactionReviewScreen';
 import type {
   PublicReviewConfirmationResult,
+  TransactionActivityDependency,
   TransactionBroadcastDependency,
   TransactionConstructionDependency,
   TransactionSigningDependency,
@@ -999,6 +1000,7 @@ export function WalletHomeShell({
   createConstructionEngine,
   createSigningDependency,
   createBroadcastDependency,
+  activityService,
   onNetworkSelect,
   onLock,
   onComingSoon,
@@ -1019,6 +1021,7 @@ export function WalletHomeShell({
   createBroadcastDependency: (
     networkId: string,
   ) => Promise<TransactionBroadcastDependency | null>;
+  activityService?: TransactionActivityDependency | null;
   onNetworkSelect: (networkId: string) => NetworkSelectionResult;
   onLock: () => void;
   onComingSoon: (label: string) => void;
@@ -1200,6 +1203,7 @@ export function WalletHomeShell({
         ) : destination === 'send' ? (
           reviewDraft ? (
             <TransactionReviewScreen
+              activityService={activityService}
               createBroadcastDependency={createBroadcastDependency}
               createConstructionEngine={createConstructionEngine}
               createSigningDependency={createSigningDependency}
