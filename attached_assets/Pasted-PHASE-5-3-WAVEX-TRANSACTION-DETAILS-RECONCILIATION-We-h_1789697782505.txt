@@ -1,0 +1,1265 @@
+PHASE 5.3 — WAVEX TRANSACTION DETAILS & RECONCILIATION
+
+We have completed and approved:
+
+- Phase 5.1 — Activity / Transaction History Architecture
+- Phase 5.1A — Activity Presentation Model Amendment
+- Phase 5.2 — WAVEX Activity UI
+
+Current verified state:
+
+- Full wallet suite: 212/212 tests passing
+- TypeScript passing
+- Static iOS and Android Expo builds passing
+- Activity repository exists
+- ActivityService exists
+- ActivityReadModelService exists
+- ActivityPresentationModel exists
+- Asset-first Activity UI exists
+- Network badge presentation exists
+- Account/network/chain isolation exists
+- Exact bigint quantities are enforced
+- Existing broadcast and confirmation engines remain authoritative
+- Activity row → transaction detail is currently only a placeholder
+
+OBJECTIVE
+
+Replace the Activity transaction-detail placeholder with a proper WAVEX Transaction Details experience.
+
+Also establish the foundational reconciliation behavior needed to keep transaction status accurate.
+
+The flow should become:
+
+Activity
+  ↓
+Transaction Details
+  ↓
+Read-only transaction information
+  ↓
+Optional reconciliation / refresh
+  ↓
+Current known status
+
+This phase is READ-ONLY from the blockchain perspective.
+
+DO NOT add:
+
+- Swap
+- Swap execution
+- Swap detection
+- DApp / WalletConnect
+- backend history
+- external indexers
+- price APIs
+- notifications
+- transaction replacement
+- speed-up
+- cancellation
+- fee bumping
+
+==================================================
+1. CORE PRINCIPLE
+==================================================
+
+Transaction Details must clearly distinguish:
+
+LOCAL TRANSACTION RECORD
+UNSIGNED TRANSACTION
+SIGNED TRANSACTION
+BROADCASTED TRANSACTION
+CONFIRMING TRANSACTION
+CONFIRMED TRANSACTION
+REVERTED TRANSACTION
+FAILED TRANSACTION
+UNKNOWN TRANSACTION
+
+Never collapse these into a generic "success" state.
+
+A transaction being:
+
+SIGNED
+
+does NOT mean:
+
+BROADCASTED
+
+A transaction being:
+
+BROADCASTED
+
+does NOT mean:
+
+CONFIRMED
+
+A transaction being:
+
+UNKNOWN
+
+does NOT mean:
+
+FAILED
+
+==================================================
+2. DETAIL SCREEN
+==================================================
+
+Create:
+
+src/components/TransactionDetailScreen.tsx
+src/components/TransactionDetailScreen.logic.ts
+src/components/tests/transaction-detail-screen.test.ts
+
+Follow existing project architecture and naming conventions if an equivalent structure already exists.
+
+The screen must consume the existing ActivityReadModelService / ActivityPresentationModel.
+
+Do NOT duplicate activity data models.
+
+Do NOT make UI code responsible for blockchain interpretation.
+
+==================================================
+3. NAVIGATION
+==================================================
+
+Activity row tap should navigate to Transaction Details.
+
+Pass only:
+
+- activity ID
+- safe public context if required
+
+Do NOT pass:
+
+- private key
+- mnemonic
+- signing capability
+- PIN
+- biometric credentials
+- SecureStore values
+- wallet secrets
+
+The detail screen must resolve the authoritative activity record through the Activity service/read model.
+
+==================================================
+4. VISUAL DESIGN
+==================================================
+
+Use the existing WAVEX design system.
+
+Continue the visual language established in the Activity page:
+
+- dark futuristic background
+- deep navy/black surfaces
+- cyan/electric blue/violet accents
+- restrained glow
+- premium rounded cards
+- clean typography
+- strong information hierarchy
+
+The Activity screenshot remains the visual reference for the overall wallet experience.
+
+The Transaction Details page should feel like the natural next screen after tapping an Activity row.
+
+Do not create a separate design system.
+
+==================================================
+5. HEADER
+==================================================
+
+Header:
+
+- Back button
+- "Transaction Details"
+
+Navigation must behave consistently with the rest of WAVEX.
+
+==================================================
+6. PRIMARY TRANSACTION SUMMARY
+==================================================
+
+At the top, show a strong summary card.
+
+Depending on activity type:
+
+Sent:
+
+"Sent"
+
+with:
+
+- asset icon
+- network badge
+- amount
+- asset symbol
+
+Received:
+
+"Received"
+
+with:
+
+- asset icon
+- network badge
+- amount
+- asset symbol
+
+Swap:
+
+"Swapped"
+
+with:
+
+- primary/secondary assets
+- input/output amounts
+
+IMPORTANT:
+
+Only show "Swapped" when the ActivityPresentationModel explicitly identifies the event as a swap.
+
+Do NOT infer swaps.
+
+Contract interaction:
+
+"Contract Interaction"
+
+with appropriate asset/contract information.
+
+Unknown:
+
+"Transaction"
+
+or another neutral label.
+
+==================================================
+7. STATUS
+==================================================
+
+Display the current transaction status prominently.
+
+Supported states:
+
+- Draft
+- Signed
+- Broadcasting
+- Broadcasted
+- Confirming
+- Confirmed
+- Reverted
+- Failed
+- Unknown
+
+Use honest wording.
+
+Examples:
+
+"Signed locally — not broadcast"
+
+"Broadcasted — awaiting confirmation"
+
+"Confirming"
+
+"Confirmed"
+
+"Reverted"
+
+"Broadcast failed"
+
+"Status unknown"
+
+Do not show:
+
+"Successful"
+
+unless the actual state is confirmed.
+
+Do not show:
+
+"Sent"
+
+as proof of blockchain confirmation.
+
+==================================================
+8. STATUS EXPLANATIONS
+==================================================
+
+Where useful, provide concise explanations.
+
+Example:
+
+UNKNOWN:
+
+"The broadcast result could not be established. Check the transaction on the network before attempting anything again."
+
+Do NOT tell the user to rebroadcast automatically.
+
+For reverted:
+
+"The transaction was included on-chain but execution reverted."
+
+For failed:
+
+"The transaction did not reach confirmed on-chain execution."
+
+Use the existing normalized error/state model where available.
+
+Do not expose raw RPC errors.
+
+==================================================
+9. FROM / TO
+==================================================
+
+Display:
+
+FROM
+
+- full sender address
+- shortened address
+- copy action
+
+TO
+
+- full recipient/contract address
+- shortened address
+- copy action
+
+Use existing clipboard boundaries.
+
+Never read clipboard contents.
+
+Do not persist clipboard contents.
+
+Do not label an address:
+
+- safe
+- trusted
+- verified
+
+unless explicit trusted metadata exists.
+
+A valid EVM address is not proof that it is safe.
+
+==================================================
+10. TRANSACTION HASH
+==================================================
+
+If a blockchain transaction hash exists:
+
+Display:
+
+Transaction Hash
+
+- shortened hash
+- full hash accessible
+- copy action
+
+If no hash exists:
+
+display an appropriate state such as:
+
+"Transaction hash not yet available"
+
+Do not fabricate a hash.
+
+For locally-created transactions before broadcast:
+
+use the local transaction identity appropriately.
+
+Do not pretend the local ID is an on-chain transaction hash.
+
+==================================================
+11. NETWORK
+==================================================
+
+Display:
+
+- network name
+- chain ID
+- network icon/badge where available
+- configured/unconfigured status
+
+The network must come from the authoritative activity record.
+
+Do not infer network from:
+
+- token symbol
+- transaction hash
+- explorer URL
+
+Do not allow the detail screen to change the active wallet network.
+
+==================================================
+12. ASSET INFORMATION
+==================================================
+
+For native assets:
+
+show:
+
+- asset icon
+- name
+- symbol
+- exact amount
+
+For ERC-20:
+
+show:
+
+- asset icon
+- name
+- symbol
+- exact amount
+- contract address
+
+Contract address should be copyable.
+
+Use existing AssetIcon / TokenLogo architecture.
+
+Do not treat icon availability as token verification.
+
+If token metadata is incomplete:
+
+show what is known and clearly represent unavailable fields.
+
+Do not invent token metadata.
+
+==================================================
+13. COUNTERPARTY
+==================================================
+
+For Sent:
+
+"To"
+
+For Received:
+
+"From"
+
+For Contract Interaction:
+
+"Contract"
+
+For Self Transfer:
+
+appropriate neutral presentation.
+
+Display:
+
+- full address
+- shortened address
+- copy action
+
+Do not infer human-readable names.
+
+Do not add address labels unless an authoritative source already exists.
+
+==================================================
+14. AMOUNT
+==================================================
+
+Use existing exact formatting.
+
+Never use:
+
+Number()
+parseFloat()
+floating-point arithmetic
+toFixed() for blockchain quantities
+
+Display exact blockchain amount.
+
+For outgoing:
+
+-amount
+
+For incoming:
+
++amount
+
+For swaps:
+
+input amount
+output amount
+
+Preserve exact raw values underneath the presentation layer.
+
+==================================================
+15. NETWORK FEE
+==================================================
+
+Where fee information is available:
+
+Display:
+
+Network Fee
+
+- exact fee
+- native currency symbol
+- fee model where known
+
+Examples:
+
+EIP-1559
+
+Legacy
+
+Do not mix token transfer amount and native network fee as though they are the same currency.
+
+For ERC-20:
+
+USDC transfer amount
+
+and:
+
+ETH/BNB/etc. network fee
+
+must remain visually separate.
+
+If fee is unavailable:
+
+do not fabricate it.
+
+Show:
+
+"Fee unavailable"
+
+or omit where appropriate.
+
+==================================================
+16. GAS INFORMATION
+==================================================
+
+Where available, expose:
+
+- gas limit
+- gas used
+- fee per gas
+- max fee per gas where applicable
+- priority fee where applicable
+- fee model
+
+Only show fields supported by authoritative transaction data.
+
+Do not calculate gas used from assumptions.
+
+Do not invent missing fields.
+
+==================================================
+17. NONCE
+==================================================
+
+Where authoritative data exists:
+
+show transaction nonce.
+
+This is useful advanced information but should not dominate the screen.
+
+If unavailable:
+
+omit it.
+
+Do not infer nonce from local ordering.
+
+==================================================
+18. BLOCK / CONFIRMATION INFORMATION
+==================================================
+
+For confirmed/reverted transactions where receipt data exists:
+
+show:
+
+- block number
+- confirmation status
+- confirmation count if reliably available
+
+If confirmation count cannot be reliably established:
+
+do not fabricate it.
+
+A transaction with a receipt should still distinguish:
+
+successful execution
+
+from:
+
+reverted execution.
+
+==================================================
+19. TIMESTAMP
+==================================================
+
+Display the appropriate transaction time.
+
+Prefer authoritative blockchain-derived timestamp where available.
+
+Otherwise use observation timestamp with appropriate semantics.
+
+Do not label observation time as blockchain time.
+
+The underlying model must preserve timestamp source.
+
+==================================================
+20. EXPLORER
+==================================================
+
+If the configured network provides a valid explorer transaction URL:
+
+show:
+
+"View on Explorer"
+
+Use only validated configured explorer metadata.
+
+Do not construct arbitrary explorer URLs.
+
+Do not invent explorer URLs.
+
+For placeholder/unconfigured networks:
+
+do not display a fake explorer link.
+
+The explorer action must not alter wallet state.
+
+==================================================
+21. RECONCILIATION
+==================================================
+
+Implement foundational read-only reconciliation for known transaction hashes.
+
+Use the existing Phase 2.7 transaction lookup / confirmation architecture.
+
+Do NOT create a second receipt polling engine.
+
+When the detail screen is refreshed or reconciliation is explicitly requested:
+
+For transactions with a known transaction hash:
+
+- look up the transaction using the existing broadcast/lookup infrastructure
+- if receipt exists, update activity status appropriately
+- if receipt indicates successful execution, use confirmed
+- if receipt indicates reverted execution, use reverted
+- if transaction remains pending, preserve confirming/broadcasted state
+- if status cannot be established, preserve unknown
+
+Do NOT automatically rebroadcast.
+
+Do NOT sign.
+
+Do NOT modify transaction data.
+
+==================================================
+22. RECONCILIATION FOR UNKNOWN
+==================================================
+
+UNKNOWN must be treated carefully.
+
+If a broadcast timed out:
+
+UNKNOWN
+
+does NOT mean:
+
+FAILED.
+
+The user may manually request reconciliation.
+
+Use:
+
+- transaction hash lookup
+- receipt lookup
+- existing confirmation engine
+
+If the transaction is later found:
+
+update the activity record.
+
+If it is still not found:
+
+remain UNKNOWN.
+
+Do not automatically resubmit the signed transaction.
+
+==================================================
+23. RECONCILIATION BOUNDS
+==================================================
+
+Reconciliation must be bounded.
+
+Do not create:
+
+- infinite polling
+- aggressive polling
+- background polling loops
+- automatic retry loops
+
+A user-triggered refresh may perform a bounded read-only reconciliation.
+
+Respect the existing Phase 2.7 timeout semantics.
+
+==================================================
+24. EXTERNAL TRANSACTIONS
+==================================================
+
+The detail architecture must support transactions discovered on-chain that were not created by WAVEX.
+
+Such transactions may have:
+
+- no localTransactionId
+- transactionHash
+- accountId
+- networkId
+- chainId
+- blockchain-derived data
+- provenance = blockchain_read
+
+The UI should not imply:
+
+"Sent from WAVEX"
+
+unless provenance supports that claim.
+
+Use neutral wording where origin is unknown.
+
+==================================================
+25. PROVENANCE DISPLAY
+==================================================
+
+Do not necessarily expose technical provenance directly to ordinary users.
+
+However, preserve it internally.
+
+Examples:
+
+local_wallet
+broadcast_engine
+confirmation_engine
+blockchain_read
+external_indexer_future
+
+The presentation model may use provenance to select appropriate wording.
+
+Never use provenance to make unsupported security/trust claims.
+
+==================================================
+26. TRANSACTION TYPE
+==================================================
+
+Display transaction type where useful:
+
+- Native Transfer
+- ERC-20 Transfer
+- Contract Interaction
+- Swap
+- Approval
+- Unknown
+
+Only show Swap or Approval when authoritative activity interpretation identifies them.
+
+Do not infer transaction type from:
+
+- calldata alone unless existing authoritative decoder supports it
+- token symbol
+- multiple transfers
+- transaction value
+
+==================================================
+27. DETAILS SECTIONS
+==================================================
+
+Use expandable or grouped sections if needed.
+
+Suggested order:
+
+1. Summary
+2. Status
+3. From / To
+4. Asset / Amount
+5. Network
+6. Network Fee
+7. Transaction Details
+8. Explorer
+
+Advanced transaction details may include:
+
+- nonce
+- gas limit
+- gas used
+- fee model
+- block number
+- transaction hash
+
+Keep the most important information visible first.
+
+==================================================
+28. REFRESH
+==================================================
+
+Provide a clear user-triggered refresh/reconcile action.
+
+Possible states:
+
+- Refresh
+- Checking
+- Updated
+- No change
+- Unable to reconcile
+
+Do not hide network reads.
+
+Do not make refresh trigger a broadcast.
+
+Do not make refresh trigger signing.
+
+==================================================
+29. ACCOUNT / NETWORK ISOLATION
+==================================================
+
+The detail record must remain bound to:
+
+- accountId
+- sender/related account
+- networkId
+- chainId
+
+If the account context changes:
+
+- invalidate the current detail view
+- do not display another account's activity
+
+If the network context changes:
+
+- the transaction detail remains tied to its original network
+- do not reinterpret the transaction on the newly selected active network
+- do not silently switch active network
+
+Remember:
+
+The Activity network filter and wallet active network are separate concepts.
+
+==================================================
+30. NO TRANSACTION MUTATION
+==================================================
+
+Transaction Details is READ-ONLY.
+
+It must NOT:
+
+- sign
+- broadcast
+- replace
+- speed up
+- cancel
+- bump fees
+- modify nonce
+- modify recipient
+- modify amount
+
+The only blockchain operations allowed are public/read-only lookup/reconciliation.
+
+==================================================
+31. SECURITY BOUNDARY
+==================================================
+
+Transaction Details must never access:
+
+- mnemonic
+- private key
+- SecureStore secrets
+- PIN
+- biometric credentials
+- signing capability
+
+Do not import:
+
+- LocalSigner
+- TransactionSigningFlow
+
+Do not import or invoke:
+
+- TransactionBroadcastEngine.broadcast()
+- eth_sendRawTransaction
+
+If reconciliation needs transaction lookup, use the existing read-only lookup method only.
+
+==================================================
+32. PREVIEW TEST MODE
+==================================================
+
+Preview Test Mode must remain fail-closed.
+
+Do not create fake production transactions.
+
+Do not fabricate:
+
+- transaction hashes
+- fees
+- block numbers
+- confirmation counts
+- timestamps
+- explorer links
+- fiat values
+
+If deterministic test fixtures are used:
+
+label them clearly as development/test fixtures.
+
+Never present them as real blockchain transactions.
+
+==================================================
+33. ACCESSIBILITY
+==================================================
+
+Ensure:
+
+- accessible summary
+- accessible status
+- accessible addresses
+- accessible amounts
+- accessible copy actions
+- accessible network information
+- accessible explorer action
+- accessible refresh state
+
+A screen reader should be able to understand:
+
+"Sent 10 USDT to 0x... on Ethereum. Status confirmed."
+
+without requiring visual interpretation.
+
+==================================================
+34. RESPONSIVE DESIGN
+==================================================
+
+Verify:
+
+- 390x844
+- 402x874
+
+Test with:
+
+- long addresses
+- long hashes
+- large amounts
+- long token names
+- long symbols
+- missing metadata
+- unknown status
+- multiple fee fields
+
+Avoid horizontal overflow.
+
+==================================================
+35. TESTS
+==================================================
+
+Add focused tests covering:
+
+NAVIGATION
+
+- Activity row opens detail
+- correct activity ID passed
+- no secret navigation parameters
+- back navigation
+
+SUMMARY
+
+- sent
+- received
+- self transfer
+- contract interaction
+- explicit swap
+- unknown activity
+
+STATUS
+
+- draft
+- signed
+- broadcasting
+- broadcasted
+- confirming
+- confirmed
+- reverted
+- failed
+- unknown
+
+AMOUNTS
+
+- exact native amount
+- exact ERC-20 amount
+- signed presentation
+- no floating-point conversion
+
+FROM / TO
+
+- sender
+- recipient
+- contract
+- shortened address
+- full address
+- copy action
+
+ASSET
+
+- native
+- ERC-20
+- icon
+- fallback
+- verification independence
+- missing metadata
+
+NETWORK
+
+- network name
+- chain ID
+- network badge
+- configured network
+- placeholder network
+- account/network isolation
+
+FEES
+
+- EIP-1559
+- Legacy
+- fee unavailable
+- exact fee
+- gas limit
+- gas used
+- max fee
+- priority fee
+- no mixed-currency display
+
+TRANSACTION DETAILS
+
+- nonce
+- block number
+- confirmation information
+- timestamp source
+- transaction hash
+- local transaction ID
+
+EXPLORER
+
+- valid configured explorer
+- unavailable explorer
+- placeholder network
+- invalid metadata
+
+RECONCILIATION
+
+- confirmed update
+- reverted update
+- pending state
+- unknown state
+- unknown → found
+- unknown → still unknown
+- user-triggered refresh
+- bounded reconciliation
+- no automatic rebroadcast
+
+EXTERNAL TRANSACTIONS
+
+- no local ID
+- blockchain transaction hash
+- blockchain provenance
+- neutral origin wording
+
+SECURITY
+
+- no SecureStore
+- no mnemonic
+- no private key
+- no signing
+- no broadcasting
+- no mutation
+- no backend
+- no analytics
+- no fake values
+
+ACCOUNT / NETWORK
+
+- account isolation
+- network isolation
+- chain isolation
+- active network does not change
+- Activity filter does not change active network
+
+PREVIEW
+
+- no fake production transaction
+- deterministic fixture handling
+- no real broadcast
+- no fake confirmation
+- no fake explorer
+
+Run the complete existing test suite.
+
+==================================================
+36. DOCUMENTATION
+==================================================
+
+Update:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- src/core/activity/README.md
+- src/core/transactions/README.md
+
+Document:
+
+- Transaction Details architecture
+- read-only nature
+- activity-to-detail flow
+- status semantics
+- reconciliation behavior
+- UNKNOWN semantics
+- external transaction handling
+- explorer handling
+- exact amount handling
+- fee presentation
+- timestamp provenance
+- account/network isolation
+
+Explicitly document:
+
+Phase 5.3 does NOT implement:
+
+- Swap
+- Swap detection
+- Swap execution
+- Approval execution
+- backend history
+- external indexing
+- price APIs
+- notifications
+- transaction replacement
+- speed-up
+- cancellation
+- fee bumping
+
+==================================================
+37. SECURITY REGRESSION
+==================================================
+
+Inspect the complete diff for accidental:
+
+- SecureStore imports
+- secret access
+- mnemonic references
+- private-key references
+- signing imports
+- signing calls
+- broadcast imports
+- eth_sendRawTransaction
+- direct RPC mutation
+- backend calls
+- analytics
+- fake blockchain values
+- fake explorer URLs
+- fake fiat values
+- automatic rebroadcast
+- hidden polling loops
+- active-network switching
+
+==================================================
+38. VERIFICATION
+==================================================
+
+Run:
+
+- TypeScript
+- complete test suite
+- git diff --check
+- Expo/Metro
+- static iOS bundle/manifest build
+- static Android bundle/manifest build
+- security regression inspection
+
+Preview:
+
+- 390x844
+- 402x874
+
+Manual verification:
+
+1. Open Activity
+2. Tap an activity row
+3. Verify Transaction Details opens
+4. Verify asset icon + network badge
+5. Verify action
+6. Verify amount
+7. Verify From/To
+8. Verify transaction hash
+9. Verify status
+10. Verify network
+11. Verify fee information
+12. Verify transaction details
+13. Verify explorer behavior
+14. Verify copy actions
+15. Trigger refresh/reconciliation
+16. Verify UNKNOWN behavior
+17. Verify no rebroadcast
+18. Verify account isolation
+19. Verify network isolation
+20. Verify active network is unchanged
+21. Verify long addresses/hashes
+22. Verify 390x844
+23. Verify 402x874
+24. Verify no secrets or mutation APIs are accessed
+
+If Preview cannot demonstrate real blockchain reconciliation:
+
+DO NOT fabricate it.
+
+Use deterministic test fixtures only where clearly labeled.
+
+==================================================
+39. SCOPE CONTROL
+==================================================
+
+STOP after Phase 5.3.
+
+DO NOT implement:
+
+- Swap
+- Swap UI changes beyond compatibility
+- DApps
+- WalletConnect
+- price APIs
+- external indexing
+- backend transaction history
+- notifications
+- transaction replacement
+- speed-up
+- cancellation
+- fee bumping
+
+Wait for approval before the next phase.
+
+==================================================
+40. FINAL REPORT
+==================================================
+
+Report:
+
+- files created/changed
+- Transaction Details architecture
+- navigation integration
+- status presentation
+- asset/network presentation
+- fee presentation
+- transaction metadata
+- explorer handling
+- reconciliation implementation
+- UNKNOWN handling
+- external transaction support
+- account/network isolation
+- security regression results
+- test count
+- TypeScript result
+- Expo/build result
+- Preview result
+- known warnings
+- native testing limitations
+- anything deferred
+
+STOP after Phase 5.3.
