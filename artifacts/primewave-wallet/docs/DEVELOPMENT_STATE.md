@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 6.3 — Swap UI and quote presentation (completed; awaiting review)**
+**Phase 6.4 — Swap Review and Approval (completed; awaiting review)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -365,6 +365,23 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 - Added focused Swap UI logic tests for network-scoped selection, exact amount
   and MAX validation, pair/network gating, slippage bounds, public-only quote
   requests, and review gating.
+- Added the provider-neutral `src/core/swaps/review` layer above normalized
+  `SwapQuote` values. It validates quote lifecycle/expiry, account/sender,
+  network/chain, asset identity, exact amount/slippage context, provider
+  transaction fields, fee context, portfolio freshness, balance sufficiency,
+  allowance metadata, and blocking provider issues.
+- Added immutable public review snapshots and canonical keccak binding digests
+  covering the exact transaction and relevant quote context. Final approval
+  revalidates the current context and returns only public
+  `approved-for-signing` data.
+- Added `WalletSwapReviewScreen` and connected Swap → Review → controlled
+  **Approved for Signing** UI state. It displays minimum received, route,
+  price impact, fees, allowance metadata, contract warnings, digest, and
+  explicit blockers without entering the existing signing/broadcast flow.
+- Added focused Phase 6.4 tests for digest binding, stale/expired quotes,
+  transaction validation, account/network/asset/slippage mismatches, fresh
+  balance requirements, native fee totals, provider issues, allowance
+  metadata, and no-secret/no-execution approval output.
 
 ## Pending work
 
@@ -374,16 +391,17 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 - External token lists, verification providers, NFTs, portfolio valuation, fiat
   pricing, external indexing, backend asset/history APIs, notifications, and
   full wallet UI remain outside this controlled increment.
-- Phase 6.3 intentionally stops at quote presentation. It does not include
-  swap review/approval, swap execution, signing, broadcasting, persistent quote state,
-  Activity records, swap detection, approvals execution, Permit2, DApps,
+- Phase 6.4 intentionally stops at **Approved for Signing**. It does not include
+  swap execution, signing, broadcasting, persistent quote state, Activity
+  records, swap detection, approvals execution, Permit2, DApps,
   WalletConnect, transaction replacement, speed-up, cancellation, fee bumping,
   WaveX swap fees, backend execution, cross-chain swaps, account switching,
   asset detail, QR scanning, or Settings functionality.
 - Preview Test Mode is intentionally limited to web UI state testing and is not
   native wallet or security validation.
-- Balance preflight validation is intentionally not implemented because it is
-  optional and must not be mistaken for a guarantee before signing/broadcast.
+- Review balance validation is a fail-closed preflight over the existing
+  read-model snapshot; it is not a guarantee after a future signing or
+  broadcast phase begins.
 - Physical-device verification of local signing and native biometric behavior
   has not begun.
 
@@ -416,10 +434,10 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 
 ## Phase boundary
 
-Phase 6.3 is complete and stops at normalized quote presentation pending
-review. Later phases may separately define Swap review/approval, provider
-transaction integration, local signing/broadcast execution, external
-indexing, backend history, notifications, external verification, token
-state-changing operations, NFTs, portfolio valuation, fiat pricing, DApps,
-WalletConnect, replacement, speed-up, cancellation, automatic fee bumping,
-and other ecosystem capabilities.
+Phase 6.4 is complete and stops at a public **Approved for Signing** result.
+Phase 6.5 may separately define signing handoff and execution. Provider
+transaction integration, local signing/broadcast execution, external indexing,
+backend history, notifications, external verification, token state-changing
+operations, NFTs, portfolio valuation, fiat pricing, DApps, WalletConnect,
+replacement, speed-up, cancellation, automatic fee bumping, and other
+ecosystem capabilities remain outside this increment.

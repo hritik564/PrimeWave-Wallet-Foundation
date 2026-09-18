@@ -23,7 +23,7 @@ import {
   type PortfolioReadModelService,
 } from '@/src/core/portfolio';
 import type { ActivityReadModelService } from '@/src/core/activity';
-import type { SwapQuoteService } from '@/src/core/swaps';
+import type { SwapQuote, SwapQuoteService } from '@/src/core/swaps';
 import type { Wallet } from '@/src/core/wallet/models';
 import { ReceiveScreen } from './ReceiveScreen';
 import {
@@ -39,6 +39,7 @@ import type {
 import { WalletSendScreen } from './WalletSendScreen';
 import { WalletActivityScreen } from './WalletActivityScreen';
 import { WalletSwapScreen } from './WalletSwapScreen';
+import { WalletSwapReviewScreen } from './WalletSwapReviewScreen';
 import { assetIdentityKey, type PublicSendDraft } from './WalletSendScreen.logic';
 import { copyPublicAddress } from './public-address-actions';
 import {
@@ -1042,6 +1043,7 @@ export function WalletHomeShell({
   const [portfolio, setPortfolio] = useState<PortfolioReadModel | null>(null);
   const [portfolioError, setPortfolioError] = useState<string | null>(null);
   const [reviewDraft, setReviewDraft] = useState<PublicSendDraft | null>(null);
+  const [swapReviewQuote, setSwapReviewQuote] = useState<SwapQuote | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sendAssetKey, setSendAssetKey] = useState<string | null>(null);
   const account = wallet.accounts[0];
@@ -1100,6 +1102,10 @@ export function WalletHomeShell({
       setDestination('send');
     }
   }, [network.id, reviewDraft]);
+
+  useEffect(() => {
+    setSwapReviewQuote(null);
+  }, [network.id]);
 
   return (
     <View style={styles.shell}>
@@ -1275,16 +1281,30 @@ export function WalletHomeShell({
             onBack={() => setDestination('home')}
           />
         ) : destination === 'swap' ? (
-          <WalletSwapScreen
-            network={network}
-            onBack={() => setDestination('home')}
-            onComingSoon={onComingSoon}
-            onNetworkPress={() => setNetworkSelectorVisible(true)}
-            portfolio={portfolio}
-            portfolioState={portfolioState}
-            quoteService={swapQuoteService ?? null}
-            wallet={wallet}
-          />
+          swapReviewQuote ? (
+            <WalletSwapReviewScreen
+              network={network}
+              networkRegistry={networkRegistry}
+              onApproved={(_approval) => undefined}
+              onBack={() => setSwapReviewQuote(null)}
+              portfolio={portfolio}
+              previewMode={previewMode}
+              quote={swapReviewQuote}
+              quoteService={swapQuoteService ?? null}
+              wallet={wallet}
+            />
+          ) : (
+            <WalletSwapScreen
+              network={network}
+              onBack={() => setDestination('home')}
+              onNetworkPress={() => setNetworkSelectorVisible(true)}
+              onReview={(quote) => setSwapReviewQuote(quote)}
+              portfolio={portfolio}
+              portfolioState={portfolioState}
+              quoteService={swapQuoteService ?? null}
+              wallet={wallet}
+            />
+          )
         ) : (
           <PlaceholderDestination
             destination={destination}
@@ -1303,6 +1323,7 @@ export function WalletHomeShell({
               key={item.key}
               onPress={() => {
                 setReviewDraft(null);
+                setSwapReviewQuote(null);
                 setDestination(item.key);
               }}
               style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}

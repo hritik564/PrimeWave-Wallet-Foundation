@@ -42,13 +42,38 @@ slippage controls from 0 to 5000 bps, and neutral unknown/unverified-token
 warnings. A quote is only displayed when its normalized context matches the
 current account, network, pair, amount, and slippage.
 
-The `Review Swap` control is intentionally enabled only for a current,
-unexpired quote. Its Phase 6.3 action stops at a controlled Phase 6.4 message;
-it does not sign, approve, execute, broadcast, add fees, or create activity.
+The `Review Swap` control is enabled only for a current, unexpired normalized
+quote and hands that quote to the isolated Phase 6.4 review layer. It never
+hands a quote directly to signing or execution.
 
 The normalized transaction request is quote data only. It does not go directly
 to signing or broadcasting, and existing WaveX transaction construction
 remains authoritative for any future execution. Phase 6.2 does not execute
 approvals, Permit2, EIP-712 signing, swaps, signing, broadcasting, or
-backend execution. It adds no WaveX swap fee, Activity record, swap UI, or
+backend execution. It adds no WaveX swap fee, Activity record, or
 cross-chain support.
+
+## Phase 6.4 review and approval boundary
+
+`SwapReviewService` consumes only a normalized `SwapQuote`. It revalidates the
+quote lifecycle and expiry, exact account/sender/network/chain, network-scoped
+assets, exact amounts and slippage, provider transaction target/value/calldata,
+freshness of the existing `PortfolioReadModel`, sell balance plus native fee
+requirements, and blocking provider issues. Missing or stale public data
+blocks approval instead of being refreshed, inferred, or replaced.
+
+Each review stores an immutable public snapshot and a canonical keccak binding
+digest over the exact account, sender, network, chain, provider/quote identity,
+assets, amounts, slippage, transaction request, fee context, allowance
+metadata, and provider issues. `approveReview` revalidates the current input
+and returns only `approved-for-signing` public context when the digest still
+matches. Allowance requirements remain metadata; this phase never executes an
+approval, Permit2, EIP-712 signing, swap signing, `eth_sendRawTransaction`, or
+Activity write.
+
+`WalletSwapReviewScreen` presents the public review, fee and route states,
+minimum received amount, allowance metadata, contract warning, digest, and
+blocking reasons. The UI stops at **Approved for Signing** and does not
+authenticate, access SecureStore, access signing services, broadcast, or
+silently refresh a quote. Preview Test Mode uses the same public-only boundary
+and cannot produce a fake successful approval.

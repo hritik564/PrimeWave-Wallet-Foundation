@@ -946,6 +946,46 @@ monetary values are never converted through floating point, and network,
 protocol, and provider fees remain separate. Unknown price impact is
 represented as unavailable rather than fabricated as zero.
 
+### Phase 6.4 Swap Review and Approval security boundary
+
+Phase 6.4 adds `src/core/swaps/review` as a separate provider-neutral layer
+above the normalized quote. `SwapReviewService` never consumes raw 0x data and
+never imports wallet access, SecureStore, authentication, signing, approval,
+Permit2, or broadcast services. Its inputs are public account metadata, the
+selected configured network, the existing public `PortfolioReadModel`, the
+selected public asset view models, and a normalized `SwapQuote`.
+
+Before creating a review, the service revalidates quote lifecycle and
+expiration; account ID, sender address, active network, and chain ID; exact
+network-scoped sell/buy asset identities; exact sell amount and slippage;
+provider transaction sender, target, value, and bounded hexadecimal calldata;
+portfolio account/network/chain scope and freshness; sell balance, including
+sell amount plus authoritative native fee for native sells and native fee
+retention for token sells; fee asset identity; and blocking provider issues.
+
+Unavailable or stale public balances and required fee data are explicit
+blocking states. The service does not silently refresh, rebuild, switch
+networks, deduct gas from the entered sell amount, or fabricate missing
+values. Allowance requirements are displayed as untrusted metadata and never
+become authorization to execute an approval or increase allowance.
+
+Every review is an immutable public snapshot. Its canonical keccak digest
+binds account, sender, network, chain, quote/provider identity, both assets,
+amounts, slippage, provider transaction fields, route and price impact, fee
+context, allowance metadata, and provider issues. `approveReview` performs a
+fresh validation and refuses a changed digest, expired quote, changed
+transaction context, stale balance, unavailable fee, insufficient balance, or
+blocking provider issue. A successful result is only
+`approved-for-signing` public context. It contains no signed bytes,
+authorization capability, private key, mnemonic, PIN, authentication result,
+or secret.
+
+The UI presents this result as **Approved for Signing** and stops. It does not
+authenticate, access wallet secrets, call `eth_sendRawTransaction`, create
+Activity records, execute token approvals, sign EIP-712 data, sign the swap,
+or broadcast. Preview Test Mode uses the same fail-closed public boundary and
+cannot create fake successful approvals.
+
 ### Development-only Replit web preview mode
 
 The Replit web preview cannot use native SecureStore, so it fails closed for

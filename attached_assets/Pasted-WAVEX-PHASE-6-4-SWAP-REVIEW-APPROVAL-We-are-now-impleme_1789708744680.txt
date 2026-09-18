@@ -1,0 +1,1391 @@
+WAVEX — PHASE 6.4: SWAP REVIEW & APPROVAL
+
+We are now implementing Phase 6.4 of the WaveX wallet roadmap.
+
+APPROVED PHASES:
+
+- Phase 6.1 — Swap Architecture & Quote Model
+- Phase 6.2 — 0x Swap API v2 Quote Provider
+- Phase 6.3 — WaveX Swap UI
+
+This phase creates the secure Swap Review & Approval layer between the external quote and the future signing/execution phases.
+
+IMPORTANT:
+
+This phase MUST NOT sign a swap.
+
+This phase MUST NOT broadcast a swap.
+
+This phase MUST NOT execute token approvals.
+
+This phase MUST NOT execute Permit2.
+
+This phase MUST NOT perform EIP-712 signing.
+
+This phase MUST NOT send eth_sendRawTransaction.
+
+This phase MUST NOT automatically approve tokens.
+
+This phase MUST NOT automatically increase allowance.
+
+This phase MUST NOT execute a swap.
+
+This phase MUST NOT add backend wallet execution.
+
+This phase MUST NOT add cross-chain swaps.
+
+This phase MUST NOT add WaveX swap fees.
+
+This phase MUST NOT create Activity records for an unexecuted swap.
+
+Do NOT bypass the existing transaction construction, authorization, signing, or broadcast architecture.
+
+STOP after Phase 6.4 and wait for my review.
+
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Build the secure WaveX Swap Review layer.
+
+The intended future flow is:
+
+0x Quote
+    ↓
+Untrusted Provider Transaction
+    ↓
+WaveX Swap Validation
+    ↓
+Swap Review
+    ↓
+Explicit User Approval
+    ↓
+Phase 6.5 Local Signing
+    ↓
+Phase 6.5 Broadcast
+    ↓
+Phase 6.6 Activity
+
+Phase 6.4 stops immediately after:
+
+"Approved for Signing"
+
+It must NOT proceed into signing.
+
+
+==================================================
+2. CORE SECURITY PRINCIPLE
+
+A quote is NOT a transaction.
+
+A provider transaction request is NOT trusted merely because it came from 0x.
+
+A valid quote is NOT automatically authorized.
+
+The user must explicitly review and approve the exact swap transaction context before it can ever reach Phase 6.5.
+
+Document this invariant:
+
+"WaveX never treats an external provider quote as signing authorization."
+
+
+==================================================
+3. CREATE SWAP REVIEW MODULE
+
+Follow existing project architecture.
+
+Suggested structure:
+
+src/core/swaps/review/
+  models.ts
+  validation.ts
+  review-service.ts
+  errors.ts
+  index.ts
+  tests/
+    swap-review.test.ts
+
+And if the existing UI architecture requires:
+
+src/components/
+  WalletSwapReviewScreen.tsx
+  WalletSwapReviewScreen.logic.ts
+
+Reuse existing WaveX transaction review patterns from the Send flow where appropriate.
+
+Do NOT duplicate transaction construction logic.
+
+
+==================================================
+4. SWAP REVIEW INPUT
+
+Create a provider-neutral review input.
+
+It should contain the normalized:
+
+SwapQuote
+
+plus the current wallet/account context.
+
+The review must remain bound to:
+
+accountId
+senderAddress
+networkId
+chainId
+sellAsset
+buyAsset
+sellAmount
+slippageBps
+quoteId
+providerId
+
+Do not accept a raw 0x API response.
+
+The review layer must only consume the normalized Phase 6.1/6.2 SwapQuote.
+
+
+==================================================
+5. QUOTE FRESHNESS
+
+Before creating a review:
+
+Verify the quote is still valid.
+
+Check:
+
+- quote exists
+- quote is not expired
+- quote lifecycle is quoted
+- account matches
+- sender matches
+- network matches
+- chain matches
+- sell asset matches
+- buy asset matches
+- sell amount matches
+- slippage matches
+
+If any value changed:
+
+reject the review.
+
+Use an explicit normalized error such as:
+
+SWAP_QUOTE_STALE
+
+Do NOT silently refresh the quote.
+
+Do NOT silently modify the quote.
+
+
+==================================================
+6. NETWORK VALIDATION
+
+The review must verify:
+
+WaveX network
+    ↓
+expected chain ID
+    ↓
+quote chain ID
+    ↓
+provider transaction context
+
+All must agree.
+
+Reject:
+
+- network mismatch
+- chain mismatch
+- disabled network
+- unconfigured network
+- unsupported network
+- PrimeWave placeholder
+
+Do NOT switch networks automatically.
+
+Do NOT change the active wallet network from the review layer.
+
+
+==================================================
+7. ACCOUNT / SENDER VALIDATION
+
+Verify:
+
+review.accountId === currentAccountId
+
+and:
+
+review.senderAddress === current wallet public address
+
+Normalize EVM addresses consistently with existing WaveX architecture.
+
+Reject any mismatch.
+
+Never allow a quote created for Account A to be reviewed or executed by Account B.
+
+
+==================================================
+8. SELL ASSET VALIDATION
+
+The review must display and validate:
+
+- sell asset
+- asset type
+- network
+- contract address when ERC-20
+- symbol
+- name where available
+- decimals
+- exact sell amount
+- formatted sell amount
+- verification status
+- metadata status
+
+The authoritative identity must remain the existing WaveX AssetIdentity.
+
+Do not trust provider token names/symbols as identity.
+
+
+==================================================
+9. BUY ASSET VALIDATION
+
+The review must display:
+
+- buy asset
+- asset type
+- network
+- contract address when ERC-20
+- symbol
+- name where available
+- decimals
+- expected buy amount
+- minimum buy amount
+- verification status
+- metadata status
+
+Again:
+
+Contract address + network is authoritative.
+
+Do not use token name or symbol as identity.
+
+
+==================================================
+10. SWAP SUMMARY
+
+The primary review must clearly show:
+
+You pay
+
+SELL AMOUNT + SELL ASSET
+
+You receive
+
+EXPECTED BUY AMOUNT + BUY ASSET
+
+Example:
+
+You pay
+250 USDC
+
+You receive
+~0.0731 ETH
+
+The values must come from the validated quote.
+
+Do NOT use mock values.
+
+
+==================================================
+11. MINIMUM RECEIVED
+
+Display:
+
+Minimum received
+
+using:
+
+minimumBuyAmount
+
+from the normalized quote.
+
+Make the distinction visually clear:
+
+Expected received
+≈ 0.0731 ETH
+
+Minimum received
+0.0723 ETH
+
+Do not replace unavailable minimum received with zero.
+
+If minimum received is required but unavailable:
+
+block approval and show a clear reason.
+
+
+==================================================
+12. SLIPPAGE
+
+Display:
+
+Slippage tolerance
+
+Example:
+
+0.50%
+
+Also preserve:
+
+slippageBps
+
+internally.
+
+The review must verify the displayed slippage corresponds exactly to the quote.
+
+Do not change slippage at review time.
+
+Do not silently increase slippage.
+
+If the user wants different slippage:
+
+they must return to the Swap screen and request a new quote.
+
+
+==================================================
+13. PRICE IMPACT
+
+Display price impact only when reliably available.
+
+Example:
+
+Price impact
+0.42%
+
+If unavailable:
+
+Price impact
+Unavailable
+
+Do not fabricate:
+
+0.00%
+
+Do not infer price impact from the displayed rate.
+
+
+==================================================
+14. ROUTE
+
+Display the provider route when available.
+
+Example:
+
+Route
+0x Aggregated
+
+or:
+
+Route
+Multiple liquidity sources
+
+Only display information actually provided by the normalized quote.
+
+Do not invent protocol names.
+
+Do not imply a route is known if it is unavailable.
+
+
+==================================================
+15. PROVIDER
+
+Display the quote provider.
+
+Example:
+
+Quote provider
+0x
+
+If the quote contains provider-specific metadata useful for transparency, display it appropriately.
+
+Do not expose API keys or internal credentials.
+
+
+==================================================
+16. FEES
+
+The review must clearly distinguish:
+
+Network fee
+Protocol fee
+Provider fee
+
+Do NOT merge these into an unexplained total.
+
+Do NOT add WaveX fees.
+
+Do NOT add affiliate/integrator fees.
+
+Do NOT introduce monetization in this phase.
+
+
+==================================================
+17. NETWORK FEE
+
+Display the quote's available network fee information.
+
+Example:
+
+Network fee
+~0.0021 ETH
+
+If unavailable:
+
+Network fee
+Unavailable
+
+Do not fabricate fiat conversion.
+
+Do not add a price API.
+
+
+==================================================
+18. TOTAL COST
+
+Where mathematically valid, display the total native cost implications.
+
+For native-asset sell swaps:
+
+sell amount + applicable network fee
+
+must be considered.
+
+For ERC-20 sells:
+
+the user must retain sufficient native asset for network fees.
+
+IMPORTANT:
+
+Do not create a second independent gas engine.
+
+Reuse existing WaveX Gas/Fee and transaction construction logic where appropriate.
+
+The review must not silently deduct gas from the user's entered sell amount.
+
+
+==================================================
+19. BALANCE VALIDATION
+
+Before approval:
+
+Validate the user's current relevant balances using existing read-only wallet/account services.
+
+For ERC-20 sell:
+
+sell token balance >= sell amount
+
+For native sell:
+
+native balance must cover:
+
+sell amount + required network fee
+
+where the authoritative final fee data is available.
+
+Do not use stale UI balance data as an authoritative guarantee.
+
+If a fresh read is unavailable:
+
+do not falsely claim sufficient balance.
+
+Show an unavailable state and prevent approval.
+
+
+==================================================
+20. APPROVAL / ALLOWANCE REQUIREMENT
+
+0x AllowanceHolder quotes may indicate that an ERC-20 allowance is required.
+
+The review must surface this fact clearly.
+
+For example:
+
+Token approval required before swap
+
+Do NOT execute it.
+
+Do NOT sign it.
+
+Do NOT broadcast it.
+
+Do NOT automatically approve.
+
+Do NOT automatically grant unlimited allowance.
+
+
+==================================================
+21. ALLOWANCE TARGET
+
+If the provider supplies an allowance target/spender:
+
+preserve it as explicit review metadata.
+
+Display it in an appropriate advanced/details section if useful.
+
+At minimum retain:
+
+allowanceTarget
+spender
+requiredAllowance
+currentAllowance
+
+when those values are available from the architecture/provider response.
+
+Do not invent missing allowance information.
+
+
+==================================================
+22. EXACT APPROVAL AMOUNT
+
+If an approval is eventually required, preserve the exact required allowance amount.
+
+Do NOT automatically convert it to:
+
+uint256 max
+unlimited allowance
+
+Do NOT silently increase the allowance.
+
+Do NOT make an unlimited approval the default.
+
+Phase 6.4 only reviews the requirement.
+
+Actual approval architecture/execution must be handled separately and explicitly.
+
+
+==================================================
+23. PERMIT2
+
+Do NOT implement Permit2 signing in Phase 6.4.
+
+Do NOT request EIP-712 signatures.
+
+Do NOT create typed-data signing requests.
+
+Do NOT add Permit2 execution.
+
+If provider metadata references Permit2:
+
+show it as unsupported/deferred rather than attempting to execute it.
+
+
+==================================================
+24. PROVIDER TRANSACTION REQUEST
+
+The quote contains:
+
+from
+to
+value
+data
+
+Treat these as UNTRUSTED provider-generated transaction fields.
+
+Before approval, validate:
+
+from
+to
+value
+data
+
+against the current review context.
+
+
+==================================================
+25. TRANSACTION SENDER
+
+Require:
+
+providerTransaction.from === current sender
+
+If not:
+
+reject the review.
+
+Do not silently rewrite it.
+
+Do not replace provider transaction fields automatically.
+
+
+==================================================
+26. TRANSACTION TARGET
+
+Validate:
+
+to
+
+as a valid EVM address.
+
+Preserve the exact target.
+
+Do not replace it with a locally assumed DEX router.
+
+Do not infer the target from the token pair.
+
+If the target is unavailable or malformed:
+
+block approval.
+
+
+==================================================
+27. TRANSACTION VALUE
+
+Validate transaction value exactly.
+
+Use bigint.
+
+For ERC-20 swap transactions:
+
+the transaction value may be zero or provider-defined.
+
+Do not blindly assume zero.
+
+For native asset swaps:
+
+preserve the provider value exactly and validate it against the quote semantics.
+
+Do not convert through JavaScript number.
+
+
+==================================================
+28. TRANSACTION CALLDATA
+
+Validate:
+
+- valid hexadecimal data
+- even-length hex where applicable
+- 0x prefix
+- no malformed characters
+- bounded size
+- exact preservation
+
+Do not modify provider calldata.
+
+Do not normalize calldata in a way that changes bytes.
+
+Do not decode arbitrary calldata into a false "human-readable" claim.
+
+Document:
+
+"Valid calldata syntax does not by itself establish that the contract interaction is safe."
+
+
+==================================================
+29. CONTRACT INTERACTION WARNING
+
+Because a swap transaction is a contract interaction:
+
+display a neutral informational warning such as:
+
+"Swap transactions interact with smart contracts. Review the transaction details before approving."
+
+Do not use unsupported labels such as:
+
+Scam
+Malicious
+Unsafe
+
+unless a future trusted security system explicitly provides such evidence.
+
+
+==================================================
+30. QUOTE → TRANSACTION BINDING
+
+Create a canonical review identity/digest covering the exact values that will matter later.
+
+At minimum bind:
+
+accountId
+senderAddress
+networkId
+chainId
+quoteId
+providerId
+sellAsset
+buyAsset
+sellAmount
+expectedBuyAmount
+minimumBuyAmount
+slippageBps
+transaction.from
+transaction.to
+transaction.value
+transaction.data
+
+If gas/fee fields are part of the final transaction context, bind those too.
+
+The purpose is:
+
+The transaction reviewed by the user must be the transaction that Phase 6.5 eventually signs.
+
+Do NOT use a provider quote ID alone as the security binding.
+
+
+==================================================
+31. REVIEW SNAPSHOT
+
+Create an immutable-in-practice review snapshot.
+
+Once the review is displayed:
+
+do not silently mutate it.
+
+If any quote-affecting value changes:
+
+invalidate the review.
+
+If the quote expires:
+
+invalidate the review.
+
+If the account/network changes:
+
+invalidate the review.
+
+
+==================================================
+32. USER APPROVAL
+
+The review screen must have an explicit action:
+
+Approve Swap
+
+or:
+
+Confirm Swap
+
+However, this button means ONLY:
+
+"Approved for Signing"
+
+It must NOT sign.
+
+It must NOT broadcast.
+
+It must NOT execute approval.
+
+It must NOT execute Permit2.
+
+It must return a structured authorization/review result to the future Phase 6.5 signing layer.
+
+For example:
+
+SwapReviewApproval
+
+containing only public/non-secret transaction context.
+
+No private key.
+No mnemonic.
+No PIN.
+No biometric result.
+No signing capability.
+
+==================================================
+33. APPROVAL REQUIREMENTS
+
+The Approve Swap button must remain disabled unless:
+
+- quote exists
+- quote is current
+- quote is unexpired
+- account matches
+- sender matches
+- network matches
+- chain matches
+- sell asset matches
+- buy asset matches
+- sell amount matches
+- slippage matches
+- transaction request is valid
+- required fee information is valid where required
+- balance validation succeeds
+- minimum received is available when required
+- no blocking provider issue exists
+- no unsupported allowance/signing mechanism is required
+
+
+==================================================
+34. FINAL CHECKPOINT
+
+Immediately before returning:
+
+SwapReviewApproval
+
+perform one final deterministic validation.
+
+Re-check:
+
+account
+sender
+network
+chain
+quote freshness
+sell asset
+buy asset
+sell amount
+slippage
+transaction target
+transaction value
+transaction calldata
+fee context
+minimum received
+allowance requirements
+
+If anything changed:
+
+reject.
+
+Do not silently refresh.
+
+Do not silently rebuild.
+
+
+==================================================
+35. EXPLICIT IRREVERSIBILITY WARNING
+
+Before the final approval action, display a clear neutral warning:
+
+"Once signed and broadcast, blockchain transactions generally cannot be reversed."
+
+Do not overstate guarantees.
+
+Do not claim a transaction can never be reversed under every possible protocol circumstance.
+
+The purpose is to ensure the user understands the consequence of later signing/broadcasting.
+
+
+==================================================
+36. REVIEW DETAILS / ADVANCED SECTION
+
+Provide a compact advanced-details section where appropriate.
+
+Potential fields:
+
+Network
+Chain ID
+Quote provider
+Quote ID
+Route
+Sell token contract
+Buy token contract
+Transaction target
+Transaction value
+Gas estimate
+Allowance target
+Quote expiry
+
+Do not overwhelm the primary screen.
+
+Do not hide important user-facing economic information.
+
+
+==================================================
+37. UI DESIGN
+
+Use the existing WaveX design language.
+
+Reference the existing Send Transaction Review screen for consistency.
+
+The Swap Review should visually feel like:
+
+WAVEX
+Swap Review
+
+[ Sell Asset ]
+250 USDC
+
+↓ Swap
+
+[ Receive Asset ]
+~0.0731 ETH
+
+--------------------------------
+
+Minimum received
+0.0723 ETH
+
+Rate
+1 USDC ≈ ...
+
+Price impact
+0.42%
+
+Network fee
+~0.0021 ETH
+
+Route
+0x Aggregated
+
+Slippage
+0.50%
+
+--------------------------------
+
+Token approval required
+if applicable
+
+Smart-contract interaction
+informational warning
+
+--------------------------------
+
+[ Approve Swap ]
+
+The actual UI may differ based on existing WaveX components.
+
+
+==================================================
+38. ASSET ICONS
+
+Reuse the existing:
+
+AssetIcon
+TokenLogo
+network badge
+
+architecture.
+
+Do not create a second token-logo system.
+
+Verification status must remain independent from icon display.
+
+
+==================================================
+39. NAVIGATION
+
+Implement:
+
+Swap screen
+    ↓
+Swap Review
+    ↓
+Approved for Signing
+
+Do NOT navigate to signing yet.
+
+After approval, either:
+
+- return a controlled "Approved for Signing" state
+- or route to an explicitly deferred Phase 6.5 placeholder
+
+Do not accidentally invoke authentication or signing.
+
+
+==================================================
+40. NO SIGNING
+
+The Phase 6.4 diff MUST NOT introduce calls/imports to:
+
+TransactionSigningEngine
+LocalSigner
+WalletAuthenticator
+AuthenticationManager
+SecureStore
+mnemonic APIs
+private-key APIs
+biometric APIs
+
+The review layer does not need secrets.
+
+
+==================================================
+41. NO BROADCAST
+
+Do NOT import or call:
+
+TransactionBroadcastEngine
+eth_sendRawTransaction
+
+Do not create a broadcast result.
+
+Do not create transaction confirmation polling.
+
+
+==================================================
+42. NO APPROVAL EXECUTION
+
+Do NOT call:
+
+approve()
+eth_sendTransaction()
+eth_sendRawTransaction()
+
+Do not create approval transactions.
+
+Do not create Permit2 signatures.
+
+Do not create EIP-712 signing flows.
+
+
+==================================================
+43. NO ACTIVITY
+
+Do not create Activity records for:
+
+quote
+review
+approval-for-signing
+
+Activity only belongs to later execution/confirmation.
+
+Phase 6.6 will integrate actual swap activity.
+
+
+==================================================
+44. ERROR STATES
+
+Create normalized swap-review errors.
+
+Examples:
+
+SWAP_REVIEW_QUOTE_STALE
+SWAP_REVIEW_QUOTE_EXPIRED
+SWAP_REVIEW_ACCOUNT_MISMATCH
+SWAP_REVIEW_SENDER_MISMATCH
+SWAP_REVIEW_NETWORK_MISMATCH
+SWAP_REVIEW_CHAIN_MISMATCH
+SWAP_REVIEW_ASSET_MISMATCH
+SWAP_REVIEW_AMOUNT_MISMATCH
+SWAP_REVIEW_SLIPPAGE_MISMATCH
+SWAP_REVIEW_TRANSACTION_INVALID
+SWAP_REVIEW_TRANSACTION_TARGET_INVALID
+SWAP_REVIEW_CALLDATA_INVALID
+SWAP_REVIEW_BALANCE_UNAVAILABLE
+SWAP_REVIEW_INSUFFICIENT_BALANCE
+SWAP_REVIEW_ALLOWANCE_UNSUPPORTED
+SWAP_REVIEW_UNSUPPORTED_SIGNING_MECHANISM
+SWAP_REVIEW_PROVIDER_ISSUE
+
+Use existing WaveX sanitized error conventions.
+
+
+==================================================
+45. SECURITY AGAINST STALE QUOTES
+
+Explicitly test:
+
+User receives quote A.
+
+User changes amount.
+
+Review must reject quote A.
+
+User changes token.
+
+Review must reject quote A.
+
+User changes network.
+
+Review must reject quote A.
+
+User changes account.
+
+Review must reject quote A.
+
+Quote expires.
+
+Review must reject quote A.
+
+Provider transaction data changes.
+
+Review must reject the changed transaction.
+
+This is a mandatory security boundary.
+
+
+==================================================
+46. TESTS
+
+Create comprehensive Phase 6.4 tests.
+
+QUOTE FRESHNESS:
+
+- valid current quote
+- expired quote
+- changed account
+- changed sender
+- changed network
+- changed chain
+- changed sell asset
+- changed buy asset
+- changed sell amount
+- changed slippage
+- changed quote ID
+
+TRANSACTION:
+
+- valid transaction
+- sender mismatch
+- invalid target
+- invalid value
+- malformed calldata
+- oversized calldata
+- transaction context mismatch
+
+BALANCE:
+
+- sufficient ERC20 balance
+- insufficient ERC20 balance
+- sufficient native balance
+- insufficient native balance after network fee
+- unavailable balance
+- stale balance
+
+ALLOWANCE:
+
+- no allowance required
+- allowance required
+- allowance target preserved
+- required allowance preserved
+- unlimited approval NOT automatically generated
+- approval execution NOT invoked
+- Permit2 requirement rejected/deferred
+
+QUOTE:
+
+- expected buy amount preserved
+- minimum buy amount preserved
+- slippage preserved
+- price impact unavailable
+- route unavailable
+- provider fee preserved
+- protocol fee preserved
+- network fee preserved
+
+APPROVAL:
+
+- valid review approved for signing
+- approval does not sign
+- approval does not broadcast
+- approval does not execute allowance
+- approval does not create Activity
+
+SECURITY:
+
+Verify no access to:
+
+- SecureStore
+- mnemonic
+- private keys
+- PIN
+- biometrics
+- signing engine
+- broadcast engine
+- approval execution
+- Permit2
+- EIP-712 signing
+- backend wallet secrets
+
+
+==================================================
+47. EXACT VALUE TESTS
+
+Use bigint tests for:
+
+0
+1
+999999999999999999
+1000000000000000000
+
+and very large uint256-compatible values.
+
+Verify:
+
+- no floating-point conversion
+- no rounding
+- no scientific notation
+- no precision loss
+
+
+==================================================
+48. REVIEW BINDING TEST
+
+Create a test proving:
+
+Quote A
++
+Transaction A
++
+Review A
+
+is approved.
+
+Then alter ONE field:
+
+sender
+network
+chain
+sell asset
+buy asset
+sell amount
+slippage
+transaction target
+transaction value
+transaction calldata
+
+The approval must fail.
+
+This test is mandatory.
+
+
+==================================================
+49. NO FAKE DATA
+
+Do not add fake:
+
+- quotes
+- exchange rates
+- gas fees
+- balances
+- routes
+- price impact
+- minimum received
+- approval state
+
+If data is unavailable:
+
+show unavailable.
+
+Do not manufacture values for screenshots.
+
+
+==================================================
+50. PREVIEW TEST MODE
+
+The existing Preview Test Mode must remain isolated.
+
+Do not allow Preview Test Mode to:
+
+- sign
+- broadcast
+- approve
+- access real wallet secrets
+- call real blockchain execution
+
+If there is no real 0x key or real configured network:
+
+show controlled unavailable/deferred states.
+
+Do not create fake successful swap approval results.
+
+
+==================================================
+51. DOCUMENTATION
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+src/core/swaps/README.md
+
+Document:
+
+Phase 6.4 — Swap Review & Approval
+Status: Implemented
+
+Document the boundary:
+
+0x Quote
+↓
+Untrusted Provider Transaction
+↓
+WaveX Validation
+↓
+Swap Review
+↓
+Explicit Approval for Signing
+↓
+Phase 6.5
+
+Clearly state:
+
+Phase 6.4 does NOT sign or broadcast.
+
+
+==================================================
+52. REGRESSION CHECK
+
+Before finishing:
+
+Run:
+
+- focused Phase 6.4 tests
+- all swap tests
+- complete project test suite
+- TypeScript
+- Expo validation
+- iOS static/build validation if available
+- Android static/build validation if available
+- relevant workflows
+- git diff review
+
+The previous full suite was:
+
+243 passing
+0 failing
+
+Do not regress existing functionality.
+
+
+==================================================
+53. FINAL SECURITY DIFF REVIEW
+
+Before reporting completion, inspect the Phase 6.4 diff for accidental access to:
+
+SecureStore
+mnemonic
+private key
+PIN
+biometric APIs
+TransactionSigningEngine
+LocalSigner
+WalletAuthenticator
+TransactionBroadcastEngine
+eth_sendRawTransaction
+approve()
+Permit2
+EIP-712 signing
+backend wallet secrets
+ZEROEX_API_KEY
+
+There must be NO secret-handling or execution capability introduced by Phase 6.4.
+
+
+==================================================
+54. FINAL REPORT
+
+When finished, report:
+
+1. Files created/changed
+2. Swap Review architecture
+3. Quote freshness validation
+4. Transaction validation
+5. Balance validation
+6. Allowance handling
+7. Review binding/digest
+8. Approval-for-signing behavior
+9. Security boundaries
+10. Focused tests passed
+11. Full regression test count
+12. TypeScript result
+13. iOS/Android validation
+14. Preview verification
+15. Known warnings/limitations
+
+DO NOT start Phase 6.5.
+
+STOP after Phase 6.4 and wait for my review.

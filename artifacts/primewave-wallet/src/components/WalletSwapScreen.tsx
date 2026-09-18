@@ -38,11 +38,11 @@ import {
 
 type PortfolioState = 'loading' | 'available' | 'empty' | 'unavailable' | 'error';
 
-function assetLabel(asset: PortfolioAssetViewModel | null): string {
+export function assetLabel(asset: PortfolioAssetViewModel | null): string {
   return asset?.symbol ?? asset?.name ?? (asset?.assetType === 'native' ? 'Native' : 'Token');
 }
 
-function assetName(asset: PortfolioAssetViewModel | null): string {
+export function assetName(asset: PortfolioAssetViewModel | null): string {
   return asset?.name ?? asset?.symbol ?? (asset?.assetType === 'native' ? 'Native asset' : 'Token asset');
 }
 
@@ -52,7 +52,7 @@ function assetIconLabel(asset: PortfolioAssetViewModel): string {
     .toUpperCase();
 }
 
-function AssetIcon({ asset, size = 'regular' }: { asset: PortfolioAssetViewModel; size?: 'regular' | 'large' }) {
+export function AssetIcon({ asset, size = 'regular' }: { asset: PortfolioAssetViewModel; size?: 'regular' | 'large' }) {
   const remoteIcon = asset.icon.status === 'available' && asset.icon.reference !== null;
   return (
     <View style={[styles.assetIcon, size === 'large' && styles.assetIconLarge]}>
@@ -274,8 +274,8 @@ export function WalletSwapScreen({
   portfolioState,
   quoteService,
   onBack,
+  onReview,
   onNetworkPress,
-  onComingSoon,
 }: {
   readonly wallet: Wallet;
   readonly network: EvmNetwork;
@@ -283,8 +283,8 @@ export function WalletSwapScreen({
   readonly portfolioState: PortfolioState;
   readonly quoteService: SwapQuoteService | null;
   readonly onBack: () => void;
+  readonly onReview: (quote: SwapQuote) => void;
   readonly onNetworkPress: () => void;
-  readonly onComingSoon: (message: string) => void;
 }) {
   const account = wallet.accounts[0];
   const swapAssets = useMemo(() => getSwapAssets(portfolio?.assets ?? [], network), [network, portfolio?.assets]);
@@ -503,7 +503,7 @@ export function WalletSwapScreen({
             <Text style={styles.expiredText}>This quote expired. Refresh to request a current quote.</Text>
           </View>
         ) : null}
-        <Pressable accessibilityLabel="Review Swap" accessibilityRole="button" disabled={!canReview} onPress={() => onComingSoon('Swap review and approval will be available in Phase 6.4.')} style={({ pressed }) => [styles.primaryButton, !canReview && styles.disabledButton, pressed && canReview && styles.pressed]}>
+        <Pressable accessibilityLabel="Review Swap" accessibilityRole="button" disabled={!canReview} onPress={() => { if (quote) onReview(quote); }} style={({ pressed }) => [styles.primaryButton, !canReview && styles.disabledButton, pressed && canReview && styles.pressed]}>
           <Text style={styles.primaryButtonText}>Review Swap</Text>
           <Ionicons name="arrow-forward-outline" size={18} color={theme.colors.primaryForeground} />
         </Pressable>

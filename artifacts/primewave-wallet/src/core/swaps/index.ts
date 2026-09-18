@@ -45,3 +45,20 @@ export type {
   SwapSlippageBps,
   SwapTransactionRequest,
 } from './models';
+export {
+  SwapReviewError,
+  isSwapReviewError,
+  SwapReviewService,
+  formatAmount as formatSwapReviewAmount,
+} from './review';
+export type {
+  SwapReviewApproval,
+  SwapReviewAssetSnapshot,
+  SwapReviewBlocker,
+  SwapReviewBlockerCode,
+  SwapReviewContext,
+  SwapReviewErrorCode,
+  SwapReviewInput,
+  SwapReviewServiceOptions,
+  SwapReviewSnapshot,
+} from './review';

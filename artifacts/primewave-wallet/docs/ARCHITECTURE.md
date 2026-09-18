@@ -916,7 +916,7 @@ configured network metadata. Phase 5.3 does not add swap detection or
 execution, approval execution, backend history, external indexing, price APIs,
 notifications, replacement, speed-up, cancellation, or fee bumping.
 
-### Phase 6.2/6.3 WAVEX Swap Architecture, Quote Provider, and Presentation
+### Phase 6.2–6.4 WAVEX Swap Architecture, Quote Provider, Review, and Presentation
 
 Phase 6.1 and 6.2 add the isolated provider-neutral swap domain under
 `src/core/swaps`. It reuses the existing network-scoped `AssetIdentity`,
@@ -936,9 +936,11 @@ SwapQuoteService request/response validation
       ↓
 Validated SwapQuote
       ↓
-Future Swap Review
+SwapReviewService
       ↓
-Existing Transaction Construction
+Approved for Signing (public context only)
+      ↓
+Future Phase 6.5 signing handoff
       ↓
 Existing Secure Local Signing
       ↓
@@ -988,10 +990,28 @@ bounded debounce and request version protect the visible state from stale
 responses. The screen presents only normalized values actually available from
 the quote and keeps missing route, impact, fee, and metadata states explicit.
 
-The screen's `Review Swap` action is gated by a valid unexpired quote and stops
-at a controlled Phase 6.4 placeholder. Phase 6.3 adds no WaveX swap fee,
-backend execution, approval execution, signing, broadcasting, activity record,
-or cross-chain behavior.
+The screen's `Review Swap` action is gated by a valid unexpired quote and hands
+only that normalized quote to `SwapReviewService`. Phase 6.4 revalidates the
+exact quote context against the selected public account, configured active
+network, selected assets, and fresh existing `PortfolioReadModel`. It checks
+provider transaction fields, native fee totals, token balance sufficiency,
+allowance metadata, provider issues, and explicit unavailable states.
+
+The review result is an immutable public snapshot with a canonical keccak
+binding digest over account/sender/network/chain, provider and quote identity,
+assets, exact amounts, slippage, transaction fields, fee context, allowance
+metadata, and provider issues. Final approval revalidates the current context
+and returns only `approved-for-signing` public transaction context when the
+digest matches. Missing or stale balances, unavailable required fees, and
+blocking provider issues disable approval; the service never refreshes,
+rebuilds, silently switches networks, or fabricates values.
+
+`WalletSwapReviewScreen` presents the exact public review, minimum received
+amount, route, price impact, network/protocol/provider fees, allowance
+metadata, contract warning, binding digest, and blockers. Phase 6.4 stops at
+**Approved for Signing**. It adds no WaveX swap fee, backend execution,
+approval execution, Permit2, EIP-712 signing, swap signing, broadcast,
+authentication, SecureStore access, Activity record, or cross-chain behavior.
 
 ## Design system
 
