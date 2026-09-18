@@ -1,0 +1,280 @@
+WAVEX — PHASE 6.5 EXECUTION VALIDATION PREPARATION
+NO NEW EXECUTION FEATURES
+
+Phase 6.5 implementation is complete and has passed:
+
+- 259 tests
+- TypeScript
+- Expo build
+- git diff --check
+
+Do NOT implement Phase 6.6.
+Do NOT modify the existing swap execution architecture unless a concrete validation blocker is discovered.
+
+This task is ONLY to prepare and verify the project for a controlled physical-device + testnet validation of Phase 6.5.
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Prepare WaveX for safe real-device testnet validation of:
+
+Approved Swap Review
+    ↓
+Authentication
+    ↓
+Local transaction signing
+    ↓
+Broadcast
+    ↓
+Confirmation
+
+The test must use a dedicated test wallet and testnet funds.
+
+NO MAINNET TRANSACTION.
+
+NO REAL FUNDS.
+
+==================================================
+2. NATIVE DEVICE READINESS
+==================================================
+
+Inspect the existing development-build configuration.
+
+Verify that the project is capable of running the existing:
+
+- Expo SecureStore
+- WalletAuthenticator
+- WalletAccessManager
+- PIN authentication
+- biometric authentication where supported
+- LocalWalletEngine
+- TransactionSigningEngine
+- TransactionBroadcastEngine
+
+Do not replace native implementations with browser/Preview Test Mode.
+
+Do not weaken security for testing.
+
+Confirm exactly what is required to run the development build on:
+
+- iOS physical device
+- Android physical device
+
+If a native build configuration issue exists, make only the minimum configuration correction required.
+
+==================================================
+3. TESTNET CONFIGURATION
+==================================================
+
+Inspect the existing EVM NetworkRegistry.
+
+Identify which currently configured testnet can safely be used for validation.
+
+Prefer an existing supported testnet rather than adding a new network unnecessarily.
+
+Verify:
+
+- chain ID
+- RPC configuration
+- native currency
+- explorer configuration
+- network environment = testnet
+- enabled/configured state
+- correct network selection behavior
+
+Do NOT invent RPC URLs or chain IDs.
+
+If no appropriate testnet is currently configured, STOP and report exactly what configuration information is required.
+
+==================================================
+4. 0x TESTNET COMPATIBILITY
+==================================================
+
+Inspect the existing Phase 6.2 0x provider.
+
+Determine whether the currently implemented 0x Swap API v2 provider supports the selected testnet.
+
+Do not assume that Ethereum mainnet 0x support automatically means the selected testnet is supported.
+
+If 0x does not support the selected testnet:
+
+DO NOT bypass the provider boundary.
+
+DO NOT use fake production quotes.
+
+DO NOT modify the architecture just to force a test.
+
+Report the limitation and identify the smallest safe validation path.
+
+==================================================
+5. API KEY SECURITY
+==================================================
+
+Confirm:
+
+ZEROEX_API_KEY
+
+remains available only through the existing trusted provider boundary.
+
+Do not expose it to:
+
+- React Native UI
+- browser bundle
+- logs
+- transaction data
+- Activity
+- wallet state
+
+Do not print the actual key.
+
+Only report:
+
+configured / missing
+
+==================================================
+6. TEST WALLET SAFETY
+==================================================
+
+Verify that the project supports creating/restoring a dedicated test wallet.
+
+The test wallet must be independent from any production wallet.
+
+Do not request or display a production recovery phrase.
+
+Do not add test private keys to source code.
+
+Do not hardcode a funded test wallet.
+
+Do not log private keys or recovery phrases.
+
+The actual test wallet will be created/funded manually by the project owner on the physical device.
+
+==================================================
+7. SAFE VALIDATION DIAGNOSTICS
+==================================================
+
+If useful, add minimal development-only diagnostics that report PUBLIC execution state only.
+
+Allowed examples:
+
+- selected network
+- chain ID
+- public address
+- quote obtained
+- review approved
+- authentication started/completed
+- signing started/completed
+- transaction hash
+- broadcast state
+- confirmation state
+
+Never expose:
+
+- private key
+- recovery phrase
+- PIN
+- SecureStore contents
+- signing capability
+- API key
+- raw authentication secrets
+
+Do not create fake transaction hashes or fake receipts.
+
+Diagnostics must be development-only and must not weaken production behavior.
+
+==================================================
+8. DO NOT EXECUTE A TRANSACTION
+==================================================
+
+This task must NOT:
+
+- sign a transaction
+- broadcast a transaction
+- approve a token
+- execute a swap
+- call eth_sendRawTransaction
+- move funds
+
+We are only preparing and validating configuration.
+
+==================================================
+9. BUILD VALIDATION
+==================================================
+
+Run the existing checks:
+
+- full test suite
+- TypeScript
+- Expo validation
+- development-build configuration validation
+- git diff --check
+
+If native project generation is available, verify configuration without requiring a production submission.
+
+Do not introduce unnecessary dependencies.
+
+==================================================
+10. SECURITY REVIEW
+==================================================
+
+Inspect the Phase 6.5 execution path and confirm that physical-device testing will use:
+
+- native SecureStore
+- real wallet authentication
+- real local signing
+- existing broadcast engine
+
+Preview Test Mode must remain isolated and must never execute real transactions.
+
+==================================================
+11. DOCUMENTATION
+==================================================
+
+Update DEVELOPMENT_STATE.md only if necessary to document:
+
+- selected testnet
+- physical-device validation requirements
+- current testnet readiness
+- known blockers
+
+Do not mark Phase 6.5 production-ready.
+
+==================================================
+12. STOP CONDITION
+==================================================
+
+STOP after preparation.
+
+Do not implement additional swap features.
+
+Do not implement Phase 6.6.
+
+Do not execute any transaction.
+
+==================================================
+13. FINAL REPORT
+==================================================
+
+Report:
+
+1. Physical-device readiness
+2. iOS development-build readiness
+3. Android development-build readiness
+4. Recommended testnet
+5. Testnet chain ID
+6. Testnet RPC configuration status
+7. Testnet explorer status
+8. Whether 0x supports the selected testnet
+9. ZEROEX_API_KEY status — configured/missing only
+10. Test-wallet readiness
+11. Diagnostics added, if any
+12. Security findings
+13. Tests/typecheck/build results
+14. Any blocker
+15. Exact next manual action required from the project owner
+
+CRITICAL:
+Do not claim that real signing or execution has been validated.
+This is preparation only.
+STOP after the report.
