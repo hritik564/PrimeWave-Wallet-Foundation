@@ -305,6 +305,11 @@ UI testing; it is not a real wallet and does not alter the native boundary.
   values, and validated explorer availability.
 - Added conservative action rules: swaps and approvals are only accepted from
   explicit future trusted interpretations and are never inferred.
+- Added the WAVEX Activity destination with bounded read-model loading,
+  asset-first rows, deterministic network badge overlays, type/network display
+  filters, date grouping, refresh and empty/error states.
+- Added safe activity-row selection into a public-context detail placeholder;
+  the full transaction detail page remains deferred.
 
 ## Pending work
 
@@ -312,12 +317,12 @@ UI testing; it is not a real wallet and does not alter the native boundary.
   before the primary network can be activated.
 - Recovery UX and authentication UI require separate scope and security review.
 - External token lists, verification providers, NFTs, portfolio valuation, fiat
-  pricing, transaction history, transfers, approvals, permits, swaps, DApps,
-  backend asset APIs, notifications, and full wallet UI remain outside this
-  controlled increment.
-- Phase 5.1A intentionally does not include the polished Activity UI,
-  transaction detail UI, account switching, asset detail, QR scanning, Swap,
-  or Settings functionality.
+  pricing, external indexing, backend asset/history APIs, notifications, and
+  full wallet UI remain outside this controlled increment.
+- Phase 5.2 intentionally does not include the complete transaction detail
+  page, swap detection/execution, approvals execution, DApps, WalletConnect,
+  transaction replacement, speed-up, cancellation, account switching, asset
+  detail, QR scanning, or Settings functionality.
 - Preview Test Mode is intentionally limited to web UI state testing and is not
   native wallet or security validation.
 - Balance preflight validation is intentionally not implemented because it is
@@ -354,9 +359,8 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 
 ## Phase boundary
 
-Phase 5.1A is complete. Stop here. Later phases may separately define the
-Activity UI, transaction detail UI, external indexing, backend history,
-notifications, external verification, token state-changing operations, NFTs,
-portfolio valuation, fiat pricing, swaps, DApps, WalletConnect, replacement,
-speed-up, cancellation, automatic fee bumping, full wallet UI, and other
-ecosystem capabilities.
+Phase 5.2 is complete. Stop here. Later phases may separately define the full
+transaction detail UI, external indexing, backend history, notifications,
+external verification, token state-changing operations, NFTs, portfolio
+valuation, fiat pricing, swaps, DApps, WalletConnect, replacement, speed-up,
+cancellation, automatic fee bumping, and other ecosystem capabilities.

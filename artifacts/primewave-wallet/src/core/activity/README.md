@@ -1,8 +1,9 @@
 # Activity / transaction history architecture
 
 Phase 5.1 provides a UI-independent public transaction activity model,
-repository, lifecycle service, and read model. It does not build the Activity
-screen, transaction detail UI, backend indexing, external indexers,
+repository, lifecycle service, and read model. Phase 5.2 adds the
+presentation-only Activity destination and asset-first feed. The feed does not
+build a complete transaction detail page, backend indexing, external indexers,
 notifications, analytics, or cloud persistence.
 
 Records are scoped by `accountId`, `networkId`, and exact `chainId`. A local
@@ -76,3 +77,35 @@ Phase 5.1A remains UI-independent and does not implement Activity UI,
 transaction detail UI, backend history, external indexing, notifications,
 analytics, price APIs, signing, authentication, SecureStore access,
 broadcasting, replacement, speed-up, or cancellation.
+
+## Phase 5.2 Activity destination
+
+`WalletActivityScreen` consumes only `ActivityReadModelService` items and their
+`ActivityPresentationModel` data. It never calls RPC, reads receipts,
+reconstructs a transaction, calculates a blockchain amount, or creates another
+repository. Results remain bounded to the read-model limit and are rendered in
+React Native list primitives.
+
+Rows are asset-first: the primary asset icon is the visual anchor, the
+deterministic network badge overlaps its lower-right corner, the action and
+counterparty sit in the center, and exact signed amounts are right-aligned.
+Fiat is rendered only when the presentation model provides it. Missing icons
+use the existing deterministic fallback; icon availability remains independent
+of verification.
+
+The Activity type and network controls are display filters. Selecting a network
+does not call `NetworkRegistry.selectActiveNetwork()` and cannot change the
+wallet's active network. All-networks reads query each enabled, configured
+network with the same account scope; network and chain identity remain bound
+at the service boundary.
+
+Statuses remain distinct, including pending, confirmed, reverted, failed, and
+unknown. Unknown is not presented as failed, and a sent label is not treated as
+confirmation. Dates use the presentation timestamp and source, with newest
+activity grouped first. A row opens only a controlled placeholder carrying its
+safe activity identity and public context; the full detail page is deferred.
+
+The UI supports empty, filtered-empty, unavailable, loading, refresh, and
+refresh-error states. It does not add fake transactions, fiat prices, inferred
+swaps, direct receipt polling, background polling, analytics, backend history,
+notifications, or transaction mutation.

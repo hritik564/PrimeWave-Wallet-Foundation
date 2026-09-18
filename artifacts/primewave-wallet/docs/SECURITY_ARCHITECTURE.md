@@ -825,6 +825,36 @@ only. It has no access to SecureStore, mnemonics, private keys, PINs,
 biometrics, signing capabilities, transaction submission, backend history,
 analytics, or notification services.
 
+### Phase 5.2 Activity UI boundary
+
+The Activity screen remains a read-only presentation layer. It consumes the
+bounded `ActivityReadModelService` and the existing presentation model; it does
+not call RPC, query receipts, calculate blockchain quantities, submit
+transactions, import signing code, access SecureStore, or make backend or
+analytics requests. The UI does not create fake activity, fake fiat values, or
+inferred swap classifications.
+
+Activity network filtering is intentionally separate from wallet network
+selection. The filter only changes which already-scoped read-model queries are
+displayed and never invokes active-network selection. Each query preserves the
+current account ID and exact network/chain scope, so switching the display
+filter cannot leak another account's records.
+
+The asset icon and network badge are display metadata, not trust signals.
+Verification remains independent from icon availability. Full addresses are
+retained for accessibility while shortened addresses are used visually. Row
+navigation passes only a public activity identity and public context to the
+placeholder detail sheet; no private key, mnemonic, PIN, authentication
+secret, or signing capability can be passed through this flow.
+
+Pending, confirmed, reverted, failed, and unknown statuses remain separate.
+Unknown is never relabeled as failed, and Sent is not a confirmation claim.
+Fiat is omitted when absent, explorer actions are not invented, and valid
+explorer availability is only surfaced from configured presentation metadata.
+Phase 5.2 does not implement the complete detail page, swap detection or
+execution, price APIs, external indexing, backend history, notifications,
+replacement, speed-up, cancellation, DApps, or WalletConnect.
+
 ### Development-only Replit web preview mode
 
 The Replit web preview cannot use native SecureStore, so it fails closed for

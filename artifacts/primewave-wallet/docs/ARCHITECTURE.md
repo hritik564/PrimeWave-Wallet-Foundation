@@ -851,9 +851,38 @@ metadata rather than downloaded logos. Fiat values are null unless an approved
 future resolver supplies an exact display value. Block timestamps are marked
 as blockchain-derived; otherwise observation timestamps are preserved honestly.
 
-This amendment does not implement Activity UI, transaction detail UI, swap or
-approval execution, swap detection, external indexing, price APIs, backend
-history, notifications, analytics, or any signing/broadcasting behavior.
+### Phase 5.2 WAVEX Activity UI
+
+The Activity destination is implemented in `WalletActivityScreen` and is
+wired through the existing wallet shell. It receives an
+`ActivityReadModelService` from the app composition root and renders only
+public `ActivityPresentationModel` data. The screen has no RPC, receipt,
+blockchain, signing, SecureStore, backend, or analytics dependency.
+
+The feed is asset-first. `ActivityRow` places the existing asset icon or
+deterministic fallback at the left, overlays the presentation model's network
+badge metadata, shows action and counterparty context in the center, and
+right-aligns exact signed amount strings with optional supplied fiat beneath.
+Rows retain lifecycle state, accessible labels, and a safe activity identifier
+for the controlled detail placeholder.
+
+Activity type options are data-driven: Transactions is the default, while
+Swaps, Approvals, and Contract interactions appear only when explicit
+presentation records support them. Swap and approval rows are never inferred
+from arbitrary transfers. The network control is a display filter, not the
+wallet network selector; it queries enabled networks while preserving
+account/network/chain isolation and never selects an active network.
+
+Items are bounded by the read model, ordered newest-first, and grouped using
+the presentation timestamp source. The UI distinguishes loading, unavailable,
+error, no activity, no network match, and no filter match states. Refresh
+re-reads the existing service and does not start polling or transaction
+execution.
+
+Phase 5.2 intentionally stops before the complete transaction detail page,
+swap detection or execution, price APIs, external indexing, backend history,
+notifications, transaction replacement, speed-up, cancellation, DApps, and
+WalletConnect.
 
 ## Design system
 

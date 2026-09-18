@@ -16,7 +16,10 @@ import {
 import {
   createAppPortfolioReadModelService,
 } from '@/src/core/portfolio';
-import { ActivityService } from '@/src/core/activity';
+import {
+  ActivityReadModelService,
+  ActivityService,
+} from '@/src/core/activity';
 import {
   defaultNetworkRegistry,
   NetworkRegistryError,
@@ -624,6 +627,15 @@ export default function FoundationScreen() {
     () => (previewMode ? null : new ActivityService()),
     [previewMode],
   );
+  const activityReadModelService = useMemo(
+    () =>
+      activityService
+        ? new ActivityReadModelService(activityService.getRepository(), {
+            networkRegistry: defaultNetworkRegistry,
+          })
+        : null,
+    [activityService],
+  );
   const createConstructionEngine = useCallback(
     async (wallet: Wallet, networkId: string): Promise<TransactionConstructionDependency | null> => {
       const activeNetwork = defaultNetworkRegistry.getActiveNetwork();
@@ -902,7 +914,7 @@ export default function FoundationScreen() {
     setConfirmPin('');
     setView('welcome');
   })} />;
-  else if (view === 'wallet' && currentWallet) content = <WalletHomeShell activityService={activityService} createConstructionEngine={createConstructionEngine} createSigningDependency={createSigningDependency} createBroadcastDependency={createBroadcastDependency} previewMode={previewMode} wallet={currentWallet} network={selectedNetwork} networkRegistry={defaultNetworkRegistry} readModelService={portfolioReadModelService} onNetworkSelect={handleNetworkSelect} onComingSoon={(message) => setError(message)} onLock={() => void run(async () => {
+  else if (view === 'wallet' && currentWallet) content = <WalletHomeShell activityService={activityService} activityReadModelService={activityReadModelService} createConstructionEngine={createConstructionEngine} createSigningDependency={createSigningDependency} createBroadcastDependency={createBroadcastDependency} previewMode={previewMode} wallet={currentWallet} network={selectedNetwork} networkRegistry={defaultNetworkRegistry} readModelService={portfolioReadModelService} onNetworkSelect={handleNetworkSelect} onComingSoon={(message) => setError(message)} onLock={() => void run(async () => {
     if (previewMode) {
       previewTestMode.lockPreviewWallet();
     } else {

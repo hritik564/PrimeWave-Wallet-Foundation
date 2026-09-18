@@ -22,6 +22,7 @@ import {
   type PortfolioReadModel,
   type PortfolioReadModelService,
 } from '@/src/core/portfolio';
+import type { ActivityReadModelService } from '@/src/core/activity';
 import type { Wallet } from '@/src/core/wallet/models';
 import { ReceiveScreen } from './ReceiveScreen';
 import {
@@ -35,6 +36,7 @@ import type {
   TransactionSigningDependency,
 } from './TransactionReviewScreen.logic';
 import { WalletSendScreen } from './WalletSendScreen';
+import { WalletActivityScreen } from './WalletActivityScreen';
 import { assetIdentityKey, type PublicSendDraft } from './WalletSendScreen.logic';
 import { copyPublicAddress } from './public-address-actions';
 import {
@@ -107,7 +109,7 @@ function Header({
   onSettingsPress,
 }: {
   wallet: Wallet;
-  detailMode: 'receive' | 'send' | null;
+  detailMode: 'receive' | 'send' | 'activity' | null;
   onBack: () => void;
   onAccountPress: () => void;
   onSettingsPress: () => void;
@@ -1001,6 +1003,7 @@ export function WalletHomeShell({
   createSigningDependency,
   createBroadcastDependency,
   activityService,
+  activityReadModelService,
   onNetworkSelect,
   onLock,
   onComingSoon,
@@ -1022,6 +1025,7 @@ export function WalletHomeShell({
     networkId: string,
   ) => Promise<TransactionBroadcastDependency | null>;
   activityService?: TransactionActivityDependency | null;
+  activityReadModelService?: Pick<ActivityReadModelService, 'getActivity'> | null;
   onNetworkSelect: (networkId: string) => NetworkSelectionResult;
   onLock: () => void;
   onComingSoon: (label: string) => void;
@@ -1107,7 +1111,13 @@ export function WalletHomeShell({
           onBack={() => setDestination('home')}
           wallet={wallet}
           detailMode={
-            destination === 'receive' ? 'receive' : destination === 'send' ? 'send' : null
+            destination === 'receive'
+              ? 'receive'
+              : destination === 'send'
+                ? 'send'
+                : destination === 'activity'
+                  ? 'activity'
+                  : null
           }
           onAccountPress={() => setAccountPanelVisible(true)}
           onSettingsPress={() => setDestination('settings')}
@@ -1248,6 +1258,13 @@ export function WalletHomeShell({
             onRefresh={() => void loadPortfolio(true)}
             refreshing={refreshing}
             state={portfolioState}
+          />
+        ) : destination === 'activity' ? (
+          <WalletActivityScreen
+            accountId={account?.accountId ?? null}
+            activityReadModelService={activityReadModelService ?? null}
+            networkRegistry={networkRegistry}
+            onBack={() => setDestination('home')}
           />
         ) : (
           <PlaceholderDestination
