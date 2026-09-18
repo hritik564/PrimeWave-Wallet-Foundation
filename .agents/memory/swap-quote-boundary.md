@@ -16,3 +16,13 @@ route could make review and later signing misleading.
 Preserve exact bigint values and explicit unavailable states, and reuse the
 existing transaction-construction, signing, and broadcast boundaries rather
 than adding execution authority to quote code.
+
+Binding digests must hash only stable public review context; review timestamps,
+blocker presentation metadata, and other revalidation-time fields must remain
+outside the digest.
+
+**Why:** Approval revalidation happens after review creation, so including a
+creation timestamp can reject an otherwise unchanged quote as stale.
+
+**How to apply:** Build the digest from the immutable quote/account/network/
+transaction binding context, then attach the digest to the review snapshot.

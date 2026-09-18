@@ -339,7 +339,7 @@ export class SwapReviewService {
       canApprove: blockers.length === 0,
       reviewDigest: '0x' as `0x${string}`,
     };
-    const digest = reviewDigest(snapshot as SwapReviewSnapshot);
+    const digest = reviewDigest(bindingContext(snapshot as SwapReviewSnapshot));
     return Object.freeze({ ...snapshot, reviewDigest: digest });
   }
 

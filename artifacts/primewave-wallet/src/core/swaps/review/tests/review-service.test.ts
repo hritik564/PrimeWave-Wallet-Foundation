@@ -161,6 +161,18 @@ test('approves only the same current review context and returns public transacti
   assert.equal('authorization' in approval, false);
 });
 
+test('keeps the approval binding stable across immediate revalidation', () => {
+  let clock = NOW;
+  const service = new SwapReviewService(registry(), { now: () => clock });
+  const review = service.createReview(input());
+  clock += 1_000;
+
+  const approval = service.approveReview({ review, current: input() });
+
+  assert.equal(approval.status, 'approved-for-signing');
+  assert.equal(approval.reviewDigest, review.reviewDigest);
+});
+
 test('rejects account, sender, network, asset, slippage, and expired quote mismatches', () => {
   const service = new SwapReviewService(registry(), { now: () => NOW });
   assertReviewCode(() => service.createReview(input({ account: { accountId: 'other', address: sender } })), 'SWAP_REVIEW_ACCOUNT_MISMATCH');
