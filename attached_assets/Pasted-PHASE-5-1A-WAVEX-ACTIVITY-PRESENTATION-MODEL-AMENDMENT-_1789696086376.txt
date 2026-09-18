@@ -1,0 +1,895 @@
+PHASE 5.1A — WAVEX ACTIVITY PRESENTATION MODEL AMENDMENT
+
+IMPORTANT CONTEXT
+
+Phase 5.1 — WAVEX Activity / Transaction History Architecture has already been completed and approved.
+
+Current verified state:
+
+- Full wallet suite: 200/200 tests passing
+- TypeScript passing
+- Static iOS/Android Expo builds passing
+- Activity repository exists
+- ActivityService exists
+- ActivityReadModelService exists
+- Account/network/chain isolation exists
+- Exact bigint quantities are enforced
+- Broadcast and confirmation lifecycle integration exists
+- No backend/indexer/persistent history has been introduced
+- No Activity UI has been implemented yet
+
+We are now making a SMALL ARCHITECTURE AMENDMENT before Phase 5.2.
+
+DO NOT rebuild Phase 5.1.
+
+DO NOT replace the existing transaction repository.
+
+DO NOT remove existing lifecycle/state/provenance architecture.
+
+Extend the existing Activity presentation/read-model architecture so it can support the intended WAVEX Activity UI.
+
+==================================================
+1. VISUAL / UX REFERENCE
+==================================================
+
+Use the attached Activity screenshot as the UX/reference target.
+
+The intended WAVEX Activity experience is a wallet-native activity feed similar in INFORMATION HIERARCHY to the reference.
+
+The reference contains:
+
+- Activity header
+- Back navigation
+- "Transactions" filter
+- "All networks" filter
+- Date grouping
+- Large token/asset icon on the left
+- Small network icon/badge overlaid at the bottom-right of the asset icon
+- Action + asset on the first line
+- Counterparty/action detail below
+- Primary amount right-aligned
+- Optional fiat value beneath
+- Swap rows containing two assets/amounts
+- Chronological activity feed
+
+IMPORTANT:
+
+Use the screenshot as a UX/information-architecture reference.
+
+Do NOT copy branding, colors, exact text, logos, sample addresses, sample transaction values, or other example data from the screenshot.
+
+The final UI will use WAVEX's established visual language:
+
+- dark futuristic design
+- cyan/electric blue/violet accents
+- restrained glow
+- existing WAVEX typography
+- existing theme tokens
+- existing AssetIcon/TokenLogo architecture
+
+Phase 5.1A itself does NOT build the UI.
+
+==================================================
+2. PRIMARY OBJECTIVE
+==================================================
+
+Extend the existing ActivityReadModel so the future Activity UI can render an asset-first wallet activity feed.
+
+The read model must explicitly represent:
+
+- primary asset
+- optional secondary asset
+- network presentation metadata
+- action
+- counterparty
+- direction
+- primary amount
+- secondary amount
+- optional fiat value
+- status
+- timestamp/observation metadata
+- provenance
+
+Do not put UI components inside core/activity.
+
+==================================================
+3. ACTIVITY PRESENTATION MODEL
+==================================================
+
+Add or extend a presentation model such as:
+
+ActivityPresentationModel
+
+or an appropriately named equivalent consistent with the existing architecture.
+
+It should expose public, presentation-ready information such as:
+
+activityId
+transactionHash
+accountId
+networkId
+chainId
+
+action
+
+primaryAsset
+secondaryAsset
+
+direction
+
+counterparty
+
+primaryAmount
+secondaryAmount
+
+fiatValue
+
+status
+
+timestamp
+
+provenance
+
+explorerAvailability
+
+Do not duplicate authoritative transaction data unnecessarily.
+
+The existing Activity model/repository remains authoritative.
+
+The presentation model should transform existing activity records into UI-ready data.
+
+==================================================
+4. ASSET-FIRST PRESENTATION
+==================================================
+
+The primary visual identity of an Activity item must be the asset.
+
+The presentation model should provide:
+
+PRIMARY ASSET
+
+- asset identity
+- asset type
+- symbol
+- name
+- icon/fallback metadata
+- network association
+
+The existing AssetIcon / TokenLogo architecture MUST be reused.
+
+Do not create a second token-logo system.
+
+Do not infer token verification from icon availability.
+
+Icon availability and verification/trust remain independent.
+
+==================================================
+5. NETWORK BADGE
+==================================================
+
+The future Activity UI needs a small network badge positioned over the bottom-right of the primary asset icon.
+
+Therefore the presentation model should expose network presentation metadata such as:
+
+- networkId
+- network name
+- network icon/badge identity
+- chain ID
+- configured/available state
+
+Reuse the existing NetworkRegistry and network metadata.
+
+Do not download external network logos in this phase.
+
+Do not create a new network registry.
+
+Do not infer a network from token symbol.
+
+Network identity must come from the authoritative networkId/chainId context.
+
+If no network icon asset exists yet:
+
+provide deterministic fallback metadata.
+
+Do not fabricate a real network logo.
+
+==================================================
+6. ACTION MODEL
+==================================================
+
+Create an explicit action classification for Activity presentation.
+
+At minimum support:
+
+- sent
+- received
+- swapped
+- approved
+- contract_interaction
+- unknown
+
+IMPORTANT:
+
+This phase does NOT implement Swap, Approval, or new blockchain functionality.
+
+It only makes the presentation architecture capable of representing these future event types.
+
+Existing native/ERC-20 transfers must map correctly to:
+
+sent
+or
+received
+
+Contract interactions that cannot safely be represented as a simple transfer should map to:
+
+contract_interaction
+
+Unknown activity should map to:
+
+unknown
+
+Do NOT guess "swapped" merely because multiple transfers appear.
+
+A swap classification requires explicit trusted transaction interpretation in a future Swap/indexing layer.
+
+==================================================
+7. COUNTERPARTY MODEL
+==================================================
+
+Support a presentation-level counterparty:
+
+type:
+
+- to
+- from
+- contract
+- unknown
+
+Expose:
+
+- full address
+- deterministic shortened address
+- direction label where appropriate
+
+Examples for future UI:
+
+Sent:
+
+To: 0x0083...985h
+
+Received:
+
+From: 0x0083...985h
+
+Contract interaction:
+
+Contract: 0x0083...985h
+
+Do not label any address:
+
+- safe
+- trusted
+- verified
+
+unless explicit trusted verification metadata exists.
+
+Never infer trust from address syntax.
+
+==================================================
+8. MULTI-ASSET EVENTS
+==================================================
+
+This is IMPORTANT.
+
+The Activity presentation architecture must support events containing more than one asset.
+
+This is required for future Swap support.
+
+Support:
+
+primaryAsset
+primaryAmount
+
+optional:
+
+secondaryAsset
+secondaryAmount
+
+Example future representation:
+
+Action:
+swapped
+
+Input:
+BNB
+-0.0015 BNB
+
+Output:
+USDT
++1.0655 USDT
+
+The architecture must be able to preserve both sides of the event.
+
+DO NOT implement swap detection.
+
+DO NOT infer swaps from arbitrary transaction logs.
+
+DO NOT add swap execution.
+
+DO NOT add swap quotes.
+
+This is only a future-compatible presentation model.
+
+==================================================
+9. SWAP PRESENTATION
+==================================================
+
+Prepare the presentation layer for a future swap row similar to:
+
+[Asset A + network badge]    Swapped
+                             Asset A → Asset B
+                             +output amount
+                             -input amount
+
+The model must not assume which asset is "primary" based solely on alphabetical order or token identity.
+
+Preserve explicit input/output semantics when provided by a future trusted event interpreter.
+
+If the underlying record is not a trusted swap event:
+
+do not label it swapped.
+
+==================================================
+10. AMOUNT PRESENTATION
+==================================================
+
+The model must expose exact amounts.
+
+Use:
+
+- raw bigint/string-safe representation
+- existing exact formatter
+
+Never convert blockchain quantities through:
+
+Number()
+parseFloat()
+parseInt() for arbitrary blockchain quantities
+toFixed() for financial calculations
+
+The UI can receive a formatted display string generated through the existing exact formatting architecture.
+
+Preserve sign/direction explicitly rather than encoding financial meaning through floating-point arithmetic.
+
+Examples:
+
+Outgoing:
+-10 USDT
+
+Incoming:
++10 USDT
+
+Do not store "-10.00" as the authoritative blockchain amount.
+
+==================================================
+11. FIAT VALUE
+==================================================
+
+Support an OPTIONAL fiat presentation value.
+
+Example future UI:
+
+-10 USDT
+-$10.00
+
+But:
+
+DO NOT implement price APIs in Phase 5.1A.
+
+DO NOT invent prices.
+
+DO NOT calculate fiat values from hardcoded assumptions.
+
+If price data is unavailable:
+
+fiatValue must be null/unavailable.
+
+The future Activity UI should gracefully omit or indicate unavailable fiat data.
+
+Document that fiat pricing will come from a later approved price/data layer.
+
+==================================================
+12. DATE GROUPING PREPARATION
+==================================================
+
+The future UI should be able to group activity by date.
+
+The presentation model should provide:
+
+- event timestamp when known
+- timestamp source
+- whether timestamp is blockchain-derived or observation-derived
+
+Do NOT claim a blockchain timestamp when one is unavailable.
+
+The future UI may display:
+
+Today
+Yesterday
+Sep 16, 2026
+
+etc.
+
+Date formatting itself belongs to the presentation/UI layer.
+
+==================================================
+13. STATUS PRESENTATION
+==================================================
+
+Preserve the existing precise transaction status model.
+
+The presentation model should expose:
+
+- draft
+- signed
+- broadcasting
+- broadcasted
+- confirming
+- confirmed
+- reverted
+- failed
+- unknown
+
+Do NOT collapse these into:
+
+success / failure
+
+The future UI can map them into visual states.
+
+Example:
+
+Pending transaction:
+"Pending"
+
+Confirmed:
+"Confirmed"
+
+Reverted:
+"Reverted"
+
+Unknown:
+"Status unknown"
+
+Do not show "Sent successfully" merely because a transaction was signed.
+
+==================================================
+14. DIRECTION
+==================================================
+
+Expose:
+
+- outgoing
+- incoming
+- self_transfer
+- unknown
+
+For existing locally-created sends:
+
+direction should remain outgoing.
+
+For future blockchain-discovered activity:
+
+direction must be determined from account/network context.
+
+Do not infer direction solely from UI position.
+
+==================================================
+15. NETWORK + ASSET IDENTITY
+==================================================
+
+Maintain strict identity:
+
+Asset identity + network identity
+
+For ERC-20:
+
+networkId + contractAddress
+
+For native assets:
+
+networkId + authoritative native asset identity
+
+The presentation model must never merge:
+
+USDT on Ethereum
+
+with:
+
+USDT on BNB Chain
+
+or:
+
+USDT on Polygon
+
+simply because the symbol matches.
+
+==================================================
+16. EXPLORER PRESENTATION
+==================================================
+
+Expose:
+
+- explorer available
+- explorer transaction URL when valid/configured
+
+Reuse existing network explorer metadata.
+
+Do not create URLs for:
+
+- placeholder networks
+- unconfigured networks
+- invalid explorer metadata
+
+Do not invent explorer URLs.
+
+==================================================
+17. PROVENANCE
+==================================================
+
+Preserve the existing provenance model.
+
+The presentation model should be able to identify sources such as:
+
+- local_wallet
+- broadcast_engine
+- confirmation_engine
+- blockchain_read
+- external_indexer_future
+
+Do not introduce an external indexer now.
+
+Provenance must not be used to make unsupported trust claims.
+
+==================================================
+18. ACCOUNT / NETWORK ISOLATION
+==================================================
+
+The presentation service MUST preserve:
+
+accountId
+networkId
+chainId
+
+Do not allow a presentation record from another account/network to leak into the current Activity feed.
+
+The repository/service layer remains responsible for authoritative scoping.
+
+The UI must not become the security boundary.
+
+==================================================
+19. UI-READY BUT UI-INDEPENDENT
+==================================================
+
+The new presentation model should be suitable for rendering:
+
+Activity Row
+
+Example conceptual data:
+
+{
+  action: "sent",
+
+  primaryAsset: {
+    symbol: "USDT",
+    name: "Tether USD",
+    icon: ...
+  },
+
+  network: {
+    name: "...",
+    badge: ...
+  },
+
+  counterparty: {
+    type: "to",
+    displayAddress: "0x0083...985h"
+  },
+
+  primaryAmount: {
+    display: "-10 USDT"
+  },
+
+  fiatValue: null,
+
+  status: "confirmed"
+}
+
+This is illustrative only.
+
+Do not hardcode these example values.
+
+==================================================
+20. FUTURE EVENT TYPES
+==================================================
+
+Make the architecture extensible for:
+
+- send
+- receive
+- swap
+- approve
+- contract interaction
+- NFT transfer
+- bridge
+- staking
+- other DApp activity
+
+But do NOT implement these features.
+
+Unknown events must remain:
+
+unknown
+
+rather than being forced into an incorrect category.
+
+==================================================
+21. NO TRANSACTION EXECUTION
+==================================================
+
+This amendment must NOT access or implement:
+
+- signing
+- authentication
+- SecureStore
+- mnemonic
+- private key
+- signing capability
+- broadcasting
+- transaction submission
+- eth_sendRawTransaction
+- transaction replacement
+- speed-up
+- cancellation
+
+Activity remains read-only/presentation architecture.
+
+==================================================
+22. NO BACKEND / PRICE / INDEXER
+==================================================
+
+Do NOT add:
+
+- backend
+- external indexer
+- price provider
+- analytics
+- cloud history
+- notification service
+
+This phase only prepares the model.
+
+==================================================
+23. TESTS
+==================================================
+
+Add focused tests covering:
+
+ASSET PRESENTATION
+
+- native asset
+- ERC-20 asset
+- asset identity
+- icon reuse
+- icon fallback
+- verification independence
+
+NETWORK
+
+- network metadata
+- network badge metadata
+- network identity
+- chain ID
+- configured/unconfigured state
+- asset/network isolation
+
+ACTION
+
+- sent
+- received
+- swapped representation
+- approved representation
+- contract interaction
+- unknown
+- no false swap classification
+
+COUNTERPARTY
+
+- to
+- from
+- contract
+- unknown
+- shortened address
+- full address preservation
+
+MULTI-ASSET
+
+- primary asset
+- secondary asset
+- input/output semantics
+- two-asset swap representation
+- missing secondary asset
+
+AMOUNTS
+
+- exact bigint
+- formatted amount
+- positive/negative presentation
+- no floating-point conversion
+
+FIAT
+
+- available value
+- unavailable value
+- null when no price source exists
+- no hardcoded price
+
+STATUS
+
+- all lifecycle states
+- status preserved
+- signed != broadcasted
+- broadcasted != confirmed
+
+TIMESTAMP
+
+- blockchain timestamp
+- observation timestamp
+- unknown timestamp
+- source preserved
+
+EXPLORER
+
+- valid explorer
+- unavailable explorer
+- placeholder network
+- invalid metadata
+
+PROVENANCE
+
+- local wallet
+- broadcast engine
+- confirmation engine
+- blockchain read
+- future external indexer value
+
+ISOLATION
+
+- account isolation
+- network isolation
+- chain isolation
+
+SECURITY
+
+- no SecureStore
+- no mnemonic
+- no private key
+- no signing
+- no broadcasting
+- no backend
+- no analytics
+
+Run the complete existing test suite.
+
+==================================================
+24. DOCUMENTATION
+==================================================
+
+Update:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- src/core/activity/README.md
+
+Document:
+
+- asset-first Activity presentation
+- network badge architecture
+- action classification
+- counterparty presentation
+- multi-asset event support
+- future swap representation
+- exact amount rules
+- optional fiat value
+- timestamp provenance
+- explorer metadata
+- account/network isolation
+- future extensibility
+
+Explicitly document:
+
+Phase 5.1A does NOT implement:
+
+- Activity UI
+- Swap detection
+- Swap execution
+- Approval execution
+- External indexing
+- Price APIs
+- Backend history
+- Notifications
+
+==================================================
+25. VERIFICATION
+==================================================
+
+Run:
+
+- TypeScript
+- complete test suite
+- git diff --check
+- Expo/Metro
+- static iOS bundle/manifest build
+- static Android bundle/manifest build
+- security regression inspection
+
+Inspect the diff specifically for:
+
+- accidental UI implementation
+- duplicated transaction models
+- floating-point blockchain arithmetic
+- fake fiat values
+- fake swap classification
+- external network/logo API
+- backend calls
+- analytics
+- secret access
+- signing
+- broadcasting
+
+==================================================
+26. SCOPE CONTROL
+==================================================
+
+This is an AMENDMENT to Phase 5.1.
+
+Do NOT rebuild unrelated Activity architecture.
+
+Do NOT implement Phase 5.2.
+
+Do NOT implement Activity UI.
+
+Do NOT implement Swap.
+
+Do NOT implement external transaction indexing.
+
+STOP after this amendment.
+
+==================================================
+27. FINAL REPORT
+==================================================
+
+Report:
+
+- files created/changed
+- existing models extended
+- presentation model
+- asset-first architecture
+- network badge metadata
+- action classification
+- counterparty model
+- multi-asset support
+- fiat handling
+- timestamp handling
+- explorer handling
+- account/network isolation
+- tests
+- TypeScript result
+- Expo/build result
+- security regression result
+- known warnings
+- anything deferred
+
+STOP after Phase 5.1A.
+
+Wait for approval before Phase 5.2.
