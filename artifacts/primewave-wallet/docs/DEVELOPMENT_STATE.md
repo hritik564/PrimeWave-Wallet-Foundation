@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 5.3 — WAVEX Transaction Details and reconciliation (completed)**
+**Phase 6.1 — WAVEX Swap Architecture and Quote Model (completed)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -324,6 +324,19 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 - Added focused Transaction Details logic tests for navigation scope, status
   semantics, exact quantities, lookup context, reconciliation outcomes,
   external activity, and security-sensitive omissions.
+- Added isolated provider-neutral swap request, quote, route, fee, price-impact,
+  transaction-request, provider metadata, and lifecycle models.
+- Added deterministic same-chain request validation using the existing asset
+  identity and network validation boundaries, including exact bigint amounts,
+  address normalization, chain checks, supported asset types, and 0–5000 bps
+  slippage enforcement.
+- Added strict untrusted provider response validation for quote identity,
+  amounts, expected/minimum received values, routes, expiration, fees,
+  transaction calldata, recipient, value, and optional gas limits.
+- Added a memory-only `SwapQuoteService` with idle/requesting/quoted/expired/
+  failed lifecycle states and sanitized provider error normalization.
+- Added focused swap architecture, validation, lifecycle, large-amount, and
+  security-boundary tests. No real quote provider or external API was added.
 
 ## Pending work
 
@@ -333,10 +346,11 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 - External token lists, verification providers, NFTs, portfolio valuation, fiat
   pricing, external indexing, backend asset/history APIs, notifications, and
   full wallet UI remain outside this controlled increment.
-- Phase 5.3 intentionally does not include swap detection/execution,
-  approvals execution, DApps, WalletConnect, transaction replacement,
-  speed-up, cancellation, fee bumping, account switching, asset detail,
-  QR scanning, or Settings functionality.
+- Phase 6.1 intentionally does not include a real quote provider, external
+  swap API, swap UI, swap execution, signing, broadcasting, persistent quote
+  state, Activity records, swap detection, approvals execution, DApps,
+  WalletConnect, transaction replacement, speed-up, cancellation, fee bumping,
+  account switching, asset detail, QR scanning, or Settings functionality.
 - Preview Test Mode is intentionally limited to web UI state testing and is not
   native wallet or security validation.
 - Balance preflight validation is intentionally not implemented because it is
@@ -373,8 +387,9 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 
 ## Phase boundary
 
-Phase 5.3 is complete. Stop here. Later phases may separately define external
-indexing, backend history, notifications, external verification, token
-state-changing operations, NFTs, portfolio valuation, fiat pricing, swaps,
-DApps, WalletConnect, replacement, speed-up, cancellation, automatic fee
-bumping, and other ecosystem capabilities.
+Phase 6.1 is complete. Stop here. Later phases may separately define a real
+quote provider, Swap UI, swap review, provider transaction integration, local
+signing/broadcast execution, external indexing, backend history, notifications,
+external verification, token state-changing operations, NFTs, portfolio
+valuation, fiat pricing, DApps, WalletConnect, replacement, speed-up,
+cancellation, automatic fee bumping, and other ecosystem capabilities.

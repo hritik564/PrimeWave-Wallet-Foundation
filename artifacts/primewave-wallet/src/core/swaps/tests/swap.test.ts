@@ -2,11 +2,13 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
   createTokenAssetIdentity,
-  defaultNetworkRegistry,
-  supportedNetworks,
   type AssetIdentity,
 } from '@/src/core/assets';
-import { NetworkRegistry } from '@/src/core/networks';
+import {
+  defaultNetworkRegistry,
+  NetworkRegistry,
+  supportedNetworks,
+} from '@/src/core/networks';
 import {
   MAX_SWAP_SLIPPAGE_BPS,
   SwapError,
@@ -407,6 +409,26 @@ test('rejects malformed or untrusted provider quote fields', () => {
   assertSwapCode(
     () =>
       validateSwapQuoteResponse(
+        quote({
+          route: {
+            hops: [
+              quote().route.hops[0],
+              {
+                ...quote().route.hops[0],
+                inputAsset: native,
+              },
+            ],
+          },
+        }),
+        validated,
+        metadata,
+        BASE_TIME,
+      ),
+    'SWAP_INVALID_ROUTE',
+  );
+  assertSwapCode(
+    () =>
+      validateSwapQuoteResponse(
         quote({ expiresAt: BASE_TIME }),
         validated,
         metadata,
@@ -428,6 +450,24 @@ test('rejects malformed or untrusted provider quote fields', () => {
 
 test('quote service exposes idle, requesting, quoted, expired, and failed lifecycle states', async () => {
   let now = BASE_TIME;
+  let resolvePending: ((value: unknown) => void) | undefined;
+  const pendingProvider: SwapQuoteProvider = {
+    ...provider(),
+    getQuote: () =>
+      new Promise((resolve) => {
+        resolvePending = resolve;
+      }),
+  };
+  const pendingService = new SwapQuoteService(
+    defaultNetworkRegistry,
+    pendingProvider,
+    { now: () => now },
+  );
+  const pendingResult = pendingService.getQuote(request());
+  assert.equal(pendingService.getLifecycle().state, 'requesting');
+  resolvePending?.(quote());
+  await pendingResult;
+
   const service = new SwapQuoteService(
     defaultNetworkRegistry,
     provider(),

@@ -220,6 +220,14 @@ function normalizeRoute(
       }),
     );
   }
+  for (let index = 1; index < hops.length; index += 1) {
+    if (
+      getAssetIdentityKey(hops[index - 1].outputAsset) !==
+      getAssetIdentityKey(hops[index].inputAsset)
+    ) {
+      return fail('SWAP_INVALID_ROUTE');
+    }
+  }
   if (
     getAssetIdentityKey(hops[0].inputAsset) !==
       getAssetIdentityKey(request.sellAsset) ||

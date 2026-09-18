@@ -14,6 +14,8 @@ export function validateSwapQuoteProviderMetadata(
   metadata: SwapQuoteProviderMetadata,
 ): SwapQuoteProviderMetadata {
   if (
+    typeof metadata !== 'object' ||
+    metadata === null ||
     typeof metadata.providerId !== 'string' ||
     metadata.providerId.trim().length === 0 ||
     typeof metadata.displayName !== 'string' ||
@@ -43,7 +45,9 @@ export function createSwapQuoteProvider(
   if (
     typeof provider !== 'object' ||
     provider === null ||
-    typeof provider.getQuote !== 'function'
+    typeof provider.getQuote !== 'function' ||
+    typeof provider.metadata !== 'object' ||
+    provider.metadata === null
   ) {
     throw new SwapError('SWAP_PROVIDER_ERROR');
   }

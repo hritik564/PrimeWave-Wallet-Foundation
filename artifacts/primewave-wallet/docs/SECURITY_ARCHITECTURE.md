@@ -891,6 +891,41 @@ No backend history, external indexer, price API, notification, analytics,
 swap, approval execution, DApp, WalletConnect, replacement, speed-up,
 cancellation, or fee-bumping boundary was added in Phase 5.3.
 
+### Phase 6.1 Swap Architecture security boundary
+
+Phase 6.1 introduces only provider-neutral quote architecture under
+`src/core/swaps`. A swap provider receives a public
+`SwapQuoteRequest` and is never trusted with wallet secrets or signing
+authority. The request contains only account ID, sender public address,
+network/chain context, network-scoped asset identities, exact bigint sell
+amount, and integer slippage basis points.
+
+Provider responses are untrusted input. `SwapQuoteService` validates provider
+identity, network, exact chain, account, asset identities, exact amounts,
+slippage, quote timestamps, expiration, route continuity, price-impact state,
+fee structures, addresses, calldata, transaction value, and optional gas
+limits. Malformed, mismatched, expired, negative, or impossible values are
+rejected with sanitized swap-specific errors. No malformed provider field is
+silently repaired.
+
+Provider transaction calldata is untrusted input and must be validated before
+it can enter the transaction signing flow. Existing transaction construction
+remains authoritative for any future execution. A quote is not an approved
+transaction, a signed transaction, a broadcast, a confirmation, or a
+completed swap.
+
+The swap module has no SecureStore, mnemonic, seed, private key, PIN,
+biometric, authentication, signing, broadcasting, wallet persistence,
+backend, external quote API, or provider SDK dependency. It does not execute
+swaps, mutate balances, create Activity records, add WaveX fees, refresh
+quotes automatically, or background-poll. Cross-chain swaps are rejected.
+
+The quote lifecycle is limited to idle, requesting, quoted, expired, and
+failed. Expected and minimum received amounts remain separate, exact bigint
+monetary values are never converted through floating point, and network,
+protocol, and provider fees remain separate. Unknown price impact is
+represented as unavailable rather than fabricated as zero.
+
 ### Development-only Replit web preview mode
 
 The Replit web preview cannot use native SecureStore, so it fails closed for

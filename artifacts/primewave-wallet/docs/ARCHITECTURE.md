@@ -916,6 +916,48 @@ configured network metadata. Phase 5.3 does not add swap detection or
 execution, approval execution, backend history, external indexing, price APIs,
 notifications, replacement, speed-up, cancellation, or fee bumping.
 
+### Phase 6.1 WAVEX Swap Architecture and Quote Model
+
+Phase 6.1 adds the isolated provider-neutral swap domain under
+`src/core/swaps`. It reuses the existing network-scoped `AssetIdentity`,
+ERC-20 address normalization, `NetworkRegistry`, and exact bigint conventions.
+Swap requests are public-only and contain account ID, sender address, network
+ID, exact chain ID, sell/buy assets, exact sell amount, and integer slippage
+basis points.
+
+The quote boundary is:
+
+```text
+SwapQuoteProvider
+      ↓
+Untrusted provider response
+      ↓
+SwapQuoteService request/response validation
+      ↓
+Validated SwapQuote
+      ↓
+Future Swap Review
+      ↓
+Existing Transaction Construction
+      ↓
+Existing Secure Local Signing
+      ↓
+Existing Broadcast Engine
+```
+
+Phase 6.1 supports same-chain requests only and enforces 0–5000 bps slippage.
+The quote model keeps expected buy amount separate from minimum buy amount,
+represents multi-hop routes, exposes price impact as available or unavailable,
+and separates network, protocol, and provider fees. Provider transaction
+calldata, recipient, value, and optional gas limit are untrusted and validated
+before a quote is returned.
+
+`SwapQuoteService` owns the in-memory quote lifecycle
+(`idle`, `requesting`, `quoted`, `expired`, `failed`). It does not persist
+swap state, automatically refresh, background-poll, invent rates or routes, or
+create Activity records. No real provider, SDK, API key, external request,
+swap UI, signing, broadcast, or execution is included in this phase.
+
 ## Design system
 
 WAVEX uses a centralized dark foundation with blue, cyan, and violet
