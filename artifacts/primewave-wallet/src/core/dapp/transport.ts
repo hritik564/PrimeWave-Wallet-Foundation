@@ -1,5 +1,9 @@
 import type { DAppRequest } from './request-models';
-import type { DAppSession, DAppSessionProposal } from './models';
+import type {
+  DAppAuthorizationDecision,
+  DAppSession,
+  DAppSessionProposal,
+} from './models';
 
 export interface DAppTransportRequestEvent {
   readonly type: 'request';
@@ -46,6 +50,8 @@ export interface DAppTransport {
   stop(): Promise<void> | void;
   sendResponse(response: DAppTransportResponse): Promise<void> | void;
   disconnect(sessionId: string): Promise<void> | void;
+  approveProposal(proposalId: string): Promise<DAppSession>;
+  rejectProposal(proposalId: string): Promise<void>;
 }
 
 export type DAppTransportRequestHandler = (

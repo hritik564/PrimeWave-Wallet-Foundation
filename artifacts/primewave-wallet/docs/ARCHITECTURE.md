@@ -156,6 +156,27 @@ normalized into the DApp transport boundary. Signing methods, transaction
 execution, broadcasting, `wallet_switchEthereumChain`, and
 `wallet_addEthereumChain` are not implemented.
 
+## Phase 7.3 — DApp connection approval UI
+
+The app now listens for real provider proposals through the Phase 7.2
+transport and routes them to a dedicated connection approval screen. The
+screen is reachable only from a real transport proposal; Preview Test Mode
+does not manufacture a proposal or session.
+
+The screen is provider-neutral. It renders validated public proposal data,
+maps network IDs through `NetworkRegistry`, labels unsupported signing
+capabilities as unavailable, and uses the existing public-address clipboard
+helper. The provider adapter remains responsible for WalletConnect
+approval/rejection and session construction.
+
+Before approval, the UI revalidates proposal expiry and the account, address,
+and active-network context captured when the proposal arrived. The adapter
+also revalidates the provider proposal before calling `approveSession`. A
+context change produces a stale state and cannot approve the old proposal.
+After approval, the UI shows a lightweight connected state and exposes the
+existing disconnect boundary. Signing, transaction execution, broadcasting,
+automatic network switching, and DApp management remain deferred.
+
 ## Security boundary
 
 Signing material stays on the user's device. The backend must never receive

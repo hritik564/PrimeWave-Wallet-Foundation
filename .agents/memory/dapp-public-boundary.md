@@ -14,3 +14,17 @@ an account must never silently authorize message signing or transaction signing.
 at both model and repository/service boundaries, preserve typed-data payloads
 exactly, and hand any future transaction request into the existing review,
 construction, authorization, signing, and confirmation pipeline.
+
+The connection UI is a separate explicit consent boundary: a proposal remains
+pending until the user chooses Connect or Reject, and approval rechecks expiry,
+account/address, active network, provider identity, chains, capabilities, and
+current network configuration. Preview must never manufacture DApp proposals or
+sessions.
+
+**Why:** A real provider proposal can become stale while the app is backgrounded
+or while the user changes wallet context; opening a screen must never grant
+authority.
+
+**How to apply:** Keep provider SDK calls in the adapter, make the UI consume
+validated public DTOs, and let stale/expired context fail closed before session
+approval.

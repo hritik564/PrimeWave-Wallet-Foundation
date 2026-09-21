@@ -72,6 +72,26 @@ signing or transaction requests with sanitized provider errors. Session
 updates that change the authorized account or primary network are revoked
 instead of silently rebinding the session.
 
+## Phase 7.3 approval UI boundary
+
+The connection screen is an explicit user-consent boundary, not a trust
+indicator. It presents DApp name, URL/origin, icon-or-fallback, public account,
+validated networks, and requested capabilities. It labels metadata as
+unverified and states that connection exposes only the approved public address;
+it does not expose private keys or grant signing authority.
+
+The screen never auto-approves, never approves in the background, and guards
+duplicate/concurrent actions with explicit pending states. It captures the
+account and active-network context when a proposal arrives, then revalidates
+expiry, identity, account, active network, requested chains, capabilities, and
+current network configuration before approval. Stale, expired, changed, or
+failed proposals cannot create a session.
+
+The preview build has no fake DApp connection path. Real proposals require the
+native WalletConnect transport and a configured public project ID. Physical
+native-device pairing and deep-link behavior remain unverified until a
+standalone native test build is available.
+
 ## 1. Security principles
 
 - **Non-custodial architecture:** signing authority remains on the user's

@@ -81,6 +81,11 @@ interface SessionScope {
   readonly networkId: string;
 }
 
+interface PendingProposal {
+  readonly event: WalletKitTypes.EventArguments['session_proposal'];
+  readonly mapped: WalletConnectMappedProposal;
+}
+
 function providerError(
   code: DAppError['code'],
   message: string,
@@ -90,6 +95,22 @@ function providerError(
 
 function safeErrorCode(error: unknown): string {
   return error instanceof DAppError ? error.code : 'PROVIDER_TRANSPORT_ERROR';
+}
+
+function sameIdentity(
+  left: DAppIdentity,
+  right: DAppIdentity,
+): boolean {
+  return (
+    left.dappId === right.dappId &&
+    left.name === right.name &&
+    left.description === right.description &&
+    left.url === right.url &&
+    left.iconUrl === right.iconUrl &&
+    left.origin === right.origin &&
+    left.providerSessionId === right.providerSessionId &&
+    left.metadataVersion === right.metadataVersion
+  );
 }
 
 function providerRejectionReason(error: DAppError): ReturnType<typeof getSdkError> {
@@ -137,6 +158,7 @@ export class WalletConnectDAppTransport implements DAppTransport {
   private started = false;
   private readonly repository: DAppSessionRepository;
   private readonly sessionScopes = new Map<string, SessionScope>();
+  private readonly pendingProposals = new Map<string, PendingProposal>();
   private readonly now: () => number;
 
   private readonly onSessionProposal = (
@@ -282,6 +304,108 @@ export class WalletConnectDAppTransport implements DAppTransport {
     );
   }
 
+  async approveProposal(proposalId: string): Promise<DAppSession> {
+    const pending = this.pendingProposals.get(proposalId);
+    if (!pending) {
+      throw new DAppError(
+        'PROVIDER_MALFORMED_PROPOSAL',
+        'The DApp connection request is no longer available.',
+      );
+    }
+    if (!this.options.authorization) {
+      throw new DAppError(
+        'PROVIDER_UNAVAILABLE',
+        'DApp connection authorization is unavailable.',
+      );
+    }
+
+    const remapped = mapWalletConnectProposal(
+      pending.event.params,
+      this.options.registry,
+      this.now(),
+    );
+    if (
+      remapped.proposal.proposalId !== pending.mapped.proposal.proposalId ||
+      !sameIdentity(
+        remapped.proposal.identity,
+        pending.mapped.proposal.identity,
+      ) ||
+      remapped.proposal.requestedNetworkIds.join(',') !==
+        pending.mapped.proposal.requestedNetworkIds.join(',') ||
+      remapped.proposal.requestedChainIds.join(',') !==
+        pending.mapped.proposal.requestedChainIds.join(',') ||
+      remapped.proposal.requestedCapabilities.join(',') !==
+        pending.mapped.proposal.requestedCapabilities.join(',')
+    ) {
+      throw new DAppError(
+        'PROVIDER_MALFORMED_PROPOSAL',
+        'The DApp connection request changed while it was open.',
+      );
+    }
+
+    const decision = await this.options.authorization.authorize(
+      remapped.proposal,
+    );
+    if (decision.decision === 'rejected') {
+      throw new DAppError(
+        'PROVIDER_UNSUPPORTED_REQUEST',
+        decision.reason ?? 'The DApp connection request was rejected.',
+      );
+    }
+
+    try {
+      const namespaces = buildApprovedNamespaces(
+        remapped,
+        decision,
+        this.options.registry,
+      );
+      const providerSession = await this.walletKit.approveSession({
+        id: pending.event.id,
+        namespaces,
+      });
+      const session = this.createCoreSession(
+        providerSession,
+        remapped.proposal.identity,
+        decision,
+      );
+      const stored = this.repository.create(session);
+      this.sessionScopes.set(providerSession.topic, {
+        accountId: stored.accountId,
+        networkId: stored.networkId,
+      });
+      this.pendingProposals.delete(proposalId);
+      this.emit({ type: 'session', event: 'approved', session: stored });
+      return stored;
+    } catch (error) {
+      const normalized =
+        error instanceof DAppError
+          ? error
+          : providerError(
+              'PROVIDER_TRANSPORT_ERROR',
+              'The WalletConnect session could not be approved.',
+            );
+      await this.rejectPendingProposal(pending, normalized);
+      throw normalized;
+    }
+  }
+
+  async rejectProposal(proposalId: string): Promise<void> {
+    const pending = this.pendingProposals.get(proposalId);
+    if (!pending) {
+      throw new DAppError(
+        'PROVIDER_MALFORMED_PROPOSAL',
+        'The DApp connection request is no longer available.',
+      );
+    }
+    await this.rejectPendingProposal(
+      pending,
+      providerError(
+        'PROVIDER_UNSUPPORTED_REQUEST',
+        'The DApp connection request was rejected.',
+      ),
+    );
+  }
+
   async disconnect(sessionId: string): Promise<void> {
     const scope = this.sessionScopes.get(sessionId);
     if (!scope) {
@@ -324,61 +448,13 @@ export class WalletConnectDAppTransport implements DAppTransport {
               'PROVIDER_MALFORMED_PROPOSAL',
               'The WalletConnect proposal could not be validated.',
             );
-      await this.rejectProposal(event.id, normalized);
+      await this.rejectProviderProposal(event.id, normalized);
       this.emitError(normalized.code);
       return;
     }
 
+    this.pendingProposals.set(mapped.proposal.proposalId, { event, mapped });
     this.emit({ type: 'proposal', proposal: mapped.proposal });
-    if (!this.options.authorization) {
-      // A proposal is intentionally left pending until an explicit UI boundary
-      // authorizes it. This path never creates a successful fake session.
-      return;
-    }
-
-    try {
-      const decision = await this.options.authorization.authorize(
-        mapped.proposal,
-      );
-      if (decision.decision === 'rejected') {
-        await this.walletKit.rejectSession({
-          id: event.id,
-          reason: getSdkError('USER_REJECTED'),
-        });
-        return;
-      }
-
-      const namespaces = buildApprovedNamespaces(
-        mapped,
-        decision,
-        this.options.registry,
-      );
-      const providerSession = await this.walletKit.approveSession({
-        id: event.id,
-        namespaces,
-      });
-      const session = this.createCoreSession(
-        providerSession,
-        mapped.proposal.identity,
-        decision,
-      );
-      const stored = this.repository.create(session);
-      this.sessionScopes.set(providerSession.topic, {
-        accountId: stored.accountId,
-        networkId: stored.networkId,
-      });
-      this.emit({ type: 'session', event: 'approved', session: stored });
-    } catch (error) {
-      const normalized =
-        error instanceof DAppError
-          ? error
-          : providerError(
-              'PROVIDER_TRANSPORT_ERROR',
-              'The WalletConnect session could not be approved.',
-            );
-      await this.rejectProposal(event.id, normalized);
-      this.emitError(normalized.code);
-    }
   }
 
   private async handleSessionRequest(
@@ -531,7 +607,7 @@ export class WalletConnectDAppTransport implements DAppTransport {
     };
   }
 
-  private async rejectProposal(
+  private async rejectProviderProposal(
     id: number,
     error: DAppError,
   ): Promise<void> {
@@ -542,6 +618,25 @@ export class WalletConnectDAppTransport implements DAppTransport {
       });
     } catch {
       this.emitError('PROVIDER_TRANSPORT_ERROR');
+    }
+  }
+
+  private async rejectPendingProposal(
+    pending: PendingProposal,
+    error: DAppError,
+  ): Promise<void> {
+    try {
+      await this.walletKit.rejectSession({
+        id: pending.event.id,
+        reason: providerRejectionReason(error),
+      });
+      this.pendingProposals.delete(pending.mapped.proposal.proposalId);
+    } catch {
+      this.emitError('PROVIDER_TRANSPORT_ERROR');
+      throw new DAppError(
+        'PROVIDER_TRANSPORT_ERROR',
+        'The DApp connection request could not be rejected.',
+      );
     }
   }
 

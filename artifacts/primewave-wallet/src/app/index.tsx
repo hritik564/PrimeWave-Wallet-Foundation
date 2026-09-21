@@ -49,6 +49,21 @@ import {
   createZeroExSwapQuoteProvider,
   SwapQuoteService,
 } from '@/src/core/swaps';
+import {
+  assertDAppApprovalCheckpoint,
+  type DAppApprovalContext,
+  type DAppAuthorizationDecision,
+  type DAppApprovalStatus,
+  type DAppSession,
+  type DAppSessionProposal,
+} from '@/src/core/dapp';
+import {
+  createDAppApprovalSnapshot,
+  validateDAppApproval,
+  type DAppApprovalSnapshot,
+} from '@/src/components/dapp/DAppConnectionApproval.logic';
+import { DAppConnectionApprovalScreen } from '@/src/components/dapp/DAppConnectionApprovalScreen';
+import type { WalletConnectDAppTransport } from '@/src/core/dapp/providers/walletconnect';
 
 const iconSource = require('../../assets/images/icon.png');
 const confirmationPositions = [4, 9, 12];
@@ -66,6 +81,7 @@ type ViewName =
   | 'biometric'
   | 'locked'
   | 'wallet'
+  | 'dapp-approval'
   | 'security'
   | 'recovery';
 
@@ -751,8 +767,16 @@ export default function FoundationScreen() {
   const [biometricAvailability, setBiometricAvailability] = useState<BiometricAvailability>({ available: false, type: null });
   const [error, setError] = useState('');
   const [backgrounded, setBackgrounded] = useState(false);
+  const [dappTransport, setDappTransport] = useState<WalletConnectDAppTransport | null>(null);
+  const [dappProposal, setDappProposal] = useState<DAppSessionProposal | null>(null);
+  const [dappSnapshot, setDappSnapshot] = useState<DAppApprovalSnapshot | null>(null);
+  const [dappStatus, setDappStatus] = useState<DAppApprovalStatus>('none');
+  const [dappError, setDappError] = useState<string | null>(null);
+  const [dappSession, setDappSession] = useState<DAppSession | null>(null);
   const [, setAccessRevision] = useState(0);
   const appState = useRef(AppState.currentState);
+  const walletRef = useRef<Wallet | null>(null);
+  const selectedNetworkRef = useRef(selectedNetwork);
 
   useEffect(() => {
     if (!access) return;
@@ -854,14 +878,265 @@ export default function FoundationScreen() {
     : access?.getStatus() === 'unlocked'
       ? (() => { try { return nativeAccess().getWallet(); } catch { return null; } })()
       : null;
+  walletRef.current = currentWallet;
+  selectedNetworkRef.current = selectedNetwork;
+
+  const currentDAppContext = (): DAppApprovalContext | null => {
+    const wallet = walletRef.current;
+    const network = selectedNetworkRef.current;
+    const account = wallet?.accounts[0];
+    if (!account || network.chainId === null) return null;
+    return {
+      accountId: account.accountId,
+      walletAddress: account.address,
+      networkId: network.id,
+      chainId: BigInt(network.chainId),
+    };
+  };
+
+  useEffect(() => {
+    if (
+      previewMode ||
+      Platform.OS === 'web' ||
+      !currentWallet ||
+      !process.env.EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID
+    ) {
+      return;
+    }
+
+    let mounted = true;
+    let transport: WalletConnectDAppTransport | null = null;
+    const listener = (event: import('@/src/core/dapp').DAppTransportEvent) => {
+      if (!mounted) return;
+      if (event.type === 'proposal') {
+        const wallet = walletRef.current;
+        const context = currentDAppContext();
+        if (!wallet || !context) {
+          setDappStatus('failed');
+          setDappError('The wallet context is unavailable for this request.');
+          return;
+        }
+        try {
+          setDappProposal(event.proposal);
+          setDappSnapshot(
+            createDAppApprovalSnapshot(
+              event.proposal,
+              wallet,
+              defaultNetworkRegistry,
+              context,
+            ),
+          );
+          setDappSession(null);
+          setDappError(null);
+          setDappStatus('received');
+          setView('dapp-approval');
+        } catch (proposalError) {
+          setDappStatus('failed');
+          setDappError(safeMessage(proposalError));
+        }
+      } else if (event.type === 'session' && event.event === 'approved') {
+        setDappSession(event.session);
+        setDappStatus('approved');
+      } else if (event.type === 'error') {
+        if (event.errorCode === 'PROVIDER_SESSION_EXPIRED') {
+          setDappStatus('expired');
+        } else {
+          setDappStatus('failed');
+        }
+      }
+    };
+
+    void (async () => {
+      try {
+        const { WalletConnectDAppTransport: Transport } = await import(
+          '@/src/core/dapp/providers/walletconnect'
+        );
+        transport = await Transport.create({
+          projectId: process.env.EXPO_PUBLIC_WALLETCONNECT_PROJECT_ID as string,
+          metadata: {
+            name: 'WAVEX Wallet',
+            description: 'A self-custody wallet for public DApp connections.',
+            url: 'https://wavex.app',
+            icons: [],
+          },
+          registry: defaultNetworkRegistry,
+          authorization: {
+            authorize: (proposal): DAppAuthorizationDecision => {
+              const wallet = walletRef.current;
+              const activeNetwork = selectedNetworkRef.current;
+              const account = wallet?.accounts[0];
+              if (!account) {
+                return {
+                  decision: 'rejected',
+                  reason: 'The wallet account is unavailable.',
+                };
+              }
+              const primaryIndex = Math.max(
+                0,
+                proposal.requestedNetworkIds.indexOf(activeNetwork.id),
+              );
+              const primaryNetworkId = proposal.requestedNetworkIds[primaryIndex];
+              const primaryChainId = proposal.requestedChainIds[primaryIndex];
+              if (primaryNetworkId === undefined || primaryChainId === undefined) {
+                return {
+                  decision: 'rejected',
+                  reason: 'The request does not contain an approved network.',
+                };
+              }
+              return {
+                decision: 'approved',
+                accountId: account.accountId,
+                walletAddress: account.address,
+                networkId: primaryNetworkId,
+                chainId: primaryChainId,
+                approvedNetworkIds: [...proposal.requestedNetworkIds],
+                approvedChainIds: [...proposal.requestedChainIds],
+                approvedCapabilities: proposal.requestedCapabilities.filter(
+                  (capability) =>
+                    capability === 'account-access' ||
+                    capability === 'network-access',
+                ),
+              };
+            },
+          },
+        });
+        if (!mounted) {
+          await transport.stop();
+          return;
+        }
+        setDappTransport(transport);
+        await transport.start(listener);
+      } catch (transportError) {
+        if (mounted) {
+          setDappError(safeMessage(transportError));
+        }
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      if (transport) void transport.stop();
+      setDappTransport(null);
+    };
+  }, [currentWallet?.walletId, previewMode]);
+
+  useEffect(() => {
+    if (
+      !dappSnapshot ||
+      dappStatus === 'approved' ||
+      dappStatus === 'rejected' ||
+      dappStatus === 'expired' ||
+      dappStatus === 'stale' ||
+      dappStatus === 'failed'
+    ) {
+      return;
+    }
+    const context = currentDAppContext();
+    if (!context) return;
+    try {
+      validateDAppApproval(dappSnapshot, context);
+    } catch (contextError) {
+      setDappStatus('stale');
+      setDappError(safeMessage(contextError));
+    }
+  }, [
+    currentWallet?.accounts[0]?.accountId,
+    currentWallet?.accounts[0]?.address,
+    dappSnapshot,
+    dappStatus,
+    selectedNetwork.chainId,
+    selectedNetwork.id,
+  ]);
+
+  useEffect(() => {
+    if (!dappSnapshot || dappStatus === 'approved') return;
+    if (dappSnapshot.proposal.expiresAt === null) return;
+    const remaining = dappSnapshot.proposal.expiresAt - Date.now();
+    if (remaining <= 0) {
+      setDappStatus('expired');
+      setDappError('This connection request expired.');
+      return;
+    }
+    const timer = setTimeout(() => {
+      setDappStatus('expired');
+      setDappError('This connection request expired.');
+    }, remaining);
+    return () => clearTimeout(timer);
+  }, [dappSnapshot, dappStatus]);
 
   const handleNetworkSelect = (networkId: string): NetworkSelectionResult => {
     try {
       const nextNetwork = defaultNetworkRegistry.selectActiveNetwork(networkId);
       setSelectedNetwork(nextNetwork);
+      if (
+        dappSnapshot &&
+        dappStatus !== 'approved' &&
+        nextNetwork.id !== dappSnapshot.context.networkId
+      ) {
+        setDappStatus('stale');
+        setDappError('The active network changed while this request was open.');
+      }
       return { ok: true, network: nextNetwork };
     } catch (selectionError) {
       return { ok: false, message: safeNetworkSelectionMessage(selectionError) };
+    }
+  };
+
+  const handleDAppConnect = async () => {
+    if (!dappTransport || !dappProposal || !dappSnapshot) return;
+    const context = currentDAppContext();
+    if (!context) {
+      setDappStatus('stale');
+      setDappError('The wallet context is unavailable.');
+      return;
+    }
+    try {
+      validateDAppApproval(dappSnapshot, context);
+      setDappStatus('approving');
+      const session = await dappTransport.approveProposal(dappProposal.proposalId);
+      setDappSession(session);
+      setDappStatus('approved');
+      setDappError(null);
+    } catch (approvalError) {
+      const normalized = safeMessage(approvalError);
+      setDappError(normalized);
+      setDappStatus(
+        approvalError instanceof Error &&
+        'code' in approvalError &&
+        (approvalError as { code?: string }).code === 'PROVIDER_SESSION_EXPIRED'
+          ? 'expired'
+          : 'failed',
+      );
+    }
+  };
+
+  const handleDAppReject = async () => {
+    if (!dappTransport || !dappProposal) return;
+    setDappStatus('rejecting');
+    try {
+      await dappTransport.rejectProposal(dappProposal.proposalId);
+      setDappStatus('rejected');
+      setDappProposal(null);
+      setDappSnapshot(null);
+      setDappError(null);
+      setView('wallet');
+    } catch (rejectionError) {
+      setDappStatus('failed');
+      setDappError(safeMessage(rejectionError));
+    }
+  };
+
+  const handleDAppDisconnect = async () => {
+    if (!dappTransport || !dappSession) return;
+    try {
+      await dappTransport.disconnect(dappSession.sessionId);
+      setDappSession(null);
+      setDappProposal(null);
+      setDappSnapshot(null);
+      setDappStatus('none');
+      setView('wallet');
+    } catch (disconnectError) {
+      setDappError(safeMessage(disconnectError));
     }
   };
 
@@ -936,6 +1211,20 @@ export default function FoundationScreen() {
     setConfirmPin('');
     setView('welcome');
   })} />;
+  else if (view === 'dapp-approval' && dappSnapshot) {
+    content = (
+      <DAppConnectionApprovalScreen
+        error={dappError}
+        model={dappSnapshot.viewModel}
+        onConnect={() => void handleDAppConnect()}
+        onDisconnect={() => void handleDAppDisconnect()}
+        onDone={() => setView('wallet')}
+        onReject={() => void handleDAppReject()}
+        session={dappSession}
+        status={dappStatus}
+      />
+    );
+  }
   else if (view === 'wallet' && currentWallet) content = <WalletHomeShell activityService={activityService} activityReadModelService={activityReadModelService} createConstructionEngine={createConstructionEngine} createSigningDependency={createSigningDependency} createBroadcastDependency={createBroadcastDependency} previewMode={previewMode} wallet={currentWallet} network={selectedNetwork} networkRegistry={defaultNetworkRegistry} readModelService={portfolioReadModelService} swapQuoteService={swapQuoteService} onNetworkSelect={handleNetworkSelect} onComingSoon={(message) => setError(message)} onLock={() => void run(async () => {
     if (previewMode) {
       previewTestMode.lockPreviewWallet();

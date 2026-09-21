@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 7.2 — Real WalletConnect/Reown DApp transport (implemented; no signing)**
+**Phase 7.3 — Real DApp connection approval UI (implemented; no signing)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -499,10 +499,11 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 
 ## Phase boundary
 
-Phase 7.2 stops at public-only WalletConnect transport and session handling.
-Signing, transaction execution, broadcasting, UI approval screens, persistent
-sessions, backend APIs, Preview transport behavior, and automatic network
-switching remain outside this increment.
+Phase 7.3 stops at public-only WalletConnect transport, explicit connection
+approval, and lightweight connected-session state. Signing, transaction
+execution, broadcasting, persistent sessions, backend APIs, Preview transport
+behavior, automatic network switching, and DApp management remain outside this
+increment.
 
 ## Phase 7.2 completion
 
@@ -525,3 +526,22 @@ switching remain outside this increment.
   implement signing, transaction execution, broadcasting, or network changes.
 - A native development build is required for React Native pairing/deep-link
   validation; the existing `wavex` scheme is used for WalletConnect metadata.
+
+## Phase 7.3 completion
+
+- Added the real `DAppConnectionApprovalScreen` and provider-neutral approval
+  model helpers under `src/components/dapp/`.
+- Added explicit Connect and Reject actions with guarded approving/rejecting
+  states. No proposal is approved when the screen opens or while the app is in
+  the background.
+- Added a final checkpoint for expiry, identity, account, wallet address,
+  active network, and configured network context. Changes produce stale or
+  expired states.
+- Displayed untrusted DApp metadata with a deterministic fallback icon,
+  public-address copy behavior, validated network rows, and accurate
+  unsupported-capability labels.
+- Added a lightweight connected state with adapter-backed disconnect.
+- Preview Test Mode remains unavailable for DApp connections and creates no
+  fake proposal or session.
+- Signing, transaction execution, broadcasting, automatic network switching,
+  DApp management, and physical-device validation remain deferred.

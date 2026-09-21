@@ -60,6 +60,15 @@ export {
 export {
   DAppRequestService,
 } from './service';
+export {
+  assertDAppApprovalCheckpoint,
+  dappCapabilityLabel,
+  toDAppApprovalViewModel,
+  type DAppApprovalContext,
+  type DAppApprovalNetwork,
+  type DAppApprovalStatus,
+  type DAppApprovalViewModel,
+} from './proposal-models';
 export type {
   DAppTransport,
   DAppTransportEvent,
