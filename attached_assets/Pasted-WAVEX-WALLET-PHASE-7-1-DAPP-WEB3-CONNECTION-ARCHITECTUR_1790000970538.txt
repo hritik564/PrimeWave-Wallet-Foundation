@@ -1,0 +1,577 @@
+WAVEX WALLET — PHASE 7.1
+DAPP / WEB3 CONNECTION ARCHITECTURE
+ARCHITECTURE-FIRST — NO UI, NO REAL DAPP CONNECTIONS
+
+We are continuing the existing WaveX Wallet project.
+
+IMPORTANT WORKFLOW:
+- Implement ONLY this phase.
+- Do not start later phases automatically.
+- Do not redesign existing wallet screens.
+- Do not modify unrelated wallet/transaction/swap behavior.
+- Do not introduce large dependencies unless absolutely necessary.
+- Preserve all existing security boundaries.
+- After implementation, run the required tests and validation and provide a complete report.
+- Do NOT perform real DApp connections or real signing/broadcasting in this phase.
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Establish the provider-neutral architecture and security boundaries required for future DApp/Web3 integration.
+
+WaveX must eventually support DApps requesting:
+
+- wallet connection
+- account access
+- network information
+- message signing
+- transaction signing
+- transaction broadcasting through the existing transaction pipeline
+
+But Phase 7.1 is ARCHITECTURE ONLY.
+
+Do not implement actual WalletConnect sessions, deep links, QR connections, browser integration, DApp communication, message signing, transaction signing from DApps, or broadcasting.
+
+==================================================
+2. SECURITY INVARIANT
+==================================================
+
+WaveX remains strictly non-custodial.
+
+Private keys, recovery phrases, PINs, biometric secrets, vault encryption keys, and signing secrets must NEVER:
+
+- enter DApp-facing models
+- enter DApp session storage
+- enter backend APIs
+- enter analytics
+- enter logs
+- enter URLs/deep links
+- enter WalletConnect metadata
+- be exposed to JavaScript-facing DApp APIs
+- be persisted outside the existing secure wallet architecture
+
+DApps may request actions.
+
+DApps NEVER receive private wallet secrets.
+
+All sensitive actions must eventually pass through explicit WaveX user authorization and the existing secure local signing architecture.
+
+==================================================
+3. CREATE DAPP CORE MODULE
+==================================================
+
+Create:
+
+src/core/dapp/
+
+Organize the module cleanly, for example:
+
+src/core/dapp/
+  models.ts
+  session-models.ts
+  request-models.ts
+  permissions.ts
+  validation.ts
+  errors.ts
+  service.ts
+  README.md
+  tests/
+
+Use the existing project architecture conventions.
+
+Do not create UI files in this phase.
+
+==================================================
+4. DAPP IDENTITY MODEL
+==================================================
+
+Create a provider-neutral DAppIdentity model.
+
+It should support public metadata such as:
+
+- dappId
+- name
+- description (optional)
+- url
+- iconUrl (optional)
+- origin/domain where applicable
+- provider/session identifier where applicable
+- metadata version
+
+Treat all DApp metadata as UNTRUSTED INPUT.
+
+Validate:
+
+- URL structure
+- maximum lengths
+- supported schemes
+- malformed metadata
+- unsafe/invalid values
+
+Do not treat a DApp name, domain, icon, or URL as proof of trust.
+
+Do not create a "trusted DApp" classification.
+
+==================================================
+5. SESSION MODEL
+==================================================
+
+Create a provider-neutral DAppSession model.
+
+A session must be explicitly scoped to:
+
+- sessionId
+- DApp identity
+- accountId
+- public wallet address
+- network/chain context
+- approved capabilities
+- createdAt
+- lastActivityAt
+- expiration information where applicable
+- session status
+
+Session statuses should distinguish states such as:
+
+- pending
+- active
+- expired
+- disconnected
+- revoked
+
+Do not persist sessions yet.
+
+Use an in-memory repository/interface only.
+
+==================================================
+6. PERMISSION MODEL
+==================================================
+
+Create explicit permission/capability models.
+
+At minimum support conceptual capabilities for:
+
+- account access
+- chain/network access
+- message signing
+- transaction signing
+
+Do NOT automatically grant any permission.
+
+Permissions must be:
+
+- explicitly represented
+- account-scoped
+- network-scoped where appropriate
+- revocable
+- inspectable
+- distinguishable from authentication state
+
+Important:
+
+A connected DApp session does NOT automatically receive permission to sign.
+
+Connection permission and signing authorization must remain separate.
+
+==================================================
+7. REQUEST MODEL
+==================================================
+
+Create provider-neutral DApp request models.
+
+Support future request categories:
+
+- connect
+- disconnect
+- account access
+- network information
+- message signing
+- typed-data signing
+- transaction request
+- chain/network request
+
+Every request must contain sufficient context to prevent confused-deputy behavior.
+
+Include fields such as:
+
+- requestId
+- sessionId
+- DApp identity
+- account context
+- network context
+- request type
+- request payload
+- createdAt
+- expiration
+- status
+
+Do not place private keys, mnemonics, PINs, or other secret material in request models.
+
+==================================================
+8. TRANSACTION REQUEST BOUNDARY
+==================================================
+
+Create a provider-neutral DAppTransactionRequest model.
+
+It must represent public transaction intent only.
+
+Include appropriate public fields such as:
+
+- from
+- to
+- value
+- calldata
+- chainId
+- optional gas-related fields where supplied
+- nonce where supplied
+- provider/session/request context
+
+Do not allow a DApp request to bypass the existing:
+
+Phase 2.4 Gas/Fee Engine
+Phase 2.5 Transaction Construction
+Phase 2.6 Secure Local Signing
+Phase 2.7 Broadcast/Confirmation
+
+Future DApp transaction flow MUST eventually be:
+
+DApp
+  ↓
+DApp request validation
+  ↓
+WaveX transaction review
+  ↓
+existing transaction construction
+  ↓
+explicit user authorization
+  ↓
+existing local signing
+  ↓
+existing broadcast/confirmation
+
+Never:
+
+DApp → private key
+DApp → raw signer
+DApp → direct eth_sendRawTransaction
+
+==================================================
+9. MESSAGE SIGNING BOUNDARY
+==================================================
+
+Create provider-neutral request models for:
+
+- personal message signing
+- typed-data signing
+
+Do NOT implement actual signing yet.
+
+Document that future signing must:
+
+- display the requesting DApp
+- display the account
+- display the relevant network/context
+- present human-readable data where possible
+- require explicit user approval
+- invoke existing authentication/authorization architecture
+- never expose private keys
+
+For typed data, preserve the exact original payload for future cryptographic binding.
+
+Do not parse or rewrite typed-data semantics in a way that changes what is actually signed.
+
+==================================================
+10. NETWORK / CHAIN REQUESTS
+==================================================
+
+Define architecture for future DApp requests involving chain/network changes.
+
+Important security rule:
+
+A DApp must NOT silently change the active WaveX network.
+
+Future network requests must become explicit user decisions.
+
+Architecture should distinguish:
+
+- requested chain
+- currently active WaveX chain
+- session-approved chains
+- configured/unconfigured networks
+- enabled/disabled networks
+
+Reuse the existing NetworkRegistry concepts.
+
+Do not implement network switching UI yet.
+
+==================================================
+11. SESSION REPOSITORY
+==================================================
+
+Create an interface such as:
+
+DAppSessionRepository
+
+with operations appropriate for:
+
+- create
+- get
+- list
+- update
+- revoke
+- remove
+- clear
+
+Implement:
+
+InMemoryDAppSessionRepository
+
+Requirements:
+
+- account isolation
+- session isolation
+- deterministic behavior
+- duplicate session protection
+- bounded storage
+- no secrets
+- no SecureStore
+- no backend
+- no database
+
+Persistent DApp sessions are explicitly deferred.
+
+==================================================
+12. REQUEST LIFECYCLE
+==================================================
+
+Define a provider-neutral lifecycle.
+
+For example:
+
+created
+→ pending
+→ approved OR rejected
+→ completed OR failed OR expired
+
+The architecture must distinguish:
+
+- user rejection
+- validation failure
+- expired request
+- disconnected session
+- unsupported request
+- network mismatch
+- account mismatch
+- provider error
+
+Do not silently convert rejection into failure.
+
+==================================================
+13. PROVIDER ABSTRACTION
+==================================================
+
+Create a provider-neutral interface for future DApp transports.
+
+For example:
+
+DAppTransport
+
+The interface should conceptually support:
+
+- incoming connection/request handling
+- outgoing response
+- session lifecycle events
+- disconnect
+
+But do NOT implement WalletConnect yet.
+
+The goal is to ensure future WalletConnect integration does not leak provider-specific concepts throughout the wallet core.
+
+==================================================
+14. WALLETCONNECT DEFERRED
+==================================================
+
+DO NOT install WalletConnect SDKs in Phase 7.1.
+
+Do not implement:
+
+- WalletConnect pairing
+- QR pairing
+- deep linking
+- universal links
+- relay connections
+- WalletConnect namespaces
+- WalletConnect sessions
+- WalletConnect signing
+- WalletConnect approvals
+
+Those belong to a later Phase 7 sprint after this architecture is reviewed.
+
+==================================================
+15. BACKEND BOUNDARY
+==================================================
+
+DApp connections must not require WaveX backend custody infrastructure.
+
+Do not create backend APIs.
+
+Do not send:
+
+- private keys
+- recovery phrases
+- PINs
+- signing secrets
+- secure vault data
+
+to any backend.
+
+If future backend functionality is needed for optional metadata or notifications, it must remain outside the signing boundary.
+
+==================================================
+16. SECURITY / VALIDATION
+==================================================
+
+Add tests covering at minimum:
+
+- malformed DApp identity
+- invalid URLs
+- oversized metadata
+- duplicate session IDs
+- session account isolation
+- session network isolation
+- revoked sessions
+- expired sessions
+- unsupported request types
+- malformed request payloads
+- account mismatch
+- network mismatch
+- signing permission separation
+- connection permission does not imply signing permission
+- transaction request cannot contain secret material
+- message request cannot contain secret material
+- typed-data payload preservation
+- DApp cannot bypass transaction construction
+- DApp cannot bypass local signing
+- DApp cannot directly broadcast
+- DApp cannot silently change active network
+- repository isolation
+- deterministic lifecycle behavior
+
+Add security regression tests proving that:
+
+- no DApp model contains private keys
+- no DApp model contains mnemonic/recovery phrase
+- no DApp model contains PIN
+- no DApp model contains SecureStore values
+- no DApp module imports private-key export APIs
+- no DApp module directly calls eth_sendRawTransaction
+- no DApp module directly accesses SecureStore
+- no DApp module directly invokes LocalWalletEngine secret APIs
+
+Use static/source-boundary tests where practical.
+
+==================================================
+17. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+
+Create/update:
+
+src/core/dapp/README.md
+
+Document:
+
+- DApp trust boundary
+- connection vs authorization
+- session model
+- request model
+- signing boundary
+- transaction boundary
+- network-switch boundary
+- provider abstraction
+- WalletConnect intentionally deferred
+- persistence intentionally deferred
+- backend intentionally deferred
+- future request flow
+
+Be explicit that DApp metadata is untrusted.
+
+==================================================
+18. PREVIEW MODE
+==================================================
+
+Do not modify Preview Test Mode behavior except where required for safe compilation.
+
+Preview Test Mode must NOT:
+
+- create fake DApp sessions
+- generate fake DApp signatures
+- create fake transaction hashes
+- simulate successful DApp approvals
+- bypass authentication
+- bypass signing
+
+No fake production Web3 behavior.
+
+==================================================
+19. STRICTLY OUT OF SCOPE
+==================================================
+
+Do NOT implement:
+
+- WalletConnect SDK
+- DApp browser
+- QR scanner for DApps
+- deep links
+- universal links
+- real DApp connections
+- real DApp sessions
+- message signing
+- typed-data signing
+- DApp transaction signing
+- DApp transaction broadcasting
+- automatic network switching
+- persistent DApp sessions
+- backend DApp APIs
+- analytics
+- notifications
+- Activity integration
+- swap integration
+- new wallet/key architecture
+- changes to existing signing/broadcast engines
+
+==================================================
+20. VALIDATION
+==================================================
+
+After implementation run:
+
+1. DApp focused tests
+2. Full test suite
+3. TypeScript checks
+4. Expo validation
+5. Static iOS/Android bundle/build validation where already supported
+6. Git diff/security-boundary inspection
+
+Confirm:
+
+- no secrets introduced
+- no new backend
+- no new signing path
+- no direct broadcast path
+- no WalletConnect dependency
+- no unrelated changes
+
+Expected outcome:
+
+A clean provider-neutral DApp/Web3 architecture that can safely support a future WalletConnect integration without allowing DApps to bypass WaveX's existing wallet security architecture.
+
+STOP after Phase 7.1.
+Do not implement Phase 7.2 automatically.
+Return a concise but complete implementation report including files changed, tests, security boundaries, and any limitations.

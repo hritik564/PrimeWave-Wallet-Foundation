@@ -1,0 +1,30 @@
+export type DAppErrorCode =
+  | 'INVALID_IDENTITY'
+  | 'INVALID_URL'
+  | 'METADATA_TOO_LARGE'
+  | 'INVALID_SESSION'
+  | 'DUPLICATE_SESSION'
+  | 'SESSION_NOT_FOUND'
+  | 'SESSION_SCOPE_MISMATCH'
+  | 'SESSION_NOT_ACTIVE'
+  | 'INVALID_PERMISSION'
+  | 'PERMISSION_DENIED'
+  | 'INVALID_REQUEST'
+  | 'UNSUPPORTED_REQUEST'
+  | 'DUPLICATE_REQUEST'
+  | 'REQUEST_NOT_FOUND'
+  | 'INVALID_LIFECYCLE'
+  | 'REQUEST_EXPIRED'
+  | 'ACCOUNT_MISMATCH'
+  | 'NETWORK_MISMATCH'
+  | 'SECRET_MATERIAL';
+
+export class DAppError extends Error {
+  constructor(
+    public readonly code: DAppErrorCode,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'DAppError';
+  }
+}
