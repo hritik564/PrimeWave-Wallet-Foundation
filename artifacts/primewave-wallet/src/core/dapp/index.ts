@@ -84,6 +84,15 @@ export {
   parsePersonalSigningRequest,
   parseTypedDataSigningRequest,
 } from './signing/validation';
+export {
+  normalizeTransactionRequest,
+  type TransactionRequestNormalizationInput,
+} from './transaction-validation';
+export {
+  assertDAppTransactionBinding,
+  createDAppTransactionBinding,
+  type DAppTransactionBinding,
+} from './transaction-binding';
 export type {
   BoundedDisplay,
   ParsedPersonalMessage,

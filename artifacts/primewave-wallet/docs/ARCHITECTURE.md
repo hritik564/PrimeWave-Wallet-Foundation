@@ -1209,4 +1209,27 @@ website layout.
          integration. Complete.
      18. **Future ecosystem capabilities:** external token verification,
          state-changing token operations, NFTs, portfolio valuation, swaps, DApp
-       connectivity, and PrimeWave integrations remain deferred.
+     connectivity beyond the Phase 7.5 transaction flow, and PrimeWave
+     integrations remain deferred.
+
+## Phase 7.5 — DApp transaction requests
+
+Connected Reown/WalletConnect sessions may submit only `eth_sendTransaction`.
+The provider adapter validates the request, session, approved transaction
+capability, account, configured network, address, quantities, calldata, nonce,
+and mutually exclusive fee model before emitting a provider-neutral
+`DAppTransactionRequest`. `eth_sendRawTransaction` remains unsupported.
+
+The request maps into the existing `TransactionIntent`, construction engine,
+fee engine, review/authentication boundary, local signing engine, and
+broadcast/confirmation engine. A stable binding covers DApp/session identity,
+account, network, recipient, value, calldata, nonce, gas, fee values, type,
+and the unsigned canonical representation. The review never switches networks
+or silently repairs input.
+
+Native balance is checked before review and again immediately before signing.
+Recognized ERC-20 transfer calldata is checked against a read-only token
+balance; approvals and unknown calldata remain factual, untrusted contract
+interactions. Activity is created only after a broadcast result exists and is
+then updated by confirmation. Provider responses contain only the transaction
+hash after broadcast or a controlled protocol error.

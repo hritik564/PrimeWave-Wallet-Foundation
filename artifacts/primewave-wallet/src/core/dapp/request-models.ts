@@ -54,6 +54,11 @@ export interface DAppTransactionIntent {
   readonly chainId: bigint;
   readonly gasLimit: bigint | null;
   readonly nonce: bigint | null;
+  readonly gasPrice: bigint | null;
+  readonly maxFeePerGas: bigint | null;
+  readonly maxPriorityFeePerGas: bigint | null;
+  readonly feePreference: 'auto' | 'legacy' | 'eip1559';
+  readonly transactionType: 'legacy' | 'eip1559' | null;
 }
 
 export interface DAppChainRequestPayload {

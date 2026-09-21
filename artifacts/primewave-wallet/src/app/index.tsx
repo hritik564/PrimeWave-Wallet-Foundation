@@ -1,4 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
+import { encodeFunctionData } from 'viem';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
@@ -25,6 +26,7 @@ import {
   NetworkRegistryError,
 } from '@/src/core/networks';
 import type { EvmNetwork } from '@/src/core/networks';
+import { EvmAccountStateService } from '@/src/core/blockchain/account-state';
 import { createEvmRpcProvider } from '@/src/core/blockchain/rpc';
 import { createTransactionConstructionEngine } from '@/src/core/transactions/construction';
 import { TransactionBroadcastEngine } from '@/src/core/transactions/broadcast';
@@ -55,6 +57,7 @@ import {
   type DAppAuthorizationDecision,
   type DAppMessageSigningRequest,
   type DAppRequest,
+  type DAppTransactionRequest,
   type DAppTypedDataSigningRequest,
   type DAppApprovalStatus,
   type DAppSession,
@@ -73,6 +76,7 @@ import {
   type DAppSigningViewModel,
 } from '@/src/components/dapp/DAppMessageSigning.logic';
 import { DAppMessageSigningScreen } from '@/src/components/dapp/DAppMessageSigningScreen';
+import { DAppTransactionReviewScreen } from '@/src/components/dapp/DAppTransactionReviewScreen';
 import type { DAppTypedDataDocument } from '@/src/core/dapp/signing';
 import type { WalletConnectDAppTransport } from '@/src/core/dapp/providers/walletconnect';
 
@@ -94,6 +98,7 @@ type ViewName =
   | 'wallet'
   | 'dapp-approval'
   | 'dapp-signing'
+  | 'dapp-transaction'
   | 'security'
   | 'recovery';
 
@@ -761,6 +766,63 @@ export default function FoundationScreen() {
     },
     [previewMode],
   );
+  const getNativeBalance = useCallback(
+    async (networkId: string, address: string): Promise<bigint> => {
+      if (previewMode) {
+        throw new Error('DApp transaction execution is unavailable in Preview Test Mode.');
+      }
+      const activeNetwork = defaultNetworkRegistry.getActiveNetwork();
+      if (
+        !activeNetwork ||
+        activeNetwork.id !== networkId ||
+        activeNetwork.configurationStatus !== 'configured' ||
+        activeNetwork.chainId === null
+      ) {
+        throw new Error('The requested network is not available for execution.');
+      }
+      const provider = await createEvmRpcProvider(defaultNetworkRegistry);
+      const accountState = new EvmAccountStateService(defaultNetworkRegistry, provider);
+      return (await accountState.getNativeBalance(address)).raw;
+    },
+    [previewMode],
+  );
+  const getTokenBalance = useCallback(
+    async (networkId: string, tokenAddress: string, owner: string): Promise<bigint> => {
+      if (previewMode) {
+        throw new Error('DApp transaction execution is unavailable in Preview Test Mode.');
+      }
+      const activeNetwork = defaultNetworkRegistry.getActiveNetwork();
+      if (
+        !activeNetwork ||
+        activeNetwork.id !== networkId ||
+        activeNetwork.configurationStatus !== 'configured' ||
+        activeNetwork.chainId === null
+      ) {
+        throw new Error('The requested network is not available for execution.');
+      }
+      const provider = await createEvmRpcProvider(defaultNetworkRegistry);
+      const data = encodeFunctionData({
+        abi: [{
+          type: 'function',
+          name: 'balanceOf',
+          stateMutability: 'view',
+          inputs: [{ name: 'owner', type: 'address' }],
+          outputs: [{ name: 'balance', type: 'uint256' }],
+        }] as const,
+        functionName: 'balanceOf',
+        args: [owner as `0x${string}`],
+      });
+      const raw = await provider.request('eth_call', [
+        { to: tokenAddress, data },
+        'latest',
+      ]);
+      if (typeof raw !== 'string' || !/^0x[0-9a-f]+$/i.test(raw)) {
+        throw new Error('The token balance response was malformed.');
+      }
+      return BigInt(raw);
+    },
+    [previewMode],
+  );
   const [selectedNetwork, setSelectedNetwork] = useState<EvmNetwork>(
     () => defaultNetworkRegistry.getPrimaryNetwork(),
   );
@@ -790,6 +852,7 @@ export default function FoundationScreen() {
   const [dappSigningStatus, setDappSigningStatus] = useState<DAppSigningStatus>('received');
   const [dappSigningError, setDappSigningError] = useState<string | null>(null);
   const dappRequestRef = useRef<DAppRequest | null>(null);
+  const dappTransactionResponseSentRef = useRef(false);
   const [, setAccessRevision] = useState(0);
   const appState = useRef(AppState.currentState);
   const walletRef = useRef<Wallet | null>(null);
@@ -957,6 +1020,14 @@ export default function FoundationScreen() {
       } else if (event.type === 'request') {
         try {
           const request = event.request;
+          if (request.requestType === 'transaction') {
+            dappRequestRef.current = request;
+            dappTransactionResponseSentRef.current = false;
+            setDappRequest(request);
+            setDappError(null);
+            setView('dapp-transaction');
+            return;
+          }
           if (
             request.requestType !== 'message-signing' &&
             request.requestType !== 'typed-data-signing'
@@ -978,8 +1049,12 @@ export default function FoundationScreen() {
       } else if (event.type === 'error') {
         if (event.errorCode === 'PROVIDER_SESSION_EXPIRED') {
           if (dappRequestRef.current) {
-            setDappSigningStatus('expired');
-            setDappSigningError('This signing request expired.');
+            if (dappRequestRef.current.requestType === 'transaction') {
+              setDappError('This transaction request expired.');
+            } else {
+              setDappSigningStatus('expired');
+              setDappSigningError('This signing request expired.');
+            }
           } else {
             setDappStatus('expired');
           }
@@ -1038,7 +1113,8 @@ export default function FoundationScreen() {
                 approvedCapabilities: proposal.requestedCapabilities.filter(
                   (capability) =>
                     capability === 'account-access' ||
-                    capability === 'network-access',
+                    capability === 'network-access' ||
+                    capability === 'transaction-signing',
                 ),
               };
             },
@@ -1251,6 +1327,85 @@ export default function FoundationScreen() {
     setView('wallet');
   };
 
+  const handleDAppTransactionReject = async () => {
+    if (!dappTransport || !dappRequest || dappRequest.requestType !== 'transaction') {
+      return;
+    }
+    try {
+      await dappTransport.sendResponse({
+        requestId: dappRequest.requestId,
+        status: 'rejected',
+        errorCode: 'USER_REJECTED',
+      });
+      dappTransactionResponseSentRef.current = true;
+      setDappRequest(null);
+      dappRequestRef.current = null;
+      setDappError(null);
+      setView('wallet');
+    } catch (rejectionError) {
+      setDappError(safeMessage(rejectionError));
+    }
+  };
+
+  const handleDAppTransactionCompleted = async (hash: `0x${string}`) => {
+    if (!dappTransport || !dappRequest || dappRequest.requestType !== 'transaction') {
+      return;
+    }
+    try {
+      await dappTransport.sendResponse({
+        requestId: dappRequest.requestId,
+        status: 'completed',
+        result: hash,
+      });
+      dappTransactionResponseSentRef.current = true;
+      setDappError(null);
+    } catch (responseError) {
+      setDappError(safeMessage(responseError));
+    }
+  };
+
+  const handleDAppTransactionFailed = async (
+    code: 'EXECUTION_FAILED' | 'STALE_REQUEST' | 'UNKNOWN_RESULT',
+  ) => {
+    if (!dappTransport || !dappRequest || dappRequest.requestType !== 'transaction') {
+      return;
+    }
+    try {
+      await dappTransport.sendResponse({
+        requestId: dappRequest.requestId,
+        status: 'failed',
+        errorCode: code,
+      });
+      dappTransactionResponseSentRef.current = true;
+    } catch (responseError) {
+      setDappError(safeMessage(responseError));
+    }
+  };
+
+  const handleDAppTransactionDone = async () => {
+    if (
+      dappTransport &&
+      dappRequest?.requestType === 'transaction' &&
+      !dappTransactionResponseSentRef.current
+    ) {
+      try {
+        await dappTransport.sendResponse({
+          requestId: dappRequest.requestId,
+          status: 'failed',
+          errorCode: 'EXECUTION_FAILED',
+        });
+        dappTransactionResponseSentRef.current = true;
+      } catch (responseError) {
+        setDappError(safeMessage(responseError));
+        return;
+      }
+    }
+    dappRequestRef.current = null;
+    setDappRequest(null);
+    setDappError(null);
+    setView('wallet');
+  };
+
   const handleDAppDisconnect = async () => {
     if (!dappTransport || !dappSession) return;
     try {
@@ -1362,6 +1517,30 @@ export default function FoundationScreen() {
           dappRequest as DAppMessageSigningRequest | DAppTypedDataSigningRequest
         }
         status={dappSigningStatus}
+      />
+    );
+  }
+  else if (
+    view === 'dapp-transaction' &&
+    dappRequest?.requestType === 'transaction' &&
+    currentWallet
+  ) {
+    content = (
+      <DAppTransactionReviewScreen
+        activityService={activityService}
+        createBroadcastDependency={createBroadcastDependency}
+        createConstructionEngine={createConstructionEngine}
+        createSigningDependency={createSigningDependency}
+        getNativeBalance={getNativeBalance}
+        getTokenBalance={getTokenBalance}
+        network={selectedNetwork}
+        networkRegistry={defaultNetworkRegistry}
+        onCompleted={(hash) => void handleDAppTransactionCompleted(hash)}
+        onDone={handleDAppTransactionDone}
+        onFailed={(code) => void handleDAppTransactionFailed(code)}
+        onReject={() => void handleDAppTransactionReject()}
+        request={dappRequest as DAppTransactionRequest}
+        wallet={currentWallet}
       />
     );
   }

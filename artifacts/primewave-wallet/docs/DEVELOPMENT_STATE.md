@@ -565,3 +565,30 @@ increment.
   explicit states.
 - Added focused normalization and authorization tests. Preview mode does not
   create fake signing requests or signatures.
+
+## Phase 7.5 completion
+
+- Implemented real `eth_sendTransaction` request normalization in the
+  WalletConnect/Reown adapter. Raw DApp transaction broadcasting remains
+  unsupported.
+- Added strict account, session, request-ID, expiry, network, quantity,
+  calldata, nonce, gas, and fee-model validation. Explicit gas and fee values
+  are preserved through the existing construction engine.
+- Added DApp transaction binding over identity, request, session, account,
+  network, transaction fields, fee values, transaction type, and canonical
+  unsigned representation. Binding is rechecked before signing.
+- Added a DApp transaction review screen with DApp identity, account/network,
+  native value, contract/approval presentation, bounded calldata, gas, fee,
+  maximum total, warnings, explicit Confirm Transaction, Reject, and existing
+  PIN/biometric authentication.
+- Reused existing construction, local signing, broadcast, confirmation, and
+  Activity services. Activity begins after actual broadcast and receives
+  confirmation lifecycle updates. Unknown outcomes are not rebroadcast.
+- Added focused DApp transaction tests for safe quantities, fee conflicts,
+  malformed fields, exact calldata, native/contract intents, and binding
+  mutation detection.
+- Preview mode remains unavailable for DApp execution and does not fabricate
+  requests, signatures, hashes, broadcasts, or Activity. Physical-device
+  validation remains deferred.
+
+Phase 7.6 was not started.

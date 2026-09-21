@@ -19,6 +19,7 @@ import {
   type DAppTransportResponse,
   type DAppRequest,
   normalizeSigningRequest,
+  normalizeTransactionRequest,
   type SigningSessionRequestInput,
   InMemoryDAppSessionRepository,
   type DAppSessionRepository,
@@ -189,6 +190,7 @@ export class WalletConnectDAppTransport implements DAppTransport {
   private readonly sessionScopes = new Map<string, SessionScope>();
   private readonly pendingProposals = new Map<string, PendingProposal>();
   private readonly pendingRequests = new Map<string, PendingRequest>();
+  private readonly handledRequestIds = new Set<string>();
   private readonly now: () => number;
 
   private readonly onSessionProposal = (
@@ -341,25 +343,31 @@ export class WalletConnectDAppTransport implements DAppTransport {
       throw new DAppError('INVALID_REQUEST', 'The DApp request ID is invalid.');
     }
     try {
-      if (
-        (response.status === 'approved' || response.status === 'completed') &&
-        typeof response.result === 'string'
-      ) {
+      if (response.status === 'completed' && typeof response.result === 'string') {
         await this.walletKit.respondSessionRequest({
           topic: pending.event.topic,
           response: { id, jsonrpc: '2.0', result: response.result },
         });
       } else {
+        const error =
+          response.errorCode === 'EXECUTION_FAILED'
+            ? { code: -32000, message: 'The wallet could not execute the transaction.' }
+            : response.errorCode === 'STALE_REQUEST'
+              ? { code: -32000, message: 'The transaction request is stale.' }
+              : response.errorCode === 'UNKNOWN_RESULT'
+                ? { code: -32000, message: 'The transaction result is unknown.' }
+                : getSdkError('USER_REJECTED');
         await this.walletKit.respondSessionRequest({
           topic: pending.event.topic,
           response: {
             id,
             jsonrpc: '2.0',
-            error: getSdkError('USER_REJECTED'),
+            error,
           },
         });
       }
       this.pendingRequests.delete(response.requestId);
+      this.handledRequestIds.add(response.requestId);
     } catch {
       throw new DAppError(
         'PROVIDER_TRANSPORT_ERROR',
@@ -530,6 +538,15 @@ export class WalletConnectDAppTransport implements DAppTransport {
       this.emitError('SESSION_NOT_FOUND');
       return;
     }
+    const requestId = String(event.id);
+    if (this.handledRequestIds.has(requestId) || this.pendingRequests.has(requestId)) {
+      await this.rejectSessionRequest(event, {
+        code: -32000,
+        message: 'The DApp request has already been handled.',
+      });
+      this.emitError('DUPLICATE_REQUEST');
+      return;
+    }
     let session: DAppSession | null = null;
     try {
       session = this.repository.get(event.topic, scope);
@@ -547,8 +564,12 @@ export class WalletConnectDAppTransport implements DAppTransport {
       const network = this.options.registry.getByChainId(Number(chain));
       if (
         !network ||
+        !network.enabled ||
+        network.configurationStatus !== 'configured' ||
+        network.chainId === null ||
         !session.approvedChainIds.includes(chain) ||
-        !session.approvedNetworkIds.includes(network.id)
+        !session.approvedNetworkIds.includes(network.id) ||
+        !session.approvedCapabilities.includes('transaction-signing')
       ) {
         throw new DAppError('NETWORK_MISMATCH', 'The request network is not approved.');
       }
@@ -567,8 +588,22 @@ export class WalletConnectDAppTransport implements DAppTransport {
           ? event.params.request.expiryTimestamp * 1_000
           : session.expiresAt,
       };
-      const request = normalizeSigningRequest(input);
-      this.pendingRequests.set(String(event.id), { event, request });
+      const request =
+        event.params.request.method === 'eth_sendTransaction'
+          ? normalizeTransactionRequest({
+              requestId: requestId,
+              sessionId: event.topic,
+              identity: session.identity,
+              accountId: session.accountId,
+              walletAddress: session.walletAddress,
+              networkId: network.id,
+              chainId: chain,
+              createdAt: this.now(),
+              expiresAt: input.expiresAt,
+              params: event.params.request.params,
+            })
+          : normalizeSigningRequest(input);
+      this.pendingRequests.set(requestId, { event, request });
       this.emit({ type: 'request', request });
       return;
     } catch (error) {

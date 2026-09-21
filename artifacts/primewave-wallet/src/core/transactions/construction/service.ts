@@ -35,7 +35,11 @@ import type {
 
 function normalizeQuantity(
   value: unknown,
-  errorCode: 'INVALID_VALUE' | 'INVALID_NONCE' | 'INVALID_GAS_LIMIT',
+  errorCode:
+    | 'INVALID_VALUE'
+    | 'INVALID_NONCE'
+    | 'INVALID_GAS_LIMIT'
+    | 'INVALID_TRANSACTION',
 ): bigint {
   if (typeof value === 'bigint') {
     if (value < 0n) {
@@ -93,6 +97,13 @@ function normalizePreference(value: unknown): TransactionFeePreference {
   throw new TransactionConstructionError('INVALID_TRANSACTION');
 }
 
+function normalizeOptionalFee(
+  value: unknown,
+): bigint | undefined {
+  if (value === undefined) return undefined;
+  return normalizeQuantity(value, 'INVALID_TRANSACTION');
+}
+
 function determineTransactionType(
   requested: unknown,
   data: `0x${string}`,
@@ -135,6 +146,25 @@ function normalizeIntent(intent: TransactionIntent): NormalizedTransactionIntent
   if (gasLimit === 0n) {
     throw new TransactionConstructionError('INVALID_GAS_LIMIT');
   }
+  const gasPrice = normalizeOptionalFee(intent.fee?.gasPrice);
+  const maxFeePerGas = normalizeOptionalFee(intent.fee?.maxFeePerGas);
+  const maxPriorityFeePerGas = normalizeOptionalFee(
+    intent.fee?.maxPriorityFeePerGas,
+  );
+  if (
+    gasPrice !== undefined &&
+    (maxFeePerGas !== undefined || maxPriorityFeePerGas !== undefined)
+  ) {
+    throw new TransactionConstructionError('INVALID_TRANSACTION');
+  }
+  if (
+    (maxFeePerGas === undefined) !== (maxPriorityFeePerGas === undefined) ||
+    (maxPriorityFeePerGas !== undefined &&
+      maxFeePerGas !== undefined &&
+      maxPriorityFeePerGas > maxFeePerGas)
+  ) {
+    throw new TransactionConstructionError('INVALID_TRANSACTION');
+  }
 
   return {
     networkId: intent.networkId,
@@ -146,6 +176,9 @@ function normalizeIntent(intent: TransactionIntent): NormalizedTransactionIntent
     gasLimit,
     transactionType: determineTransactionType(intent.transactionType, data),
     feePreference: normalizePreference(intent.fee?.preference),
+    gasPrice,
+    maxFeePerGas,
+    maxPriorityFeePerGas,
   };
 }
 
@@ -434,7 +467,7 @@ export class TransactionConstructionEngine {
         }
         assertMatchingContext(this.registry, this.provider, this.network);
 
-        const feeData = await this.readFeeData(normalized.feePreference);
+        const feeData = await this.readFeeData(normalized.feePreference, normalized);
         if (feeData.model === 'unavailable') {
           throw new TransactionConstructionError('FEE_UNAVAILABLE');
         }
@@ -522,8 +555,27 @@ export class TransactionConstructionEngine {
 
   private async readFeeData(
     preference: TransactionFeePreference,
+    overrides?: Pick<
+      NormalizedTransactionIntent,
+      'gasPrice' | 'maxFeePerGas' | 'maxPriorityFeePerGas'
+    >,
   ): Promise<Awaited<ReturnType<GasFeeEngineDependency['getFeeData']>>> {
     try {
+      if (overrides?.gasPrice !== undefined) {
+        const current = await this.gasFeeEngine.getLegacyFeeData();
+        return { ...current, gasPrice: overrides.gasPrice };
+      }
+      if (
+        overrides?.maxFeePerGas !== undefined &&
+        overrides.maxPriorityFeePerGas !== undefined
+      ) {
+        const current = await this.gasFeeEngine.getEip1559FeeData();
+        return {
+          ...current,
+          maxFeePerGas: overrides.maxFeePerGas,
+          maxPriorityFeePerGas: overrides.maxPriorityFeePerGas,
+        };
+      }
       if (preference === 'legacy') {
         return await this.gasFeeEngine.getLegacyFeeData();
       }

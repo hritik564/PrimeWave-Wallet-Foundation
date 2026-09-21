@@ -10,6 +10,9 @@ export interface PublicWalletAccount {
 
 export interface TransactionFeeConfiguration {
   readonly preference?: TransactionFeePreference;
+  readonly gasPrice?: GasQuantityInput;
+  readonly maxFeePerGas?: GasQuantityInput;
+  readonly maxPriorityFeePerGas?: GasQuantityInput;
 }
 
 export interface TransactionIntent {
@@ -34,6 +37,9 @@ export interface NormalizedTransactionIntent {
   readonly gasLimit?: bigint;
   readonly transactionType: TransactionType;
   readonly feePreference: TransactionFeePreference;
+  readonly gasPrice?: bigint;
+  readonly maxFeePerGas?: bigint;
+  readonly maxPriorityFeePerGas?: bigint;
 }
 
 export interface UnsignedTransactionBase {

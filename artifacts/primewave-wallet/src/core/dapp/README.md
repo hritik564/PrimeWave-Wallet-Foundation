@@ -92,6 +92,42 @@ through the existing adapter boundary. Message signing, typed-data signing,
 transaction execution, broadcasting, automatic network switching, and DApp
 management are deferred.
 
+## Phase 7.5 transaction requests
+
+The WalletConnect/Reown adapter accepts only `eth_sendTransaction` for
+transaction execution. It rejects `eth_sendRawTransaction`; a DApp never
+provides bytes for WAVEX to blindly broadcast. The adapter validates the
+session, request ID, expiry, account, approved transaction capability,
+configured/enabled network, recipient, value, calldata, nonce, gas, and fee
+model, then emits a `DAppTransactionRequest`.
+
+The request is mapped to the existing `TransactionIntent`. The existing
+construction engine preserves supplied nonce, gas, and explicit legacy or
+EIP-1559 fee values. The review screen binds DApp identity, request/session,
+account, network, recipient, value, calldata, nonce, gas, fee values, type,
+and the canonical unsigned transaction. A changed context or rebuilt
+transaction blocks signing and requires a new review.
+
+The screen displays the DApp name and domain, account, network and chain,
+native value, contract interaction or confidently decoded transfer/approval
+shape, bounded calldata for unknown methods, gas, estimated fee, maximum fee,
+maximum total native amount, and neutral warnings. Native balance is checked
+before review and before signing. Decoded transfers also require an
+authoritative token balance; approvals are shown without treating the spender
+or metadata as trusted.
+
+Confirming uses the existing authentication and local signing boundary. The
+existing broadcast and confirmation engines receive the signed transaction.
+Only an actual broadcast creates Activity; confirmation updates its status.
+The provider receives the transaction hash after successful broadcast, while
+rejection, execution failure, stale review, and unknown outcomes remain
+separate controlled errors. No automatic network switch or rebroadcast occurs.
+
+Preview/browser mode is intentionally unavailable for DApp transaction
+execution. It creates no fake requests, signatures, hashes, broadcasts, or
+Activity. Validation on a physical device using a standalone native build is
+deferred.
+
 ## Network requests
 
 Chain requests preserve requested chain, active chain, session-approved chains,

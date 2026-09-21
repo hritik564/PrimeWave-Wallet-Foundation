@@ -1353,3 +1353,30 @@ and unnecessary permissions.
 No backend endpoints are created for mnemonic, seed, privateKey, signingKey,
 walletPassword, walletPin, or encryptionKey fields. The current backend
 remains unchanged.
+
+## Phase 7.5 transaction security boundary
+
+`eth_sendTransaction` is normalized at the WalletConnect/Reown adapter edge.
+The DApp supplies public intent only; it never supplies a raw signed
+transaction, private key, signer, PIN, mnemonic, SecureStore value, or
+broadcast handle. Provider request IDs are single-use in the transport
+instance, and a pending duplicate is rejected.
+
+The exact `from` address must match the approved session account and current
+wallet account. The chain must be approved by the session and be registered,
+enabled, configured, and non-placeholder. Network switching is not performed.
+`to`, value, calldata, nonce, gas, and fee fields are validated without
+repair. Legacy and EIP-1559 fee models cannot be mixed.
+
+Review binding includes the request and session IDs, DApp identity, account,
+sender, network, recipient, value, calldata, nonce, gas limit, fee model and
+values, transaction type, and canonical unsigned transaction. Rebuilding a
+different transaction, changing the balance, or changing the wallet context
+invalidates the flow. Authentication and the existing one-shot signing
+capability remain mandatory.
+
+The existing broadcast engine receives the exact signed bytes. Its
+deduplication and unknown-result behavior remain authoritative; no automatic
+rebroadcast occurs. Activity begins only after an actual broadcast result and
+confirmation updates the resulting lifecycle record. Preview mode cannot
+fabricate a DApp request, signature, hash, broadcast, or Activity record.

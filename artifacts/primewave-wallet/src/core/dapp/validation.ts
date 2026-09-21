@@ -474,6 +474,59 @@ function validateTransactionPayload(value: unknown): DAppTransactionIntent {
     value.nonce === null || value.nonce === undefined
       ? null
       : exactChainId(value.nonce, 'Transaction nonce');
+  const gasPrice =
+    value.gasPrice === null || value.gasPrice === undefined
+      ? null
+      : exactChainId(value.gasPrice, 'Transaction gas price');
+  const maxFeePerGas =
+    value.maxFeePerGas === null || value.maxFeePerGas === undefined
+      ? null
+      : exactChainId(value.maxFeePerGas, 'Transaction max fee per gas');
+  const maxPriorityFeePerGas =
+    value.maxPriorityFeePerGas === null ||
+    value.maxPriorityFeePerGas === undefined
+      ? null
+      : exactChainId(
+          value.maxPriorityFeePerGas,
+          'Transaction max priority fee per gas',
+        );
+  if (
+    gasPrice !== null &&
+    (maxFeePerGas !== null || maxPriorityFeePerGas !== null)
+  ) {
+    return fail(
+      'INVALID_REQUEST',
+      'Legacy and EIP-1559 fee fields cannot be combined.',
+    );
+  }
+  if (
+    (maxFeePerGas === null) !== (maxPriorityFeePerGas === null) ||
+    (maxPriorityFeePerGas !== null &&
+      maxFeePerGas !== null &&
+      maxPriorityFeePerGas > maxFeePerGas)
+  ) {
+    return fail('INVALID_REQUEST', 'EIP-1559 fee fields are invalid.');
+  }
+  const feePreference =
+    value.feePreference === 'legacy' ||
+    value.feePreference === 'eip1559' ||
+    value.feePreference === 'auto'
+      ? value.feePreference
+      : gasPrice !== null
+        ? 'legacy'
+        : maxFeePerGas !== null
+          ? 'eip1559'
+          : 'auto';
+  const transactionType =
+    value.transactionType === 'legacy' || value.transactionType === 'eip1559'
+      ? value.transactionType
+      : null;
+  if (
+    (transactionType === 'legacy' && maxFeePerGas !== null) ||
+    (transactionType === 'eip1559' && gasPrice !== null)
+  ) {
+    return fail('INVALID_REQUEST', 'Transaction type conflicts with fee fields.');
+  }
   return Object.freeze({
     kind: 'transaction' as const,
     from: normalizeAddress(value.from, 'Transaction sender'),
@@ -483,6 +536,11 @@ function validateTransactionPayload(value: unknown): DAppTransactionIntent {
     chainId: exactChainId(value.chainId, 'Transaction chain ID'),
     gasLimit,
     nonce,
+    gasPrice,
+    maxFeePerGas,
+    maxPriorityFeePerGas,
+    feePreference,
+    transactionType,
   });
 }
 
