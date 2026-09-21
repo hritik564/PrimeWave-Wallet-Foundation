@@ -22,6 +22,40 @@ Future developers and agents must never:
 This is a permanent architectural invariant, not a temporary implementation
 choice.
 
+## Phase 7.1 DApp boundary
+
+The DApp core is a public-input boundary, not a wallet-secret boundary.
+`src/core/dapp` models contain DApp metadata, public wallet/account context,
+network context, permissions, request payloads, and lifecycle state only.
+Private keys, recovery phrases, PINs, secure-vault values, and signing handles
+are not valid DApp model fields.
+
+DApp metadata is untrusted. URL schemes, credentials, lengths, malformed
+values, request payloads, account scope, network scope, and lifecycle states
+are validated before entering the in-memory models. Metadata never creates a
+trusted-DApp classification.
+
+Sessions are bounded and in-memory only. They are isolated by account and
+network, and revoked or expired sessions cannot satisfy permissions.
+Connection/account/network access is separate from message-signing and
+transaction-signing authorization. No capability is automatically granted.
+
+Transaction requests express public intent only. The DApp boundary cannot call
+the local wallet engine, access secure storage, obtain a raw signer, invoke
+`eth_sendRawTransaction`, or change the active network. Future execution must
+remain:
+
+```text
+DApp request → validation → WaveX review → existing construction
+  → explicit authorization → existing local signing
+  → existing broadcast/confirmation
+```
+
+Typed-data payloads are retained as exact provider-supplied input for future
+cryptographic binding; this phase does not parse or sign them. The transport
+interface is provider-neutral and no WalletConnect, pairing, deep-link, QR,
+backend, or persistent-session implementation exists.
+
 ## 1. Security principles
 
 - **Non-custodial architecture:** signing authority remains on the user's

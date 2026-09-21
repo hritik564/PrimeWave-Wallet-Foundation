@@ -1,5 +1,5 @@
 import { DAppError } from './errors';
-import type { DAppRequest, DAppRequestInput } from './request-models';
+import type { DAppRequest } from './request-models';
 import { validateDAppRequest } from './validation';
 
 const TERMINAL_STATUSES = new Set<DAppRequest['status']>([
@@ -43,7 +43,7 @@ function cloneRequest(request: DAppRequest): DAppRequest {
 export class DAppRequestService {
   private readonly requests = new Map<string, DAppRequest>();
 
-  create(input: DAppRequestInput): DAppRequest {
+  create(input: unknown): DAppRequest {
     const request = validateDAppRequest(input);
     if (this.requests.has(request.requestId)) {
       throw new DAppError('DUPLICATE_REQUEST', 'DApp request ID already exists.');

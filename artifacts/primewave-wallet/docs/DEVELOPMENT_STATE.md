@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 6.5 — Secure Local Swap Execution (implemented; requires device/testnet/security validation)**
+**Phase 7.1 — Provider-neutral DApp/Web3 connection architecture (implemented; no real connections)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -482,12 +482,25 @@ UI testing; it is not a real wallet and does not alter the native boundary.
   fails closed rather than using browser storage.
 - There has been no full external security audit.
 
+## Phase 7.1 completion
+
+- Added the provider-neutral `src/core/dapp` architecture for untrusted public
+  DApp metadata, scoped in-memory sessions, explicit permissions, request
+  validation, transaction intent, typed-data preservation, chain-request
+  context, deterministic lifecycle, and future transport integration.
+- Added focused DApp security tests for malformed metadata, URL and size
+  validation, duplicate and bounded sessions, account/network isolation,
+  revoked/expired state, permission separation, request mismatches, secret
+  material rejection, typed-data preservation, lifecycle behavior, and static
+  security boundaries.
+- Phase 7.1 does not add UI, WalletConnect, pairing, deep links, real DApp
+  connections, signing, broadcasting, persistence, backend APIs, analytics,
+  notifications, or automatic network switching.
+
 ## Phase boundary
 
-Phase 6.4 is complete and stops at a public **Approved for Signing** result.
-Phase 6.5 may separately define signing handoff and execution. Provider
-transaction integration, local signing/broadcast execution, external indexing,
-backend history, notifications, external verification, token state-changing
-operations, NFTs, portfolio valuation, fiat pricing, DApps, WalletConnect,
-replacement, speed-up, cancellation, automatic fee bumping, and other
-ecosystem capabilities remain outside this increment.
+Phase 7.1 is complete and stops at a provider-neutral DApp architecture.
+Future provider integration must preserve the public-only models, explicit
+authorization boundary, existing transaction pipeline, and no-secret invariant.
+WalletConnect, real connections, signing, broadcasting, persistence, backend
+APIs, and automatic network switching remain outside this increment.

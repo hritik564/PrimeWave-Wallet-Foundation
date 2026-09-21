@@ -15,3 +15,4 @@
 - [Expo preview timing](expo-preview-timing.md) — retry screenshots after Metro emits the web bundle if the first post-restart capture is blank.
 - [Swap quote trust boundary](swap-quote-boundary.md) — provider quote data stays untrusted through validation; route continuity and exact public context must hold before any future signing handoff.
 - [Swap execution boundary](swap-execution-boundary.md) — missing allowance blocks token execution; bounded approval and swap authorization remain separate explicit actions.
+- [DApp public boundary](dapp-public-boundary.md) — DApp input stays public and untrusted; session scope, permissions, and future execution remain separate.

@@ -577,17 +577,19 @@ export function validateDAppRequest(value: unknown): DAppRequest {
   validateNoSecretMaterial(value);
   const context = validateRequestContext(value);
   const payload = validatePayload(context.requestType, value.payload);
-  if (
-    context.requestType === 'transaction' &&
-    (payload.chainId !== context.chainId ||
-      payload.from !== context.walletAddress)
-  ) {
-    return fail(
-      payload.chainId !== context.chainId
-        ? 'NETWORK_MISMATCH'
-        : 'ACCOUNT_MISMATCH',
-      'Transaction context does not match the request scope.',
-    );
+  if (context.requestType === 'transaction') {
+    const transaction = payload as DAppTransactionIntent;
+    if (
+      transaction.chainId !== context.chainId ||
+      transaction.from !== context.walletAddress
+    ) {
+      return fail(
+        transaction.chainId !== context.chainId
+          ? 'NETWORK_MISMATCH'
+          : 'ACCOUNT_MISMATCH',
+        'Transaction context does not match the request scope.',
+      );
+    }
   }
   return Object.freeze({
     ...context,

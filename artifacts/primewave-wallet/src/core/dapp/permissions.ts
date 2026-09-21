@@ -19,25 +19,19 @@ export function hasDAppPermission(
   networkId: string,
   now = Date.now(),
 ): boolean {
-  return session.permissions.some(
-    (permission) =>
-      permission.capability === capability &&
-      permission.accountId === accountId &&
-      (permission.networkId === null || permission.networkId === networkId) &&
-      permission.revokedAt === null &&
-      permission.grantedAt <= now &&
-      !session.approvedCapabilities.includes(capability),
-  )
-    ? false
-    : session.permissions.some(
-        (permission) =>
-          permission.capability === capability &&
-          permission.accountId === accountId &&
-          (permission.networkId === null || permission.networkId === networkId) &&
-          permission.revokedAt === null &&
-          permission.grantedAt <= now &&
-          session.approvedCapabilities.includes(capability),
-      );
+  return (
+    session.status === 'active' &&
+    (session.expiresAt === null || session.expiresAt > now) &&
+    session.approvedCapabilities.includes(capability) &&
+    session.permissions.some(
+      (permission) =>
+        permission.capability === capability &&
+        permission.accountId === accountId &&
+        (permission.networkId === null || permission.networkId === networkId) &&
+        permission.revokedAt === null &&
+        permission.grantedAt <= now,
+    )
+  );
 }
 
 export function assertDAppPermission(

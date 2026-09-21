@@ -1,4 +1,5 @@
 import { DAppError } from './errors';
+import { validateDAppSession } from './validation';
 import type {
   DAppPermission,
   DAppSession,
@@ -70,13 +71,14 @@ export class InMemoryDAppSessionRepository implements DAppSessionRepository {
   }
 
   create(session: DAppSession): DAppSession {
-    if (this.sessions.has(session.sessionId)) {
+    const validated = validateDAppSession(session);
+    if (this.sessions.has(validated.sessionId)) {
       throw new DAppError('DUPLICATE_SESSION', 'DApp session ID already exists.');
     }
     if (this.sessions.size >= this.maxSessions) {
       throw new DAppError('INVALID_SESSION', 'DApp session capacity has been reached.');
     }
-    const stored = cloneSession(session);
+    const stored = cloneSession(validated);
     this.sessions.set(stored.sessionId, stored);
     return cloneSession(stored);
   }
@@ -109,7 +111,7 @@ export class InMemoryDAppSessionRepository implements DAppSessionRepository {
     update: DAppSessionUpdate,
   ): DAppSession {
     const current = this.require(sessionId, scope);
-    const next = cloneSession({
+    const next = validateDAppSession({
       ...current,
       ...update,
       sessionId: current.sessionId,

@@ -116,6 +116,25 @@ No authentication, database, indexer, price aggregation, notifications, or
 custody services are created in Phase 0A. Any future backend must preserve the
 mobile app's independent operation and the non-custodial security boundary.
 
+## Phase 7.1 — provider-neutral DApp architecture
+
+Phase 7.1 adds a UI-independent `src/core/dapp` boundary for future Web3
+connections. It defines public-only DApp identity, session, permission,
+request, transaction-intent, typed-data, network-request, lifecycle, repository,
+and transport contracts.
+
+All DApp metadata and requests are untrusted input. Sessions are in-memory only
+and explicitly scoped to account and network. Connection permission does not
+imply message-signing or transaction-signing permission. DApp transaction
+intent is required to flow through the existing review, construction,
+authorization, signing, and broadcast boundaries; no alternate signing or
+broadcast path is present.
+
+The transport is provider-neutral and interface-only. WalletConnect, QR
+pairing, deep links, browser integration, real connections, persistent
+sessions, backend APIs, network switching, signing, and broadcasting remain
+deferred.
+
 ## Security boundary
 
 Signing material stays on the user's device. The backend must never receive
