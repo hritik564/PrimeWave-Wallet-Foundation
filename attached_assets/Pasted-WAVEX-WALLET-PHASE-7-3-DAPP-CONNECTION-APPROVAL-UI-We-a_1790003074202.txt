@@ -1,0 +1,635 @@
+WAVEX WALLET — PHASE 7.3
+DAPP CONNECTION & APPROVAL UI
+
+We are continuing the existing WaveX Wallet project.
+
+Phase 7.1 = provider-neutral DApp/Web3 architecture
+Phase 7.2 = real WalletConnect/Reown transport/session layer
+
+Now implement ONLY Phase 7.3:
+A real user-facing DApp connection proposal and approval experience.
+
+==================================================
+1. STRICT WORKFLOW
+==================================================
+
+Implement ONLY Phase 7.3.
+
+Do not start Phase 7.4 automatically.
+
+Do not implement message signing.
+Do not implement typed-data signing.
+Do not implement DApp transaction signing.
+Do not implement DApp transaction broadcasting.
+Do not implement automatic network switching.
+Do not redesign existing Home, Assets, Send, Activity, or Swap screens.
+
+Use the existing WaveX visual system and existing navigation architecture.
+
+Do not create fake successful WalletConnect sessions.
+
+Real WalletConnect/Reown transport from Phase 7.2 remains authoritative.
+
+==================================================
+2. OBJECTIVE
+==================================================
+
+When a real WalletConnect/Reown DApp proposal arrives, WaveX must present an explicit user approval experience.
+
+Conceptual flow:
+
+DApp
+ ↓
+WalletConnect proposal
+ ↓
+Phase 7.2 provider adapter
+ ↓
+WaveX DApp core
+ ↓
+DApp Connection Approval Screen
+ ↓
+User:
+   Approve
+   OR
+   Reject
+ ↓
+Phase 7.2 provider adapter
+ ↓
+WalletConnect session established OR rejected
+
+There must be NO automatic approval.
+
+==================================================
+3. UI DESIGN LANGUAGE
+==================================================
+
+Follow the established WaveX visual language:
+
+- dark futuristic interface
+- cyan / electric blue / violet accents
+- subtle gradients
+- restrained glow
+- rounded cards
+- premium wallet aesthetic
+- clean typography
+- strong visual hierarchy
+- mobile-first
+- accessible touch targets
+- polished loading/error states
+
+Do NOT redesign the application globally.
+
+Use existing:
+
+- theme
+- typography
+- spacing
+- buttons
+- cards
+- navigation
+- icons
+- modal/sheet conventions
+
+The UI should feel like a natural WaveX feature.
+
+==================================================
+4. DAPP CONNECTION SCREEN
+==================================================
+
+Create a dedicated connection approval experience.
+
+Suggested file structure:
+
+src/components/
+  dapp/
+    DAppConnectionApprovalScreen.tsx
+    DAppConnectionApproval.logic.ts
+    tests/
+
+Use existing architecture conventions if equivalent files already exist.
+
+The screen must display:
+
+DApp identity:
+
+- DApp name
+- DApp URL/domain
+- DApp icon when safely available
+- safe fallback icon when unavailable
+
+Never imply that the DApp is verified merely because metadata exists.
+
+If the icon fails to load or is unavailable:
+
+- use deterministic WaveX fallback
+- never block approval solely because the icon is unavailable
+
+==================================================
+5. SECURITY / TRUST PRESENTATION
+==================================================
+
+The UI must clearly communicate that:
+
+- the DApp is requesting wallet connection
+- the DApp will see the approved public wallet address
+- connection does NOT give the DApp the private key
+- connection does NOT give the DApp automatic signing authority
+
+Do NOT use misleading labels such as:
+
+"Trusted DApp"
+"Verified DApp"
+"Safe DApp"
+
+unless the application has authoritative verification data.
+
+We do NOT have such verification in this phase.
+
+Use neutral wording.
+
+==================================================
+6. ACCOUNT DISPLAY
+==================================================
+
+Show the WaveX account that is being proposed for connection.
+
+Display:
+
+- account label
+- shortened public address
+- optionally full address in a secondary/detail area
+
+Provide copy-address behavior using the existing clipboard architecture.
+
+Do not read clipboard contents.
+
+Do not display:
+
+- private key
+- recovery phrase
+- PIN
+- vault information
+
+==================================================
+7. NETWORK / CHAIN DISPLAY
+==================================================
+
+Show every requested network that has successfully passed Phase 7.2 validation.
+
+For each network display:
+
+- network name
+- chain ID where appropriate
+- network badge/icon where available
+- configured/unconfigured state
+
+Only approved/configured networks can reach the approval state.
+
+If the proposal contains an unsupported or unconfigured network:
+
+- show a clear neutral explanation
+- prevent approval if required by the provider/session model
+- do not silently remove the unsupported network and approve the remainder unless the provider protocol explicitly supports partial approval and the implementation is verified
+
+Do not automatically change the active WaveX network.
+
+Important:
+
+The user's current active network must remain unchanged merely because a DApp connection proposal arrives.
+
+==================================================
+8. REQUESTED CAPABILITIES
+==================================================
+
+Display the capabilities requested by the DApp in a human-readable manner.
+
+For example:
+
+- View wallet address
+- Access selected network(s)
+
+Do NOT tell the user that the DApp can sign transactions if signing has not been granted.
+
+Connection permissions and signing permissions remain separate.
+
+If the provider proposal contains unsupported future capabilities such as signing or transaction methods:
+
+- represent them accurately
+- mark them as unsupported/not available in this phase
+- do not silently grant them
+- do not execute them
+
+Do not create fake support.
+
+==================================================
+9. APPROVE / REJECT
+==================================================
+
+Provide two explicit actions:
+
+PRIMARY:
+"Connect"
+
+SECONDARY:
+"Reject"
+
+The user must make an explicit choice.
+
+No automatic approval after timeout.
+
+No approval merely because the screen was opened.
+
+No approval from background processing.
+
+==================================================
+10. APPROVAL CHECKPOINT
+==================================================
+
+Before calling the Phase 7.2 provider approval method, perform a final validation checkpoint.
+
+Revalidate:
+
+- proposal still exists
+- proposal is not expired
+- DApp identity unchanged
+- account context unchanged
+- requested chains unchanged
+- supported capabilities unchanged
+- WaveX wallet context still valid
+- active account still matches
+- networks are still configured/enabled
+
+If any relevant context changed:
+
+- do NOT approve
+- show a controlled stale-proposal/error state
+- require a fresh proposal if appropriate
+
+Do not approve a stale proposal.
+
+==================================================
+11. REJECTION FLOW
+==================================================
+
+Rejecting must:
+
+- explicitly reject the provider proposal
+- remove/resolve the pending proposal state
+- return the user safely to the previous wallet context
+
+Do not create a session.
+
+Use the provider's proper rejection mechanism through the existing adapter.
+
+Do not directly call provider SDK APIs from the UI if the Phase 7.2 adapter already provides an abstraction.
+
+==================================================
+12. APPROVAL FLOW
+==================================================
+
+Approving must:
+
+1. Perform final proposal validation.
+2. Build the approved public session context.
+3. Call the existing Phase 7.2 authorization boundary.
+4. Allow the provider adapter to perform the real WalletConnect approval.
+5. Receive the resulting session.
+6. Store/update the session through the existing DApp session repository.
+7. Show a successful connected state.
+8. Return to the appropriate wallet context.
+
+The UI must NOT construct raw WalletConnect namespaces itself unless the existing Phase 7.2 adapter explicitly requires a validated DTO for that purpose.
+
+Keep provider-specific logic in the provider adapter.
+
+==================================================
+13. CONNECTED DAPP STATE
+==================================================
+
+After a successful real session, provide a lightweight connected-state representation.
+
+Do not build the complete DApp management system yet.
+
+At minimum the user should be able to see:
+
+- DApp name
+- domain
+- connected account
+- connected networks
+- connection status
+
+Provide a disconnect/revoke action if it can be safely wired to the existing Phase 7.2 session deletion/revocation boundary.
+
+Do NOT implement signing from this screen.
+
+==================================================
+14. PENDING PROPOSAL MANAGEMENT
+==================================================
+
+Create a clean pending-proposal state model.
+
+It must distinguish:
+
+- no pending proposal
+- proposal received
+- proposal being reviewed
+- approving
+- rejecting
+- approved
+- rejected
+- expired
+- stale
+- failed
+
+Prevent duplicate handling.
+
+If the same proposal is opened twice:
+
+- do not create two sessions
+- do not call approval twice
+
+Concurrent approval/rejection actions must be guarded.
+
+==================================================
+15. APP LIFECYCLE
+==================================================
+
+Handle app background/foreground safely.
+
+If the app backgrounds while a proposal is pending:
+
+- preserve the pending proposal only if the provider/session lifecycle allows it
+- never auto-approve
+- never lose security context silently
+- revalidate the proposal before approval
+
+If the proposal expires while the app is backgrounded:
+
+- show expired state
+- do not approve it
+
+Do not modify the existing wallet AppState locking architecture unless strictly required.
+
+==================================================
+16. ACCOUNT / NETWORK CHANGES
+==================================================
+
+If the user changes active account or active network while a proposal is pending:
+
+- invalidate the proposal approval context
+- do not approve using stale account/network information
+- require the proposal to be re-evaluated
+
+A DApp connection proposal must never accidentally connect the wrong account.
+
+==================================================
+17. ICON / METADATA SAFETY
+==================================================
+
+DApp metadata is untrusted.
+
+Do not:
+
+- execute remote content
+- load arbitrary JavaScript
+- treat domain metadata as verified
+- use icon URLs as security proof
+
+For remote icons:
+
+- use bounded loading
+- fail safely
+- use fallback
+- avoid leaking sensitive wallet information in requests
+
+If a safe image-loading architecture already exists, reuse it.
+
+==================================================
+18. NAVIGATION
+==================================================
+
+Integrate the approval screen into the existing navigation architecture without restructuring the whole application.
+
+The connection screen should be reachable when a real Phase 7.2 proposal is received.
+
+Do not add a fake "Connect DApp" button that generates a fake proposal.
+
+If manual navigation is useful for development, it must show an unavailable/no-pending-proposal state rather than pretending a real proposal exists.
+
+==================================================
+19. PREVIEW TEST MODE
+==================================================
+
+Preview Test Mode MUST NOT create fake DApp connections.
+
+In browser Preview:
+
+- no fake WalletConnect proposal
+- no fake session
+- no fake connected DApp
+- no fake approval
+- no fake signing
+
+If the real provider transport is unavailable in Preview, show:
+
+"DApp connections are available in the native WaveX build."
+
+Do not bypass the real transport.
+
+==================================================
+20. NO SIGNING
+==================================================
+
+STRICTLY OUT OF SCOPE.
+
+Do NOT implement:
+
+- personal_sign
+- eth_sign
+- eth_signTypedData
+- eth_signTypedData_v4
+- EIP-712 signing
+- message signing
+- transaction signing
+- raw transaction signing
+
+A connected DApp must not be able to sign merely because it is connected.
+
+==================================================
+21. NO TRANSACTION EXECUTION
+==================================================
+
+STRICTLY OUT OF SCOPE.
+
+Do NOT implement:
+
+- eth_sendTransaction
+- eth_sendRawTransaction
+- transaction review from DApps
+- transaction construction from DApp requests
+- broadcasting
+- Activity integration
+- swap integration
+
+These belong to later phases.
+
+==================================================
+22. NO NETWORK SWITCHING
+==================================================
+
+STRICTLY OUT OF SCOPE.
+
+Do NOT implement:
+
+- wallet_switchEthereumChain
+- wallet_addEthereumChain
+- automatic network changes
+
+Connection approval must never change the user's active WaveX network.
+
+==================================================
+23. TESTING
+==================================================
+
+Add focused tests for:
+
+UI/model:
+
+- valid DApp proposal presentation
+- missing DApp icon fallback
+- long/malformed metadata
+- account display
+- network display
+- unsupported network
+- unconfigured network
+- unsupported capability
+- empty capability list
+- proposal expiration
+- stale proposal
+- proposal context mutation
+
+Approval:
+
+- explicit Connect required
+- no automatic approval
+- successful approval
+- approval failure
+- duplicate approval protection
+- concurrent approval protection
+- final validation before approval
+
+Rejection:
+
+- explicit rejection
+- rejection failure
+- no session after rejection
+
+Context:
+
+- account change invalidates proposal
+- network change invalidates proposal
+- DApp identity change invalidates proposal
+- expired proposal cannot be approved
+
+Security:
+
+- no private key
+- no mnemonic
+- no PIN
+- no SecureStore
+- no raw signer
+- no signing
+- no broadcast
+- no automatic network switching
+
+Lifecycle:
+
+- background/foreground
+- proposal expiration while backgrounded
+- reconnect/session state handling where applicable
+
+Preview:
+
+- no fake DApp session
+- no fake proposal
+- controlled unavailable state
+
+==================================================
+24. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+src/core/dapp/README.md
+
+Document:
+
+- DApp connection UI
+- explicit user authorization
+- proposal validation checkpoint
+- account/network binding
+- connection vs signing authorization
+- provider adapter boundary
+- Preview limitation
+- native-device requirement for real DApp connection testing
+- signing intentionally deferred
+- transaction execution intentionally deferred
+
+==================================================
+25. VALIDATION
+==================================================
+
+Run:
+
+1. DApp focused tests
+2. Full test suite
+3. TypeScript
+4. Expo validation
+5. Static iOS bundle
+6. Static Android bundle
+7. git diff --check
+8. security-boundary inspection
+
+Confirm:
+
+- no fake DApp sessions
+- no fake WalletConnect proposals
+- no signing implementation
+- no transaction execution
+- no direct provider SDK usage outside adapter where avoidable
+- no secret access
+- no automatic network switching
+- no unrelated wallet regressions
+
+IMPORTANT:
+
+Do not claim physical-device WalletConnect testing succeeded unless it was actually performed on a native development build.
+
+The real native DApp connection flow will be physically validated later when we generate the standalone testing APK.
+
+==================================================
+26. FINAL REPORT
+==================================================
+
+Return:
+
+- files created/changed
+- UI flow implemented
+- provider adapter integration
+- approval/rejection flow
+- session handling
+- network/account validation
+- security boundaries
+- focused test count
+- total test count
+- TypeScript result
+- Expo/build validation
+- known limitations
+- anything requiring physical-device validation
+
+STOP after Phase 7.3.
+
+Do not implement Phase 7.4 automatically.
