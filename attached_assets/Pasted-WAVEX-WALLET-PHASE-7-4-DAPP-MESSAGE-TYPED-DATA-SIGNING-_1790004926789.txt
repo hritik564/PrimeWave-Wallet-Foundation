@@ -1,0 +1,389 @@
+WAVEX WALLET — PHASE 7.4
+DAPP MESSAGE & TYPED-DATA SIGNING
+
+We are continuing the existing WaveX Wallet project.
+
+Completed:
+- Phase 7.1 — Provider-neutral DApp/Web3 architecture
+- Phase 7.2 — Real WalletConnect/Reown transport/session layer
+- Phase 7.3 — DApp connection & approval UI
+
+Now implement ONLY Phase 7.4:
+REAL DAPP MESSAGE AND TYPED-DATA SIGNING.
+
+==================================================
+1. STRICT WORKFLOW
+==================================================
+
+Implement ONLY Phase 7.4.
+
+Do NOT implement Phase 7.5 automatically.
+
+Do NOT implement DApp transaction signing/execution in this phase.
+
+Do NOT implement:
+
+- eth_sendTransaction
+- eth_sendRawTransaction
+- transaction broadcasting
+- automatic network switching
+- wallet_switchEthereumChain
+- wallet_addEthereumChain
+- swap execution
+- Activity integration
+- DApp browser
+- persistent DApp session redesign
+
+Use the existing WaveX security architecture.
+
+This phase introduces cryptographic message signing, so no new private-key architecture is permitted.
+
+==================================================
+2. OBJECTIVE
+==================================================
+
+Allow an already-connected DApp to request:
+
+1. personal_sign
+2. EIP-712 typed-data signing
+
+The flow must be:
+
+DApp
+ ↓
+WalletConnect request
+ ↓
+Phase 7.2 provider adapter
+ ↓
+WaveX DApp request validation
+ ↓
+Signing Request UI
+ ↓
+User explicitly reviews
+ ↓
+User explicitly approves
+ ↓
+WaveX authentication/authorization
+ ↓
+Existing local signing architecture
+ ↓
+Signature returned to DApp
+
+Private keys NEVER cross the DApp/provider boundary.
+
+==================================================
+3. EXISTING SIGNING ARCHITECTURE IS AUTHORITATIVE
+==================================================
+
+Do NOT create a second signing engine.
+
+Reuse the existing:
+
+- WalletAccessManager
+- AuthenticationManager
+- TransactionSigningEngine where applicable
+- LocalWalletEngine
+- secure vault architecture
+- existing transaction authorization/security patterns
+
+If the current signing engine only supports transaction signing and cannot safely support message signing without architectural changes:
+
+STOP and report the boundary limitation rather than exposing private keys or creating an unsafe signer.
+
+A DApp signing request must eventually reach the local wallet engine through a dedicated, security-reviewed message-signing boundary.
+
+Do NOT export private keys.
+
+Do NOT create a generic:
+
+sign(privateKey, payload)
+
+API.
+
+==================================================
+4. PROVIDER REQUEST SUPPORT
+==================================================
+
+Add provider adapter handling for:
+
+- personal_sign
+- eth_signTypedData
+- eth_signTypedData_v4 where supported by the verified current provider protocol
+
+Before implementation:
+
+- verify the current Reown/WalletConnect request event/API from the installed SDK version
+- use the existing provider adapter
+- do not call provider SDK request APIs directly from UI
+
+Unsupported signing methods must remain explicitly unsupported.
+
+Do not assume every method is equivalent.
+
+==================================================
+5. REQUEST VALIDATION
+==================================================
+
+Every incoming signing request must be validated before reaching the UI.
+
+Validate:
+
+- session exists
+- session is active
+- request belongs to the session
+- request has not expired
+- requested account matches an approved session account
+- requested chain/network is allowed by the session
+- address is a valid EVM address
+- address ownership matches the WaveX account
+- request ID is valid
+- method is supported
+- payload is structurally valid
+
+Reject:
+
+- unknown sessions
+- revoked sessions
+- expired sessions
+- wrong account
+- wrong network
+- malformed payload
+- unsupported methods
+- duplicate request IDs
+- replayed/expired requests
+
+Do not silently rewrite the request.
+
+==================================================
+6. PERSONAL_SIGN
+==================================================
+
+Implement a provider-neutral PersonalSignRequest.
+
+Preserve:
+
+- request ID
+- session ID
+- DApp identity
+- account/address
+- chain/network context
+- exact original message payload
+- payload encoding representation
+- timestamp/expiry
+
+IMPORTANT:
+
+The exact bytes being signed must be deterministically defined.
+
+Do not display one representation to the user while signing different bytes.
+
+If the provider sends a hex-encoded payload:
+
+- preserve the original bytes
+- decode only for human-readable presentation
+- retain the exact original payload for signing
+
+Do not alter:
+
+- whitespace
+- line breaks
+- capitalization
+- escape sequences
+- byte order
+- UTF-8 encoding
+
+unless the Ethereum signing specification explicitly requires a transformation.
+
+Document the exact signing semantics.
+
+==================================================
+7. PERSONAL_SIGN UI
+==================================================
+
+Create a dedicated signing approval screen.
+
+Suggested:
+
+src/components/dapp/
+  DAppMessageSigningScreen.tsx
+  DAppMessageSigning.logic.ts
+  tests/
+
+The screen must show:
+
+- DApp name
+- DApp domain
+- DApp icon/fallback
+- account name
+- shortened account address
+- network
+- request type
+- message content
+- clear signing warning
+
+Example neutral wording:
+
+"Signature requested"
+
+"This signature does not send a blockchain transaction, but signing unknown messages can have security implications."
+
+Do NOT claim that a message is safe.
+
+Do NOT claim that a DApp is trusted.
+
+==================================================
+8. MESSAGE DISPLAY SECURITY
+==================================================
+
+Message content is untrusted.
+
+Prevent UI abuse from:
+
+- huge messages
+- excessively long lines
+- control characters
+- deceptive Unicode
+- invisible characters
+- unsupported rendering
+- malicious formatting
+
+Create a bounded display representation.
+
+IMPORTANT:
+
+The displayed representation must clearly indicate when content has been truncated or normalized for display.
+
+The actual bytes signed must remain unchanged.
+
+Provide a way for the user to inspect the full payload where practical.
+
+Never silently sign a transformed/truncated display representation.
+
+==================================================
+9. EIP-712 TYPED DATA
+==================================================
+
+Implement provider-neutral typed-data request models.
+
+Preserve the exact original typed-data payload.
+
+Support the verified provider methods required for:
+
+- eth_signTypedData
+- eth_signTypedData_v4
+
+Do not silently transform the provider's payload before signing.
+
+Create a deterministic validation layer for:
+
+- domain
+- types
+- primaryType
+- message
+- account
+- chainId where present
+- verifyingContract where present
+- request context
+
+The exact original payload must remain available for cryptographic signing.
+
+==================================================
+10. EIP-712 DOMAIN PRESENTATION
+==================================================
+
+The UI must surface important security-relevant EIP-712 fields where available:
+
+- DApp/domain
+- primary type
+- chain ID
+- verifying contract
+- domain name/version where available
+- key message fields
+
+Do not claim that displaying a field proves trustworthiness.
+
+If the verifying contract is present:
+
+- validate its EVM address
+- display it
+- allow copy
+- do not label it trusted/verified without authoritative verification
+
+If chainId conflicts with the active/requested session chain:
+
+BLOCK the request.
+
+==================================================
+11. HUMAN-READABLE TYPED DATA
+==================================================
+
+Build a bounded presentation model.
+
+For example:
+
+Typed Data
+Domain
+  Name: ...
+  Version: ...
+  Chain: ...
+  Verifying Contract: ...
+
+Message
+  Recipient: ...
+  Amount: ...
+  ...
+  
+Do not attempt to make arbitrary typed data "safe" through interpretation.
+
+If a field cannot be safely rendered:
+
+- display its raw/bounded representation
+- indicate that it is unrecognized or raw data
+- never silently omit security-relevant fields
+
+Do not invent semantic meanings for arbitrary field names.
+
+==================================================
+12. HIGH-RISK / AMBIGUOUS DATA
+==================================================
+
+Identify presentation conditions that deserve additional warnings, such as:
+
+- unknown/unrecognized typed-data fields
+- missing domain fields
+- unusual chain IDs
+- verifying contract present
+- very large values
+- long strings
+- opaque byte arrays
+- raw/unrenderable data
+
+Warnings must be factual and neutral.
+
+Do not call a DApp malicious without authoritative evidence.
+
+==================================================
+13. SIGNING AUTHORIZATION
+==================================================
+
+Signing requires explicit user authorization.
+
+The flow must be:
+
+Request
+ ↓
+Validate
+ ↓
+Render review
+ ↓
+User taps "Sign"
+ ↓
+Final revalidation
+ ↓
+Authenticate wallet
+ ↓
+Bind authorization to exact request
+ ↓
+Local signing
+ ↓
+Signature returned to provider
