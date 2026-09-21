@@ -1,34 +1,65 @@
 import express, { type Express } from "express";
-import cors from "cors";
+import cors, { type CorsOptions } from "cors";
 import pinoHttp from "pino-http";
-import router from "./routes";
+import { loadConfig, type ServerConfig } from "./config";
+import { errorHandler } from "./lib/errors";
 import { logger } from "./lib/logger";
+import { MemoryRateLimiter, rateLimitMiddleware } from "./lib/rate-limit";
+import { requireJsonContentType } from "./lib/request-validation";
+import { secretMaterialGuard, securityHeaders } from "./lib/security";
+import { createRouter } from "./routes";
 
-const app: Express = express();
-
-app.use(
-  pinoHttp({
-    logger,
-    serializers: {
-      req(req) {
-        return {
-          id: req.id,
-          method: req.method,
-          url: req.url?.split("?")[0],
-        };
-      },
-      res(res) {
-        return {
-          statusCode: res.statusCode,
-        };
-      },
+export function createApp(config: ServerConfig = loadConfig()): Express {
+  const app: Express = express();
+  const rateLimiter = new MemoryRateLimiter(
+    config.rateLimitWindowMs,
+    config.rateLimitMaxRequests,
+  );
+  const corsOptions: CorsOptions = {
+    credentials: false,
+    methods: ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"],
+    origin: (origin, callback) => {
+      if (!origin || config.corsAllowedOrigins.includes(origin)) {
+        callback(null, true);
+        return;
+      }
+      callback(null, false);
     },
-  }),
-);
-app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+  };
 
-app.use("/api", router);
+  app.use(securityHeaders);
+  app.use(
+    pinoHttp({
+      logger,
+      serializers: {
+        req(req) {
+          return {
+            id: req.id,
+            method: req.method,
+            url: req.url?.split("?")[0],
+          };
+        },
+        res(res) {
+          return {
+            statusCode: res.statusCode,
+          };
+        },
+      },
+    }),
+  );
+  app.use(cors(corsOptions));
+  app.use(requireJsonContentType);
+  app.use(express.json({ limit: config.requestBodyLimit }));
+  app.use(rateLimitMiddleware(rateLimiter));
+  app.use(secretMaterialGuard);
 
-export default app;
+  // Keep the existing workflow startup probe working while the versioned
+  // namespace becomes the only new API boundary.
+  app.use(`${config.apiPrefix}`, createRouter(config));
+  app.use("/api", createRouter(config));
+  app.use(errorHandler);
+
+  return app;
+}
+
+export default createApp();

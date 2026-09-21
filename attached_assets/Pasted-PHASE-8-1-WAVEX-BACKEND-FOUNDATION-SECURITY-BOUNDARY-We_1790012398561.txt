@@ -1,0 +1,540 @@
+PHASE 8.1 — WAVEX BACKEND FOUNDATION & SECURITY BOUNDARY
+
+We are beginning Phase 8 of the WaveX Wallet project.
+
+IMPORTANT:
+This is an architecture/security foundation sprint only.
+
+Do NOT implement token indexing, blockchain indexing, price APIs, notifications, analytics, transaction synchronization, swap backend services, DApp backend services, or production deployment yet.
+
+Do NOT modify or replace the existing wallet security architecture.
+
+The existing WaveX mobile wallet is a strictly non-custodial EVM wallet. Preserve that invariant.
+
+==================================================
+1. PRIMARY OBJECTIVE
+==================================================
+
+Establish a clean, production-oriented backend foundation that can later support:
+
+- public wallet metadata
+- token metadata
+- market/price data
+- blockchain indexing
+- transaction history synchronization
+- notifications
+- privacy-safe analytics
+
+The backend is an INFORMATION AND SUPPORT SERVICE ONLY.
+
+It must NEVER become a custody or signing service.
+
+==================================================
+2. NON-CUSTODIAL SECURITY INVARIANT
+==================================================
+
+The following must NEVER be accepted, stored, logged, cached, transmitted, indexed, persisted, or recoverable through backend infrastructure:
+
+- seed phrases
+- mnemonics
+- private keys
+- raw signing keys
+- wallet PINs
+- PIN hashes
+- SecureStore/SecureVault contents
+- wallet encryption keys
+- biometric secrets
+- signing capabilities
+- local wallet vault handles
+- raw secret recovery material
+
+The backend must have no API model, DTO, database column, logging field, cache field, or event schema for these values.
+
+If a request attempts to submit secret-shaped wallet material, the backend must reject it safely.
+
+Do not merely ignore secret fields.
+
+Reject them explicitly and ensure they never reach persistence or application logs.
+
+==================================================
+3. INSPECT EXISTING PROJECT FIRST
+==================================================
+
+Before modifying anything:
+
+Inspect the existing repository structure.
+
+Identify:
+
+- existing Expo/React Native wallet
+- existing workspace structure
+- existing backend/server code if present
+- existing Express/TypeScript infrastructure if present
+- existing PostgreSQL/Drizzle infrastructure if present
+- package manager configuration
+- existing environment/secrets conventions
+- existing documentation
+- existing security architecture
+
+Do NOT create a second competing backend architecture if suitable infrastructure already exists.
+
+Reuse existing foundations where appropriate.
+
+Do not rewrite working wallet code unnecessarily.
+
+==================================================
+4. BACKEND ARCHITECTURE
+==================================================
+
+Create or formalize a clear backend boundary.
+
+Use TypeScript.
+
+The backend should have clear separation between:
+
+- HTTP/API layer
+- authentication/session boundary
+- request validation
+- domain/services
+- persistence/repository layer
+- database schema
+- security utilities
+- configuration/environment
+- error handling
+- logging
+
+Do not create business functionality for future Phase 8 features yet.
+
+Create only the foundation required to support them safely later.
+
+==================================================
+5. API VERSIONING
+==================================================
+
+Establish a versioned API namespace.
+
+Use a structure equivalent to:
+
+/api/v1/...
+
+Do not create a large collection of placeholder endpoints.
+
+At minimum provide only safe infrastructure endpoints needed for:
+
+- health/readiness
+- API version identification if appropriate
+
+Do not create wallet-secret, signing, custody, transfer, or transaction-execution endpoints.
+
+==================================================
+6. CONFIGURATION & ENVIRONMENT
+==================================================
+
+Create a centralized typed configuration layer.
+
+Separate:
+
+- development
+- test
+- production
+
+Environment values must never be hardcoded.
+
+Secret configuration must come from environment/secrets management.
+
+Do not expose server secrets to the React Native client.
+
+Do not put backend secrets into Expo public configuration.
+
+Configuration validation should fail safely when required production configuration is missing.
+
+Document required future environment variables without inventing credentials.
+
+==================================================
+7. DATABASE FOUNDATION
+==================================================
+
+If PostgreSQL/Drizzle already exists in the repository, reuse it.
+
+Otherwise establish the minimal PostgreSQL/Drizzle foundation needed for future phases.
+
+Create only foundation-level schema/migration structure.
+
+DO NOT create tables for:
+
+- private keys
+- seed phrases
+- mnemonics
+- PINs
+- signing secrets
+- vault keys
+
+Do not create speculative schemas for all future Phase 8 functionality yet.
+
+Use migration-based schema management.
+
+Database connection configuration must come from environment variables.
+
+Do not expose database credentials to the mobile client.
+
+==================================================
+8. REQUEST VALIDATION
+==================================================
+
+Establish a centralized request validation approach.
+
+Validate:
+
+- content type
+- request body structure
+- query parameters
+- path parameters
+- bounded string lengths
+- bounded arrays
+- identifiers
+- addresses where applicable
+- network identifiers where applicable
+
+Reject malformed or oversized input safely.
+
+Do not trust client-provided metadata simply because it came from WaveX.
+
+==================================================
+9. SECRET-MATERIAL REJECTION
+==================================================
+
+Create a reusable backend security guard that detects prohibited secret-shaped fields.
+
+Examples include fields resembling:
+
+- privateKey
+- private_key
+- mnemonic
+- seed
+- seedPhrase
+- seed_phrase
+- recoveryPhrase
+- recovery_phrase
+- secretKey
+- signingKey
+- walletPin
+- pin
+- vaultKey
+- encryptionKey
+
+This is a defense-in-depth layer.
+
+Do not rely only on naming.
+
+Where practical, detect obviously secret-shaped values while avoiding false positives on ordinary public data.
+
+Rejected requests must produce sanitized errors.
+
+Never log the submitted value.
+
+Do not echo the sensitive field back to the client.
+
+==================================================
+10. LOGGING SECURITY
+==================================================
+
+Create a centralized sanitized server logger.
+
+The logger must:
+
+- never log secrets
+- never log authorization tokens
+- never log database credentials
+- never log private wallet material
+- never log complete request bodies blindly
+- sanitize nested objects
+- bound logged strings
+- avoid raw stack traces in production responses
+- separate internal diagnostics from client-facing errors
+
+Do not introduce a verbose request-body logger.
+
+==================================================
+11. ERROR HANDLING
+==================================================
+
+Create centralized backend error handling.
+
+Client responses should use a stable sanitized error structure.
+
+Do not expose:
+
+- database errors
+- internal filesystem paths
+- stack traces
+- provider credentials
+- environment variables
+- secret values
+- internal implementation details
+
+Development logging may contain more diagnostics internally, but must still respect the non-custodial secret invariant.
+
+==================================================
+12. SECURITY MIDDLEWARE
+==================================================
+
+Establish appropriate foundation-level middleware for:
+
+- security headers
+- CORS
+- request size limits
+- basic rate limiting
+- request IDs/correlation IDs
+- content-type validation where appropriate
+
+CORS must not use a careless wildcard configuration for authenticated/credentialed production traffic.
+
+Do not invent production domains if they have not been provided.
+
+Use explicit configuration/placeholders where necessary.
+
+==================================================
+13. AUTHENTICATION BOUNDARY
+==================================================
+
+Do NOT invent a complete user authentication product in this sprint.
+
+Instead, define the backend authentication boundary/interfaces that future phases can use.
+
+Clearly distinguish:
+
+- user/application authentication
+- wallet ownership
+- blockchain address ownership
+- transaction signing authorization
+
+The backend must NEVER interpret backend authentication as permission to sign blockchain transactions.
+
+Document this distinction.
+
+==================================================
+14. RATE LIMITING
+==================================================
+
+Add a reusable bounded rate-limiting foundation.
+
+It should be suitable for:
+
+- public endpoints
+- authenticated endpoints later
+- sensitive operations later
+
+Do not create aggressive arbitrary production limits without documenting them.
+
+Do not make rate limiting dependent on a single spoofable client-provided identifier.
+
+==================================================
+15. HEALTH / READINESS
+==================================================
+
+Create safe health/readiness infrastructure.
+
+Health responses must not expose:
+
+- environment variables
+- database credentials
+- provider URLs containing secrets
+- internal filesystem paths
+- sensitive infrastructure details
+
+Readiness should distinguish application availability from dependency readiness where appropriate.
+
+==================================================
+16. BACKEND ↔ MOBILE BOUNDARY
+==================================================
+
+Document exactly what the mobile wallet may send to the backend.
+
+Allowed future categories may include:
+
+- public wallet address
+- public account metadata
+- public network information
+- token metadata requests
+- public transaction/indexing queries
+- notification preferences
+- privacy-safe product telemetry
+
+Explicitly prohibited:
+
+- private keys
+- seed phrases
+- wallet PINs
+- signing secrets
+- SecureStore data
+- vault data
+- raw secret material
+
+The backend must never be required for:
+
+- wallet creation
+- recovery
+- local key derivation
+- local signing
+- local authentication
+- transaction authorization
+
+The wallet must remain functional as a non-custodial client even if the backend is unavailable, wherever existing local functionality permits.
+
+==================================================
+17. DOCUMENTATION
+==================================================
+
+Update/create:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- backend README/documentation if appropriate
+
+Document:
+
+- backend responsibility
+- backend non-responsibility
+- trust boundaries
+- data classification
+- prohibited secret material
+- API boundary
+- database boundary
+- authentication distinction
+- future Phase 8 extension points
+- production deployment still deferred
+
+==================================================
+18. TESTING
+==================================================
+
+Add focused tests for:
+
+- configuration validation
+- API versioning
+- health/readiness
+- request validation
+- oversized input rejection
+- malformed request rejection
+- secret-shaped field rejection
+- nested secret rejection
+- sanitized error responses
+- logger redaction
+- CORS/security middleware
+- rate limiting
+- request ID behavior
+- database configuration
+- prohibited secret fields never reaching persistence
+
+Do NOT write tests that require real private keys or seed phrases.
+
+Use clearly synthetic test fixtures only where necessary to verify rejection behavior.
+
+==================================================
+19. SECURITY SOURCE AUDIT
+==================================================
+
+Before finishing, inspect the resulting backend source for:
+
+- privateKey
+- mnemonic
+- seed phrase
+- wallet PIN
+- signing key
+- SecureStore
+- SecureVault
+- LocalWalletEngine
+- TransactionSigningEngine
+- raw signer
+- eth_sendRawTransaction
+
+The backend must NOT import or depend on mobile wallet secret/signing modules.
+
+The backend must NOT implement signing.
+
+The backend must NOT implement custody.
+
+==================================================
+20. WHAT NOT TO IMPLEMENT
+==================================================
+
+Do NOT implement:
+
+- blockchain indexers
+- token indexing
+- token logo provider
+- price provider
+- CoinGecko integration
+- CoinMarketCap integration
+- transaction synchronization
+- push notifications
+- analytics platform
+- swap backend
+- DApp backend
+- wallet custody
+- server-side signing
+- private-key storage
+- seed-phrase storage
+- cloud wallet backup
+- wallet recovery service
+- transaction broadcasting from backend
+- production deployment
+- cloud infrastructure migration
+
+Those belong to later Phase 8 sprints.
+
+==================================================
+21. REPLIT RESOURCE DISCIPLINE
+==================================================
+
+This is Replit Free mode.
+
+Keep the implementation focused.
+
+Do not install unnecessary dependencies.
+
+Do not replace working architecture merely for stylistic reasons.
+
+Do not perform large unrelated refactors.
+
+Do not create speculative services for future phases.
+
+==================================================
+22. VALIDATION REQUIREMENTS
+==================================================
+
+Before reporting completion:
+
+1. Run backend-focused tests.
+2. Run the complete existing test suite.
+3. Run TypeScript validation.
+4. Run Expo validation/static build as applicable.
+5. Verify the existing wallet functionality was not broken.
+6. Inspect git diff.
+7. Inspect dependencies added/changed.
+8. Perform the backend source security audit described above.
+9. Confirm no prohibited secret material is persisted or logged.
+10. Confirm no backend signing/custody capability exists.
+
+Final report must include:
+
+- files created/changed
+- backend architecture
+- database changes
+- dependencies added
+- security controls
+- test results
+- TypeScript result
+- Expo result
+- git diff summary
+- known warnings
+- deferred work
+
+If all requirements pass, finish with exactly:
+
+PHASE 8.1 DEVELOPMENT COMPLETE — PENDING SECURITY REVIEW
+
+STOP.
+
+Do not begin Phase 8.2 automatically.

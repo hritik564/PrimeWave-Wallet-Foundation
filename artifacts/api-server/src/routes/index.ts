@@ -1,8 +1,9 @@
 import { Router, type IRouter } from "express";
-import healthRouter from "./health";
+import type { ServerConfig } from "../config";
+import { createHealthRouter } from "./health";
 
-const router: IRouter = Router();
-
-router.use(healthRouter);
-
-export default router;
+export function createRouter(config: ServerConfig): IRouter {
+  const router: IRouter = Router();
+  router.use(createHealthRouter(config));
+  return router;
+}
