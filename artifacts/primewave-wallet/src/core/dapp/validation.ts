@@ -284,6 +284,35 @@ export function validateDAppSession(value: unknown): DAppSession {
     return fail('INVALID_SESSION', 'DApp session status is unsupported.');
   }
   const approvedCapabilities = uniqueCapabilities(value.approvedCapabilities);
+  const approvedNetworkIds = Array.isArray(value.approvedNetworkIds)
+    ? Object.freeze(
+        value.approvedNetworkIds.map((networkId) =>
+          stringValue(
+            networkId,
+            'INVALID_SESSION',
+            'Approved network ID',
+            DAPP_MAX_ID_LENGTH,
+          ),
+        ),
+      )
+    : fail('INVALID_SESSION', 'Approved network IDs must be an array.');
+  const approvedChainIds = Array.isArray(value.approvedChainIds)
+    ? Object.freeze(
+        value.approvedChainIds.map((chainId) =>
+          exactChainId(chainId, 'Approved chain ID'),
+        ),
+      )
+    : fail('INVALID_SESSION', 'Approved chain IDs must be an array.');
+  if (
+    approvedNetworkIds.length === 0 ||
+    approvedNetworkIds.length !== approvedChainIds.length ||
+    !approvedNetworkIds.includes(networkId)
+  ) {
+    return fail(
+      'INVALID_SESSION',
+      'Approved networks must include the session network and align with approved chains.',
+    );
+  }
   const permissions = Array.isArray(value.permissions)
     ? Object.freeze(
         value.permissions.map((permission) =>
@@ -328,6 +357,8 @@ export function validateDAppSession(value: unknown): DAppSession {
     walletAddress: normalizeAddress(value.walletAddress, 'Session wallet address'),
     networkId,
     chainId: exactChainId(value.chainId, 'Session chain ID'),
+    approvedNetworkIds,
+    approvedChainIds,
     approvedCapabilities,
     permissions,
     createdAt,

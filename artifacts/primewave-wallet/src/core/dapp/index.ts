@@ -5,10 +5,13 @@ export {
   type DAppCapability,
   type DAppIdentity,
   type DAppPermission,
+  type DAppAuthorizationBoundary,
+  type DAppAuthorizationDecision,
   type DAppRequestContext,
   type DAppRequestStatus,
   type DAppRequestType,
   type DAppSession,
+  type DAppSessionProposal,
   type DAppSessionStatus,
 } from './models';
 export type {
@@ -63,5 +66,7 @@ export type {
   DAppTransportRequestEvent,
   DAppTransportRequestHandler,
   DAppTransportResponse,
+  DAppTransportProposalEvent,
+  DAppTransportErrorEvent,
   DAppTransportSessionEvent,
 } from './transport';

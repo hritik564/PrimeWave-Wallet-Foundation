@@ -15,6 +15,8 @@ export interface DAppSessionUpdate {
   readonly lastActivityAt?: number;
   readonly expiresAt?: number | null;
   readonly status?: DAppSessionStatus;
+  readonly approvedNetworkIds?: readonly string[];
+  readonly approvedChainIds?: readonly bigint[];
   readonly approvedCapabilities?: readonly DAppSession['approvedCapabilities'][number][];
   readonly permissions?: readonly DAppPermission[];
 }
@@ -37,6 +39,8 @@ function cloneSession(session: DAppSession): DAppSession {
   return Object.freeze({
     ...session,
     identity: Object.freeze({ ...session.identity }),
+    approvedNetworkIds: Object.freeze([...session.approvedNetworkIds]),
+    approvedChainIds: Object.freeze([...session.approvedChainIds]),
     approvedCapabilities: Object.freeze([...session.approvedCapabilities]),
     permissions: Object.freeze(
       session.permissions.map((permission) => Object.freeze({ ...permission })),
@@ -118,6 +122,9 @@ export class InMemoryDAppSessionRepository implements DAppSessionRepository {
       accountId: current.accountId,
       networkId: current.networkId,
       identity: current.identity,
+      approvedNetworkIds:
+        update.approvedNetworkIds ?? current.approvedNetworkIds,
+      approvedChainIds: update.approvedChainIds ?? current.approvedChainIds,
       permissions: update.permissions ?? current.permissions,
       approvedCapabilities:
         update.approvedCapabilities ?? current.approvedCapabilities,

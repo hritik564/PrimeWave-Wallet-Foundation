@@ -39,6 +39,8 @@ function makeSession(
     walletAddress,
     networkId: 'ethereum',
     chainId: 1n,
+    approvedNetworkIds: ['ethereum'],
+    approvedChainIds: [1n],
     approvedCapabilities: [],
     permissions: [],
     createdAt: 100,

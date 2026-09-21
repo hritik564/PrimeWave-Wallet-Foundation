@@ -44,6 +44,12 @@ export interface DAppSession {
   readonly walletAddress: string;
   readonly networkId: string;
   readonly chainId: bigint;
+  /**
+   * Every chain granted to the provider session. `networkId` and `chainId`
+   * remain the primary scope used by the Phase 7.1 request boundary.
+   */
+  readonly approvedNetworkIds: readonly string[];
+  readonly approvedChainIds: readonly bigint[];
   readonly approvedCapabilities: readonly DAppCapability[];
   readonly permissions: readonly DAppPermission[];
   readonly createdAt: number;
@@ -83,4 +89,36 @@ export interface DAppRequestContext {
   readonly createdAt: number;
   readonly expiresAt: number | null;
   readonly status: DAppRequestStatus;
+}
+
+export interface DAppSessionProposal {
+  readonly proposalId: string;
+  readonly providerId: string;
+  readonly identity: DAppIdentity;
+  readonly requestedNetworkIds: readonly string[];
+  readonly requestedChainIds: readonly bigint[];
+  readonly requestedCapabilities: readonly DAppCapability[];
+  readonly expiresAt: number | null;
+}
+
+export type DAppAuthorizationDecision =
+  | {
+      readonly decision: 'approved';
+      readonly accountId: string;
+      readonly walletAddress: string;
+      readonly networkId: string;
+      readonly chainId: bigint;
+      readonly approvedNetworkIds: readonly string[];
+      readonly approvedChainIds: readonly bigint[];
+      readonly approvedCapabilities: readonly DAppCapability[];
+    }
+  | {
+      readonly decision: 'rejected';
+      readonly reason?: string;
+    };
+
+export interface DAppAuthorizationBoundary {
+  authorize(
+    proposal: DAppSessionProposal,
+  ): Promise<DAppAuthorizationDecision> | DAppAuthorizationDecision;
 }

@@ -135,6 +135,27 @@ pairing, deep links, browser integration, real connections, persistent
 sessions, backend APIs, network switching, signing, and broadcasting remain
 deferred.
 
+## Phase 7.2 — WalletConnect/Reown transport adapter
+
+Phase 7.2 implements the provider-specific WalletConnect path only under
+`src/core/dapp/providers/walletconnect/`. It uses the official React Native
+wallet-side `@reown/walletkit` SDK and translates provider proposals and
+sessions into the provider-neutral DApp models.
+
+The adapter accepts only public wallet metadata, public account context from an
+explicit authorization boundary, DApp metadata, and registered network data.
+It uses `NetworkRegistry` to reject placeholder, disabled, unavailable, or
+unconfigured chains. Proposal observation is not approval: without an
+authorization callback the proposal remains pending and no successful session
+is created.
+
+WalletConnect storage is supplied by a bounded in-memory implementation, so
+sessions and protocol state are scoped to the transport instance. Provider
+session updates, deletion, expiry, and unsupported request responses are
+normalized into the DApp transport boundary. Signing methods, transaction
+execution, broadcasting, `wallet_switchEthereumChain`, and
+`wallet_addEthereumChain` are not implemented.
+
 ## Security boundary
 
 Signing material stays on the user's device. The backend must never receive

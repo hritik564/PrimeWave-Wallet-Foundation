@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 7.1 — Provider-neutral DApp/Web3 connection architecture (implemented; no real connections)**
+**Phase 7.2 — Real WalletConnect/Reown DApp transport (implemented; no signing)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -499,8 +499,29 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 
 ## Phase boundary
 
-Phase 7.1 is complete and stops at a provider-neutral DApp architecture.
-Future provider integration must preserve the public-only models, explicit
-authorization boundary, existing transaction pipeline, and no-secret invariant.
-WalletConnect, real connections, signing, broadcasting, persistence, backend
-APIs, and automatic network switching remain outside this increment.
+Phase 7.2 stops at public-only WalletConnect transport and session handling.
+Signing, transaction execution, broadcasting, UI approval screens, persistent
+sessions, backend APIs, Preview transport behavior, and automatic network
+switching remain outside this increment.
+
+## Phase 7.2 completion
+
+- Verified the current official React Native wallet-side SDK: Reown
+  `@reown/walletkit` 1.6.0 with WalletConnect React Native compatibility
+  2.25.0, Expo Application, NetInfo, random-value, and text-encoding support.
+- Added the isolated provider adapter at
+  `src/core/dapp/providers/walletconnect/`.
+- Added real pairing, proposal observation, explicit approval/rejection,
+  public namespace construction, session update/delete/expiry handling, and
+  sanitized unsupported-request responses.
+- Reused `NetworkRegistry` as the only chain source. Placeholder PrimeWave
+  Chain and unavailable/unconfigured networks cannot be declared.
+- Added bounded public multi-chain session records while keeping the existing
+  account/network scope as the primary request context.
+- Used an in-memory WalletConnect storage implementation so protocol state and
+  session state do not survive the transport instance.
+- The adapter never receives wallet secrets, raw signers, vault handles, PINs,
+  or SecureStore values. It does not auto-approve proposals and does not
+  implement signing, transaction execution, broadcasting, or network changes.
+- A native development build is required for React Native pairing/deep-link
+  validation; the existing `wavex` scheme is used for WalletConnect metadata.

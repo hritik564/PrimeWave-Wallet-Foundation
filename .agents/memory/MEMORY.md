@@ -16,3 +16,4 @@
 - [Swap quote trust boundary](swap-quote-boundary.md) — provider quote data stays untrusted through validation; route continuity and exact public context must hold before any future signing handoff.
 - [Swap execution boundary](swap-execution-boundary.md) — missing allowance blocks token execution; bounded approval and swap authorization remain separate explicit actions.
 - [DApp public boundary](dapp-public-boundary.md) — DApp input stays public and untrusted; session scope, permissions, and future execution remain separate.
+- [WalletConnect RN transport](walletconnect-transport.md) — Reown WalletKit needs RN compat/polyfills; keep provider state in explicit in-memory storage and proposals pending until authorization.

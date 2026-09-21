@@ -56,6 +56,22 @@ cryptographic binding; this phase does not parse or sign them. The transport
 interface is provider-neutral and no WalletConnect, pairing, deep-link, QR,
 backend, or persistent-session implementation exists.
 
+## Phase 7.2 WalletConnect transport boundary
+
+The real WalletConnect/Reown adapter is isolated under
+`src/core/dapp/providers/walletconnect/`. It receives public metadata,
+registered network definitions, and an explicit public authorization decision
+only. Wallet secrets, SecureStore values, raw signers, signing capabilities,
+and wallet engine handles never cross into the provider layer.
+
+The adapter uses in-memory WalletConnect storage and the existing bounded
+in-memory DApp session repository. Proposal metadata is validated as untrusted
+input; proposal observation never implies approval. The adapter approves only
+explicitly authorized public account/network namespaces and rejects all
+signing or transaction requests with sanitized provider errors. Session
+updates that change the authorized account or primary network are revoked
+instead of silently rebinding the session.
+
 ## 1. Security principles
 
 - **Non-custodial architecture:** signing authority remains on the user's

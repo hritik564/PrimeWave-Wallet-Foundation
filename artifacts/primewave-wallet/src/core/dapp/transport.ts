@@ -1,5 +1,5 @@
 import type { DAppRequest } from './request-models';
-import type { DAppSession } from './models';
+import type { DAppSession, DAppSessionProposal } from './models';
 
 export interface DAppTransportRequestEvent {
   readonly type: 'request';
@@ -8,12 +8,30 @@ export interface DAppTransportRequestEvent {
 
 export interface DAppTransportSessionEvent {
   readonly type: 'session';
+  readonly event:
+    | 'approved'
+    | 'updated'
+    | 'disconnected'
+    | 'expired'
+    | 'revoked';
   readonly session: DAppSession;
+}
+
+export interface DAppTransportProposalEvent {
+  readonly type: 'proposal';
+  readonly proposal: DAppSessionProposal;
+}
+
+export interface DAppTransportErrorEvent {
+  readonly type: 'error';
+  readonly errorCode: string;
 }
 
 export type DAppTransportEvent =
   | DAppTransportRequestEvent
-  | DAppTransportSessionEvent;
+  | DAppTransportSessionEvent
+  | DAppTransportProposalEvent
+  | DAppTransportErrorEvent;
 
 export interface DAppTransportResponse {
   readonly requestId: string;
