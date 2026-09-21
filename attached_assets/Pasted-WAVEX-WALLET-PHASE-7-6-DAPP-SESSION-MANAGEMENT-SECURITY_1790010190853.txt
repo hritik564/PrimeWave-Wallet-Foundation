@@ -1,0 +1,881 @@
+WAVEX WALLET — PHASE 7.6
+DAPP SESSION MANAGEMENT & SECURITY HARDENING
+
+We are completing the entire WaveX DApp/Web3 development section.
+
+Completed:
+- Phase 7.1 — Provider-neutral DApp/Web3 architecture
+- Phase 7.2 — Real WalletConnect/Reown transport/session layer
+- Phase 7.3 — DApp connection & approval UI
+- Phase 7.4 — Message & typed-data signing
+- Phase 7.5 — DApp transaction requests & secure execution
+
+This is the FINAL Phase 7 sprint.
+
+Implement ONLY Phase 7.6.
+
+After this phase, Phase 7 / DApp-Web3 development should be considered COMPLETE pending later physical-device validation.
+
+==================================================
+1. STRICT WORKFLOW
+==================================================
+
+This is a consolidation and security-hardening sprint.
+
+Do NOT introduce another major Web3 capability.
+
+Do NOT redesign existing wallet screens.
+
+Do NOT replace the existing DApp architecture.
+
+Do NOT replace Reown/WalletConnect.
+
+Do NOT create another signing engine.
+
+Do NOT create another transaction engine.
+
+Do NOT create another broadcast engine.
+
+Do NOT introduce a new wallet/key architecture.
+
+Preserve the existing Phase 7.1–7.5 architecture.
+
+Only make changes required for:
+
+- session management
+- request lifecycle hardening
+- disconnect/revoke
+- expiry handling
+- account/network context changes
+- transport lifecycle
+- pending request cleanup
+- concurrency protection
+- security UX
+- DApp regression testing
+- final documentation
+
+==================================================
+2. OBJECTIVE
+==================================================
+
+Harden the complete DApp lifecycle:
+
+Connection
+    ↓
+Session
+    ↓
+Requests
+    ↓
+Approval
+    ↓
+Signing / Transaction Execution
+    ↓
+Completion
+    ↓
+Disconnect / Revoke / Expiry
+
+The final architecture must safely handle:
+
+- multiple connected DApps
+- session expiry
+- DApp disconnect
+- user disconnect
+- revoked sessions
+- account changes
+- network changes
+- pending signing requests
+- pending transaction requests
+- duplicate requests
+- stale requests
+- provider transport disconnects
+- app background/foreground
+- malformed provider events
+- provider reconnection
+- cleanup
+
+==================================================
+3. ACTIVE DAPP SESSIONS
+==================================================
+
+Create a proper user-facing Active DApps / Connected DApps screen.
+
+Suggested:
+
+src/components/dapp/
+  DAppSessionsScreen.tsx
+  DAppSessions.logic.ts
+  tests/
+
+The screen should show connected sessions using the existing DAppSession repository.
+
+Each session should display:
+
+- DApp name
+- domain
+- icon/fallback
+- connected account
+- connected networks
+- connection status
+- session expiry information where appropriate
+
+Use existing WaveX visual language:
+
+- dark futuristic UI
+- cyan / blue / violet accents
+- restrained glow
+- rounded cards
+- compact information hierarchy
+- mobile-first layout
+
+Do not imply that a connected DApp is trusted or verified.
+
+Use neutral wording such as:
+
+"Connected"
+
+rather than:
+
+"Trusted"
+
+==================================================
+4. SESSION DETAILS
+==================================================
+
+Provide a session detail view.
+
+Show:
+
+DApp:
+- name
+- domain
+- icon/fallback
+
+Account:
+- account label
+- shortened public address
+
+Networks:
+- connected network names
+- chain IDs where useful
+
+Permissions:
+- account access
+- approved network access
+- connection capabilities
+
+Important:
+
+Clearly distinguish connection capabilities from signing capabilities.
+
+Do not imply that a session permanently grants transaction-signing authority.
+
+Signing remains request-by-request and explicitly authorized.
+
+==================================================
+5. DISCONNECT / REVOKE
+==================================================
+
+Provide explicit:
+
+"Disconnect"
+
+or
+
+"Disconnect DApp"
+
+action.
+
+The user must confirm the action where appropriate.
+
+Disconnect must:
+
+- revoke/delete the WaveX session
+- notify the provider through the correct Phase 7.2 adapter boundary
+- invalidate pending requests associated with that session
+- prevent future signing/transaction execution
+- clean up session state
+
+Do NOT directly manipulate provider SDK state from UI.
+
+Use the provider adapter.
+
+==================================================
+6. DISCONNECT SEMANTICS
+==================================================
+
+Distinguish:
+
+- user-initiated disconnect
+- DApp-initiated disconnect
+- provider transport disconnect
+- session expiry
+- session revocation
+- invalid session
+- unexpected transport failure
+
+Map them into the existing WaveX DApp lifecycle correctly.
+
+Do not classify all disconnects as the same error.
+
+==================================================
+7. SESSION EXPIRY
+==================================================
+
+Handle expired sessions safely.
+
+When a session expires:
+
+- mark it expired
+- prevent new requests
+- invalidate pending requests
+- remove/revoke through the provider adapter where appropriate
+- update the UI
+- do not silently reconnect
+
+Do not automatically extend a session without explicit provider protocol support.
+
+Do not silently recreate a session.
+
+==================================================
+8. ACCOUNT CHANGE HARDENING
+==================================================
+
+WaveX may support multiple wallet accounts.
+
+If the active account changes:
+
+Existing DApp sessions MUST NOT silently switch accounts.
+
+For every active session:
+
+- determine whether the session account still exists
+- determine whether it remains the active/authorized context
+- invalidate or require explicit reauthorization where appropriate
+
+Pending requests must be invalidated if their account context no longer matches.
+
+A DApp must never receive a signature from an account different from the one it requested.
+
+Do not automatically rebind sessions.
+
+==================================================
+9. NETWORK CHANGE HARDENING
+==================================================
+
+If the WaveX active network changes:
+
+Do NOT silently alter the DApp session's approved chain.
+
+For sessions:
+
+- retain their approved network scope
+- detect whether the requested operation remains valid
+- reject/defer requests targeting unauthorized chains
+- invalidate stale request context
+
+Do not automatically send a chain-switch request merely because the user changed WaveX's active network.
+
+Do not implement automatic network switching.
+
+==================================================
+10. PENDING REQUEST MANAGER
+==================================================
+
+Create or consolidate a bounded pending-request manager.
+
+It must track requests from:
+
+- message signing
+- typed-data signing
+- transaction requests
+
+Each request must be bound to:
+
+- request ID
+- session ID
+- DApp identity
+- account
+- network
+- method
+- creation time
+- expiry
+- lifecycle status
+
+Statuses should distinguish:
+
+- pending
+- reviewing
+- authenticating
+- signing
+- broadcasting
+- completed
+- rejected
+- expired
+- stale
+- failed
+- cancelled
+
+Prevent duplicate request IDs.
+
+Prevent the same request from being processed twice.
+
+==================================================
+11. PENDING REQUEST CLEANUP
+==================================================
+
+When a session is disconnected/revoked/expired:
+
+all pending requests for that session must become invalid.
+
+They must NOT:
+
+- sign
+- broadcast
+- return successful responses
+
+User-facing state should explain that the request is no longer valid.
+
+Provider responses must use appropriate rejection/error semantics.
+
+==================================================
+12. CONCURRENCY
+==================================================
+
+Ensure only one sensitive signing/execution flow is active for a given wallet security context.
+
+Protect against:
+
+- double tapping Sign
+- double tapping Confirm Transaction
+- repeated provider events
+- duplicate request IDs
+- concurrent authentication
+- concurrent signing
+- concurrent broadcast
+- duplicate provider responses
+
+Use deterministic request locking/idempotency.
+
+Do not create unsafe global locks that prevent unrelated read-only DApp operations.
+
+==================================================
+13. TRANSPORT LIFECYCLE
+==================================================
+
+Harden the provider transport lifecycle.
+
+Handle:
+
+- initialized
+- connected
+- pairing
+- session proposal
+- session established
+- session updated
+- session deleted
+- transport disconnected
+- transport reconnect
+- provider error
+
+The WaveX DApp core must remain provider-neutral.
+
+Only the provider adapter should know provider-specific transport details.
+
+==================================================
+14. PROVIDER RECONNECTION
+==================================================
+
+If the provider transport temporarily disconnects:
+
+- do not automatically approve requests
+- do not sign anything
+- do not broadcast anything
+- preserve safe public session metadata only where appropriate
+- restore provider connectivity only according to the provider SDK's documented lifecycle
+
+Do not invent a custom reconnection protocol.
+
+If provider state cannot be safely restored:
+
+fail closed.
+
+==================================================
+15. BACKGROUND / FOREGROUND
+==================================================
+
+Integrate safely with the existing AppState security architecture.
+
+When the app backgrounds:
+
+- sensitive pending signing/execution flows must remain protected
+- no request may be auto-approved
+- no request may auto-sign
+- no transaction may auto-broadcast solely because the app resumes
+
+When returning to foreground:
+
+- revalidate pending request/session/account/network context
+- expired or stale requests must remain invalid
+
+Do NOT regress the existing wallet AppState authentication/locking protections.
+
+==================================================
+16. DAPP SESSION STORAGE
+==================================================
+
+Continue using the existing DApp session repository architecture.
+
+Do NOT introduce arbitrary AsyncStorage/localStorage.
+
+If the provider SDK maintains its own session state:
+
+- keep it within the provider adapter boundary
+- do not duplicate provider session persistence unnecessarily
+- do not store secrets
+- do not store private keys
+- do not store recovery phrases
+- do not store PINs
+
+Document what is stored and where.
+
+If a provider session cannot be safely persisted:
+
+fail closed rather than inventing storage.
+
+==================================================
+17. DAPP SECURITY UX
+==================================================
+
+Add neutral security information where useful.
+
+The user should understand:
+
+- DApps are external applications
+- connection exposes approved public wallet information
+- signatures are explicit per-request
+- transactions require explicit review
+- disconnecting removes the session
+- a DApp connection does not grant private-key access
+
+Do NOT use fear-based or unsupported claims.
+
+Do NOT label arbitrary DApps malicious.
+
+Do NOT label DApps trusted/verified without authoritative data.
+
+==================================================
+18. DAPP SESSION EMPTY / ERROR STATES
+==================================================
+
+Implement polished states for:
+
+- no connected DApps
+- loading
+- unavailable
+- expired session
+- disconnected session
+- provider unavailable
+- session error
+
+No fake connected DApps.
+
+No placeholder production sessions.
+
+==================================================
+19. SESSION SEARCH / FILTER
+==================================================
+
+If the number of sessions makes it useful, provide lightweight local search/filtering.
+
+Search by:
+
+- DApp name
+- domain
+
+Do not perform remote searches.
+
+Do not send wallet/session data to external analytics.
+
+Do not overbuild this feature.
+
+==================================================
+20. SESSION DETAIL SECURITY
+==================================================
+
+Never display:
+
+- private key
+- mnemonic
+- PIN
+- SecureStore contents
+- vault handles
+- encryption keys
+
+Only public/session information is allowed.
+
+==================================================
+21. REQUEST HISTORY
+==================================================
+
+Do NOT create a persistent DApp signing-history database in this phase.
+
+Existing Activity remains authoritative for actual blockchain transactions.
+
+Do not turn rejected signatures or rejected transactions into successful Activity.
+
+Do not create fake Activity.
+
+==================================================
+22. ACTIVITY INTEGRATION CHECK
+==================================================
+
+Audit the existing Phase 7.5 Activity integration.
+
+Confirm:
+
+- DApp request alone does not create Activity
+- user rejection does not create successful Activity
+- failed signing does not create successful Activity
+- broadcast creates the appropriate Activity
+- confirmation updates the existing Activity
+- reverted transaction remains reverted
+- unknown transaction remains unknown
+- DApp provenance remains available where appropriate
+
+Do not redesign Activity.
+
+==================================================
+23. PROVIDER ERROR NORMALIZATION
+==================================================
+
+Review all DApp provider error paths.
+
+Ensure errors distinguish:
+
+- user rejection
+- session not found
+- session expired
+- request expired
+- request rejected
+- stale request
+- unsupported method
+- unsupported chain
+- account mismatch
+- network mismatch
+- provider disconnected
+- transport error
+- authentication failure
+- signing failure
+- broadcast failure
+- confirmation unknown
+
+Do not expose:
+
+- private keys
+- mnemonics
+- PINs
+- SecureStore values
+- raw stack traces
+- secret-bearing URLs
+- raw internal provider payloads when unsafe
+
+==================================================
+24. SECURITY BOUNDARY AUDIT
+==================================================
+
+Perform a source-level audit of:
+
+src/core/dapp/
+
+src/core/security/
+
+src/core/transactions/
+
+src/core/wallet/
+
+Confirm:
+
+DApp provider layer CANNOT:
+
+- export private keys
+- access mnemonic
+- access PIN
+- access SecureStore
+- access vault encryption keys
+- bypass authentication
+- bypass transaction review
+- bypass transaction construction
+- directly broadcast
+- automatically switch networks
+
+Confirm provider-specific types remain isolated.
+
+==================================================
+25. DEPENDENCY AUDIT
+==================================================
+
+Do not add new major dependencies unless absolutely necessary.
+
+Review existing Reown/WalletConnect dependencies.
+
+Confirm:
+
+- exact versions
+- no obsolete WalletConnect v1 dependency
+- no duplicate transport SDK
+- no unnecessary crypto library
+- no duplicate wallet/signing library
+
+Do not upgrade unrelated dependencies in this phase.
+
+==================================================
+26. TESTING — SESSION MANAGEMENT
+==================================================
+
+Add focused tests for:
+
+- session creation
+- session listing
+- session details
+- session disconnect
+- session revoke
+- DApp disconnect
+- session expiry
+- session deletion
+- duplicate session
+- multiple DApps
+- account isolation
+- network isolation
+
+==================================================
+27. TESTING — REQUEST MANAGEMENT
+==================================================
+
+Test:
+
+- pending request creation
+- duplicate request ID
+- request expiry
+- request completion
+- request rejection
+- request cancellation
+- session deletion invalidates requests
+- account change invalidates requests
+- network context change invalidates requests
+- stale request rejection
+- concurrent request protection
+- double approval prevention
+- double signing prevention
+- double broadcast prevention
+
+==================================================
+28. TESTING — SECURITY
+==================================================
+
+Prove:
+
+- no secret material enters DApp models
+- no provider API exposes private keys
+- no DApp session contains secret material
+- no request contains secret material
+- no session can silently change account
+- no session can silently change network
+- no signing occurs without explicit authorization
+- no transaction broadcasts without explicit confirmation
+- revoked sessions cannot sign
+- expired sessions cannot sign
+- disconnected sessions cannot broadcast
+
+==================================================
+29. TESTING — LIFECYCLE
+==================================================
+
+Test:
+
+- foreground → background → foreground
+- session expiry during background
+- pending signing request during background
+- pending transaction during background
+- provider disconnect
+- provider reconnect
+- DApp disconnect
+- user disconnect
+- app restart behavior according to supported provider/session persistence model
+
+Do not claim native behavior has been tested unless actually performed.
+
+==================================================
+30. TESTING — PREVIEW
+==================================================
+
+Preview/browser must continue to:
+
+- avoid fake DApp sessions
+- avoid fake WalletConnect proposals
+- avoid fake signatures
+- avoid fake transaction hashes
+- avoid fake broadcasts
+- avoid fake Activity
+
+If functionality requires native provider transport:
+
+show controlled unavailable state.
+
+==================================================
+31. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+src/core/dapp/README.md
+
+Document the FINAL Phase 7 architecture:
+
+DApp
+ ↓
+Reown/WalletConnect Transport
+ ↓
+Provider Adapter
+ ↓
+DApp Core
+ ↓
+Authorization / Review
+ ↓
+Existing WaveX Wallet Security
+ ↓
+Existing Transaction Pipeline
+ ↓
+Existing Broadcast / Activity
+
+Document:
+
+- session management
+- request lifecycle
+- disconnect/revoke
+- expiry
+- account/network binding
+- concurrency
+- provider lifecycle
+- security boundaries
+- Preview limitations
+- physical-device validation deferred
+
+==================================================
+32. FINAL PHASE 7 REGRESSION
+==================================================
+
+After implementation run the complete existing suite.
+
+Do NOT remove or weaken previous tests.
+
+Confirm all previous DApp functionality remains intact:
+
+Phase 7.2:
+- real pairing architecture
+
+Phase 7.3:
+- connection approval
+
+Phase 7.4:
+- personal_sign
+- typed-data signing
+
+Phase 7.5:
+- eth_sendTransaction
+- transaction review
+- signing
+- broadcast
+- confirmation
+- Activity
+
+==================================================
+33. VALIDATION
+==================================================
+
+Run:
+
+1. Focused Phase 7.6 tests
+2. Complete DApp test suite
+3. Full project test suite
+4. TypeScript
+5. Expo validation
+6. Static iOS bundle
+7. Static Android bundle
+8. git diff --check
+9. dependency inspection
+10. security-boundary inspection
+
+Confirm:
+
+- no new signing engine
+- no new transaction engine
+- no new broadcast engine
+- no private-key exposure
+- no mnemonic exposure
+- no PIN exposure
+- no SecureStore misuse
+- no automatic network switching
+- no fake DApp behavior
+- no fake transaction behavior
+- no fake signatures
+- no fake Activity
+- no unrelated wallet regressions
+
+==================================================
+34. PHYSICAL VALIDATION
+==================================================
+
+DO NOT claim the following have been physically validated:
+
+- real WalletConnect pairing
+- QR/deep-link behavior
+- native session persistence
+- native SecureStore
+- biometric authentication
+- real DApp message signing
+- real DApp transaction execution
+- real RPC execution
+
+These will be tested later using the standalone WaveX APK as already planned.
+
+Document them as pending physical-device validation.
+
+==================================================
+35. PHASE 7 COMPLETION REPORT
+==================================================
+
+At the end, provide:
+
+- files created/changed
+- session-management implementation
+- active DApp UI
+- disconnect/revoke behavior
+- expiry behavior
+- pending-request lifecycle
+- concurrency protections
+- provider lifecycle handling
+- account/network hardening
+- security-boundary audit
+- dependency audit
+- focused test count
+- complete DApp test count
+- full project test count
+- TypeScript result
+- Expo/static build results
+- git diff result
+- known warnings
+- known limitations
+- physical-device validation requirements
+
+IMPORTANT:
+
+If all validation passes, explicitly state:
+
+"PHASE 7 DEVELOPMENT COMPLETE — PENDING PHYSICAL-DEVICE VALIDATION"
+
+Do NOT start Phase 8.
+
+STOP after Phase 7.6.
