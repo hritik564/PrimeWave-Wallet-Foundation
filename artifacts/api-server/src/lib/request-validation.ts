@@ -1,6 +1,22 @@
 import type { NextFunction, Request, Response } from "express";
 import type { ZodType } from "zod";
 import { HttpError } from "./errors";
+import { randomUUID } from "node:crypto";
+
+export function requestIdMiddleware(
+  request: Request,
+  response: Response,
+  next: NextFunction,
+): void {
+  const supplied = request.header("x-request-id")?.trim();
+  const requestId =
+    supplied && supplied.length <= 128 && /^[A-Za-z0-9._:-]+$/.test(supplied)
+      ? supplied
+      : randomUUID();
+  request.id = requestId;
+  response.setHeader("X-Request-ID", requestId);
+  next();
+}
 
 export function validateBody<T>(schema: ZodType<T>) {
   return (request: Request, _response: Response, next: NextFunction): void => {

@@ -2,10 +2,10 @@ import express, { type Express } from "express";
 import cors, { type CorsOptions } from "cors";
 import pinoHttp from "pino-http";
 import { loadConfig, type ServerConfig } from "./config";
-import { errorHandler } from "./lib/errors";
+import { errorHandler, HttpError } from "./lib/errors";
 import { logger } from "./lib/logger";
 import { MemoryRateLimiter, rateLimitMiddleware } from "./lib/rate-limit";
-import { requireJsonContentType } from "./lib/request-validation";
+import { requireJsonContentType, requestIdMiddleware } from "./lib/request-validation";
 import { secretMaterialGuard, securityHeaders } from "./lib/security";
 import { createRouter } from "./routes";
 
@@ -28,6 +28,7 @@ export function createApp(config: ServerConfig = loadConfig()): Express {
   };
 
   app.use(securityHeaders);
+  app.use(requestIdMiddleware);
   app.use(
     pinoHttp({
       logger,
@@ -57,6 +58,9 @@ export function createApp(config: ServerConfig = loadConfig()): Express {
   // namespace becomes the only new API boundary.
   app.use(`${config.apiPrefix}`, createRouter(config));
   app.use("/api", createRouter(config));
+  app.use((_request, _response, next) => {
+    next(new HttpError(404, "NOT_FOUND", "The requested API resource was not found."));
+  });
   app.use(errorHandler);
 
   return app;

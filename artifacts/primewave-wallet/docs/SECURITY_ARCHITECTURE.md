@@ -1401,3 +1401,62 @@ future signing or transaction responses can be delivered. Account or network
 changes mark open requests stale rather than rebinding them. The adapter and
 provider-neutral DApp core still receive no PIN, SecureStore value, mnemonic,
 private key, raw signer, signing handle, or direct broadcast access.
+
+## Phase 8.1 backend foundation and security boundary
+
+The backend is an information and support service only. It is not a wallet,
+custody service, recovery service, signer, broadcaster, or transaction
+execution service. The mobile wallet must remain functional without the
+backend wherever its existing local boundaries permit.
+
+The only enabled API capabilities are versioned infrastructure endpoints:
+
+- `GET /api/v1/healthz`
+- `GET /api/v1/readyz`
+- `GET /api/v1/version`
+
+The existing `/api/healthz` path remains only for the managed workflow startup
+probe. There are no wallet-secret, signing, custody, transfer, or transaction
+execution endpoints.
+
+### Backend data classification
+
+The backend may later receive minimized public wallet addresses, public account
+metadata, public network context, token metadata requests, public indexing
+queries, notification preferences, and privacy-safe product telemetry. These
+categories remain untrusted and must be validated at the API boundary.
+
+The backend must never accept, persist, log, cache, transmit, index, or recover
+seed phrases, mnemonics, private keys, raw signing keys, wallet PINs or PIN
+hashes, secure-storage/vault contents, wallet encryption keys, biometric
+secrets, signing capabilities, vault handles, or raw recovery material. It has
+no DTO, database column, cache field, or event schema for them. Secret-shaped
+fields are rejected explicitly before any future persistence boundary.
+
+### Backend trust boundaries
+
+```text
+Mobile wallet
+  ├─ local creation, recovery, derivation, authentication, and signing
+  └─ public/minimized request data only
+       ↓
+WaveX API
+  ├─ request IDs, headers, CORS, size limits, rate limits
+  ├─ schema validation and prohibited-secret guard
+  ├─ future authentication/session boundary
+  ├─ sanitized errors and centralized redacted logging
+  └─ future public-data services
+       ↓
+PostgreSQL/Drizzle foundation
+  └─ no Phase 8.1 application tables
+```
+
+Backend authentication, when added later, will identify a user or application.
+It does not prove ownership of a blockchain address and never authorizes local
+wallet signing. Wallet ownership, public-address ownership, and transaction
+signing authorization remain distinct boundaries.
+
+Configuration is environment-only. Database credentials and other server
+secrets are not exposed to Expo public configuration or health responses.
+CORS production origins must be explicit; wildcard credentialed traffic is not
+allowed. Production deployment and all later Phase 8 services remain deferred.

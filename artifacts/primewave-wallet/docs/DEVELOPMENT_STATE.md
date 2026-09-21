@@ -2,7 +2,8 @@
 
 ## Current phase
 
-**Phase 7.6 — DApp session management and security hardening (implemented)**
+**Phase 8.1 — WaveX backend foundation and security boundary (implemented;
+pending security review)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -611,3 +612,31 @@ increment.
 - Preview remains unavailable for native DApp transport and creates no fake
   sessions, requests, signatures, broadcasts, or Activity. Physical-device
   validation remains deferred.
+
+## Phase 8.1 completion
+
+- Reused the existing Express/TypeScript API artifact as the single backend
+  foundation.
+- Added typed development, test, and production configuration validation with
+  production database-configuration checks.
+- Added versioned `/api/v1/` health, readiness, and version infrastructure
+  endpoints while preserving the existing workflow health probe.
+- Added request IDs, security headers, explicit CORS configuration, bounded
+  JSON request bodies, content-type validation, and reusable server-observed
+  in-memory rate limiting.
+- Added centralized request validation helpers and a defense-in-depth
+  prohibited-secret-material guard for nested request data. Rejected fields
+  are not echoed or logged.
+- Added centralized stable client errors and redacted/bounded server logging.
+- Added deferred authentication, wallet-ownership, and signing-authorization
+  interfaces without implementing an authentication product.
+- Reused the existing PostgreSQL/Drizzle foundation and documented an empty
+  migration boundary. No application tables or secret-bearing schema were
+  added.
+- Added backend-focused tests for configuration, API versioning, health and
+  readiness, malformed and oversized requests, content type, CORS, security
+  headers, request IDs, rate limiting, secret rejection, logger redaction,
+  and persistence-boundary ordering.
+- Deferred token/blockchain indexing, prices, notifications, analytics,
+  transaction synchronization, swaps, DApp backend services, custody,
+  signing, broadcasting, production deployment, and cloud migration.

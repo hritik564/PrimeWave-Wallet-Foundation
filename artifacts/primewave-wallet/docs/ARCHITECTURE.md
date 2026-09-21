@@ -112,9 +112,24 @@ environment-specific and must be supplied through reviewed configuration.
 
 ## Future backend
 
-No authentication, database, indexer, price aggregation, notifications, or
-custody services are created in Phase 0A. Any future backend must preserve the
-mobile app's independent operation and the non-custodial security boundary.
+The `artifacts/api-server` package is now the single backend foundation. It is
+an information and support service only. It exposes a versioned
+`/api/v1/` infrastructure namespace for health, readiness, and version
+identification; it does not expose wallet, signing, custody, transfer, or
+transaction-execution endpoints.
+
+The server boundary is separated into configuration, HTTP middleware,
+validation, security guards, authentication interfaces, routes, errors,
+logging, and the existing PostgreSQL/Drizzle package. The database package is
+kept migration-ready but has no Phase 8 application tables yet.
+
+The mobile wallet remains independently useful without this service. The
+backend may later receive minimized public wallet metadata, public network
+context, token metadata requests, public indexing queries, notification
+preferences, and privacy-safe telemetry. It must never receive recovery
+phrases, private keys, PINs, secure-vault data, signing capabilities, or raw
+secret material. Production deployment and all later Phase 8 business services
+remain deferred.
 
 ## Phase 7.1 — provider-neutral DApp architecture
 
