@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 7.3 — Real DApp connection approval UI (implemented; no signing)**
+**Phase 7.4 — Real DApp message and typed-data signing (implemented)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -499,10 +499,11 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 
 ## Phase boundary
 
-Phase 7.3 stops at public-only WalletConnect transport, explicit connection
-approval, and lightweight connected-session state. Signing, transaction
-execution, broadcasting, persistent sessions, backend APIs, Preview transport
-behavior, automatic network switching, and DApp management remain outside this
+Phase 7.4 adds only `personal_sign`, `eth_signTypedData`, and
+`eth_signTypedData_v4` for already-connected native WalletConnect/Reown
+sessions. Transaction signing/execution, `eth_sendTransaction`, raw transaction
+signing, broadcasting, automatic network switching, swaps, Activity, the DApp
+browser, persistent session redesign, and Preview signing remain outside this
 increment.
 
 ## Phase 7.2 completion
@@ -543,5 +544,24 @@ increment.
 - Added a lightweight connected state with adapter-backed disconnect.
 - Preview Test Mode remains unavailable for DApp connections and creates no
   fake proposal or session.
-- Signing, transaction execution, broadcasting, automatic network switching,
-  DApp management, and physical-device validation remain deferred.
+
+## Phase 7.4 completion
+
+- Added strict provider request normalization for `personal_sign`,
+  `eth_signTypedData`, and `eth_signTypedData_v4`. Unsupported methods,
+  malformed parameters, mismatched accounts, invalid EIP-712 structure,
+  invalid verifying contracts, and session-chain mismatches fail closed.
+- Added bounded signing review UI that displays untrusted DApp metadata,
+  account/network context, exact personal-message meaning, and structured
+  typed-data domain/message fields. Any display bounding or normalization is
+  marked; the original payload remains the cryptographic input.
+- Added explicit Sign and Reject actions. Sign requests require the existing
+  wallet authentication path and a one-shot capability bound to account and
+  payload digest. Private keys, mnemonic material, SecureStore values, raw
+  signers, and vault handles never cross the provider boundary.
+- Added real provider responses through `respondSessionRequest`; signatures
+  are returned only after successful local signing, while rejection,
+  expiry, stale-context, authentication, and delivery failures remain
+  explicit states.
+- Added focused normalization and authorization tests. Preview mode does not
+  create fake signing requests or signatures.

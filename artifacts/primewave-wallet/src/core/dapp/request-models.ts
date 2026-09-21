@@ -27,6 +27,11 @@ export interface DAppNetworkInformationPayload {
 export interface DAppMessageSigningPayload {
   readonly kind: 'message-signing';
   readonly message: string;
+  readonly method?: 'personal_sign';
+  readonly rawPayload?: string;
+  readonly encoding?: 'hex' | 'utf8';
+  readonly displayWasNormalized?: boolean;
+  readonly displayWasTruncated?: boolean;
 }
 
 export interface DAppTypedDataSigningPayload {
@@ -36,6 +41,8 @@ export interface DAppTypedDataSigningPayload {
    * parsed or rewritten by the architecture layer.
    */
   readonly typedData: string;
+  readonly method?: 'eth_signTypedData' | 'eth_signTypedData_v4';
+  readonly displayWasTruncated?: boolean;
 }
 
 export interface DAppTransactionIntent {

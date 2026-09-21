@@ -53,6 +53,9 @@ import {
   assertDAppApprovalCheckpoint,
   type DAppApprovalContext,
   type DAppAuthorizationDecision,
+  type DAppMessageSigningRequest,
+  type DAppRequest,
+  type DAppTypedDataSigningRequest,
   type DAppApprovalStatus,
   type DAppSession,
   type DAppSessionProposal,
@@ -63,6 +66,14 @@ import {
   type DAppApprovalSnapshot,
 } from '@/src/components/dapp/DAppConnectionApproval.logic';
 import { DAppConnectionApprovalScreen } from '@/src/components/dapp/DAppConnectionApprovalScreen';
+import {
+  toDAppSigningViewModel,
+  validateDAppSigningRequest,
+  type DAppSigningStatus,
+  type DAppSigningViewModel,
+} from '@/src/components/dapp/DAppMessageSigning.logic';
+import { DAppMessageSigningScreen } from '@/src/components/dapp/DAppMessageSigningScreen';
+import type { DAppTypedDataDocument } from '@/src/core/dapp/signing';
 import type { WalletConnectDAppTransport } from '@/src/core/dapp/providers/walletconnect';
 
 const iconSource = require('../../assets/images/icon.png');
@@ -82,6 +93,7 @@ type ViewName =
   | 'locked'
   | 'wallet'
   | 'dapp-approval'
+  | 'dapp-signing'
   | 'security'
   | 'recovery';
 
@@ -773,6 +785,11 @@ export default function FoundationScreen() {
   const [dappStatus, setDappStatus] = useState<DAppApprovalStatus>('none');
   const [dappError, setDappError] = useState<string | null>(null);
   const [dappSession, setDappSession] = useState<DAppSession | null>(null);
+  const [dappRequest, setDappRequest] = useState<DAppRequest | null>(null);
+  const [dappSigningModel, setDappSigningModel] = useState<DAppSigningViewModel | null>(null);
+  const [dappSigningStatus, setDappSigningStatus] = useState<DAppSigningStatus>('received');
+  const [dappSigningError, setDappSigningError] = useState<string | null>(null);
+  const dappRequestRef = useRef<DAppRequest | null>(null);
   const [, setAccessRevision] = useState(0);
   const appState = useRef(AppState.currentState);
   const walletRef = useRef<Wallet | null>(null);
@@ -937,11 +954,38 @@ export default function FoundationScreen() {
       } else if (event.type === 'session' && event.event === 'approved') {
         setDappSession(event.session);
         setDappStatus('approved');
+      } else if (event.type === 'request') {
+        try {
+          const request = event.request;
+          if (
+            request.requestType !== 'message-signing' &&
+            request.requestType !== 'typed-data-signing'
+          ) {
+            return;
+          }
+          const signingRequest =
+            request as DAppMessageSigningRequest | DAppTypedDataSigningRequest;
+          dappRequestRef.current = signingRequest;
+          setDappRequest(signingRequest);
+          setDappSigningModel(toDAppSigningViewModel(signingRequest));
+          setDappSigningStatus('received');
+          setDappSigningError(null);
+          setView('dapp-signing');
+        } catch (requestError) {
+          setDappSigningStatus('failed');
+          setDappSigningError(safeMessage(requestError));
+        }
       } else if (event.type === 'error') {
         if (event.errorCode === 'PROVIDER_SESSION_EXPIRED') {
-          setDappStatus('expired');
+          if (dappRequestRef.current) {
+            setDappSigningStatus('expired');
+            setDappSigningError('This signing request expired.');
+          } else {
+            setDappStatus('expired');
+          }
         } else {
-          setDappStatus('failed');
+          if (dappRequestRef.current) setDappSigningStatus('failed');
+          else setDappStatus('failed');
         }
       }
     };
@@ -1126,6 +1170,87 @@ export default function FoundationScreen() {
     }
   };
 
+  const handleDAppSigning = async () => {
+    if (!dappTransport || !dappRequest || !access) return;
+    const context = currentDAppContext();
+    if (!context) {
+      setDappSigningStatus('stale');
+      setDappSigningError('The wallet context is unavailable.');
+      return;
+    }
+    try {
+      validateDAppSigningRequest(dappRequest, context);
+      setDappSigningStatus('signing');
+      let signature: `0x${string}`;
+      if (dappRequest.payload.kind === 'message-signing') {
+        const rawPayload = dappRequest.payload.rawPayload;
+        if (!rawPayload || !rawPayload.startsWith('0x')) {
+          throw new Error('The exact personal-sign bytes are unavailable.');
+        }
+        signature = await access.signDAppPersonalMessage(defaultNetworkRegistry, {
+          requestId: dappRequest.requestId,
+          accountId: dappRequest.accountId,
+          from: dappRequest.walletAddress,
+          networkId: dappRequest.networkId,
+          chainId: dappRequest.chainId,
+          message: rawPayload as `0x${string}`,
+        });
+      } else {
+        let typedData: DAppTypedDataDocument;
+        try {
+          typedData = JSON.parse(dappRequest.payload.typedData) as DAppTypedDataDocument;
+        } catch {
+          throw new Error('The typed-data payload is invalid.');
+        }
+        signature = await access.signDAppTypedData(defaultNetworkRegistry, {
+          requestId: dappRequest.requestId,
+          accountId: dappRequest.accountId,
+          from: dappRequest.walletAddress,
+          networkId: dappRequest.networkId,
+          chainId: dappRequest.chainId,
+          rawPayload: dappRequest.payload.typedData,
+          typedData,
+        });
+      }
+      await dappTransport.sendResponse({
+        requestId: dappRequest.requestId,
+        status: 'completed',
+        result: signature,
+      });
+      setDappSigningStatus('completed');
+      setDappSigningError(null);
+    } catch (signingError) {
+      setDappSigningStatus('failed');
+      setDappSigningError(safeMessage(signingError));
+    }
+  };
+
+  const handleDAppSigningReject = async () => {
+    if (!dappTransport || !dappRequest) return;
+    setDappSigningStatus('rejecting');
+    try {
+      await dappTransport.sendResponse({
+        requestId: dappRequest.requestId,
+        status: 'rejected',
+        errorCode: 'USER_REJECTED',
+      });
+      setDappSigningStatus('rejected');
+      setDappSigningError(null);
+    } catch (rejectionError) {
+      setDappSigningStatus('failed');
+      setDappSigningError(safeMessage(rejectionError));
+    }
+  };
+
+  const handleDAppSigningDone = () => {
+    dappRequestRef.current = null;
+    setDappRequest(null);
+    setDappSigningModel(null);
+    setDappSigningError(null);
+    setDappSigningStatus('received');
+    setView('wallet');
+  };
+
   const handleDAppDisconnect = async () => {
     if (!dappTransport || !dappSession) return;
     try {
@@ -1222,6 +1347,21 @@ export default function FoundationScreen() {
         onReject={() => void handleDAppReject()}
         session={dappSession}
         status={dappStatus}
+      />
+    );
+  }
+  else if (view === 'dapp-signing' && dappRequest && dappSigningModel) {
+    content = (
+      <DAppMessageSigningScreen
+        error={dappSigningError}
+        model={dappSigningModel}
+        onDone={handleDAppSigningDone}
+        onReject={() => void handleDAppSigningReject()}
+        onSign={() => void handleDAppSigning()}
+        request={
+          dappRequest as DAppMessageSigningRequest | DAppTypedDataSigningRequest
+        }
+        status={dappSigningStatus}
       />
     );
   }

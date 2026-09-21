@@ -27,6 +27,11 @@ export type SigningCapability = {
   readonly __opaque: unique symbol;
 };
 
+export type MessageSigningCapability = {
+  readonly kind: 'message-signing-capability';
+  readonly __opaque: unique symbol;
+};
+
 export interface ExplicitSigningAuthorization {
   requestId: string;
   approved: true;

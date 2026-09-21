@@ -28,3 +28,16 @@ authority.
 **How to apply:** Keep provider SDK calls in the adapter, make the UI consume
 validated public DTOs, and let stale/expired context fail closed before session
 approval.
+
+Message signing is a separate explicit approval boundary from connection
+access. Support only the reviewed message methods, preserve exact provider
+bytes/JSON for cryptographic signing, and bind a one-shot opaque capability to
+the request, account, network, and payload digest after wallet authentication.
+
+**Why:** A connected DApp must not inherit signing authority, and bounded or
+sanitized display data must never silently become the signed payload.
+
+**How to apply:** Keep provider request normalization and response delivery in
+the adapter; show bounded review data in the UI; authorize only after an
+explicit Sign action; reject replay, stale context, unsupported methods, and
+authentication failure.

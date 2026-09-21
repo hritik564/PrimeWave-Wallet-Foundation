@@ -16,6 +16,11 @@ import {
   type TransactionSigningAuthorization,
 } from '@/src/core/transactions/signing';
 import type { UnsignedTransaction } from '@/src/core/transactions/construction';
+import {
+  MessageSigningEngine,
+  type DAppMessageSigningAuthorization,
+  type DAppTypedDataDocument,
+} from '@/src/core/dapp/signing';
 
 export type WalletAccessListener = () => void;
 
@@ -187,6 +192,51 @@ export class WalletAccessManager {
       accounts: this.currentWallet.accounts,
     });
     return signingEngine.sign(transaction, authorization);
+  }
+
+  async signDAppPersonalMessage(
+    registry: NetworkRegistry,
+    input: {
+      readonly requestId: string;
+      readonly accountId: string;
+      readonly from: string;
+      readonly networkId: string;
+      readonly chainId: bigint;
+      readonly message: `0x${string}`;
+      readonly confirmedAt?: string;
+    },
+  ): Promise<`0x${string}`> {
+    if (this.status !== 'unlocked' || !this.currentWallet) {
+      throw new Error('Wallet authentication is required before signing.');
+    }
+    const engine = new MessageSigningEngine(registry, this.engine, {
+      authenticator: this.authenticator,
+      accounts: this.currentWallet.accounts,
+    });
+    return engine.signPersonalMessage(input);
+  }
+
+  async signDAppTypedData(
+    registry: NetworkRegistry,
+    input: {
+      readonly requestId: string;
+      readonly accountId: string;
+      readonly from: string;
+      readonly networkId: string;
+      readonly chainId: bigint;
+      readonly rawPayload: string;
+      readonly typedData: DAppTypedDataDocument;
+      readonly confirmedAt?: string;
+    },
+  ): Promise<`0x${string}`> {
+    if (this.status !== 'unlocked' || !this.currentWallet) {
+      throw new Error('Wallet authentication is required before signing.');
+    }
+    const engine = new MessageSigningEngine(registry, this.engine, {
+      authenticator: this.authenticator,
+      accounts: this.currentWallet.accounts,
+    });
+    return engine.signTypedData(input);
   }
 
   async revealRecoveryPhrase(currentPin: string): Promise<string> {

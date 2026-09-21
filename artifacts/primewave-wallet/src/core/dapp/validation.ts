@@ -583,6 +583,20 @@ function validatePayload(
           'Message',
           DAPP_MAX_MESSAGE_LENGTH,
         ),
+        method: value.method === 'personal_sign' ? value.method : undefined,
+        rawPayload:
+          typeof value.rawPayload === 'string'
+            ? stringValue(
+                value.rawPayload,
+                'INVALID_REQUEST',
+                'Raw message payload',
+                DAPP_MAX_MESSAGE_LENGTH,
+              )
+            : undefined,
+        encoding:
+          value.encoding === 'hex' || value.encoding === 'utf8'
+            ? value.encoding
+            : undefined,
       });
     case 'typed-data-signing':
       return Object.freeze({
@@ -593,6 +607,11 @@ function validatePayload(
           'Typed-data payload',
           DAPP_MAX_TYPED_DATA_LENGTH,
         ),
+        method:
+          value.method === 'eth_signTypedData' ||
+          value.method === 'eth_signTypedData_v4'
+            ? value.method
+            : undefined,
       });
     case 'transaction':
       return validateTransactionPayload(value);

@@ -17,6 +17,9 @@ import {
   type DAppTransport,
   type DAppTransportEvent,
   type DAppTransportResponse,
+  type DAppRequest,
+  normalizeSigningRequest,
+  type SigningSessionRequestInput,
   InMemoryDAppSessionRepository,
   type DAppSessionRepository,
 } from '@/src/core/dapp';
@@ -86,6 +89,11 @@ interface PendingProposal {
   readonly mapped: WalletConnectMappedProposal;
 }
 
+interface PendingRequest {
+  readonly event: WalletKitTypes.EventArguments['session_request'];
+  readonly request: DAppRequest;
+}
+
 function providerError(
   code: DAppError['code'],
   message: string,
@@ -128,6 +136,27 @@ function providerRejectionReason(error: DAppError): ReturnType<typeof getSdkErro
   }
 }
 
+function parseEip155Chain(value: unknown): bigint {
+  if (
+    typeof value !== 'string' ||
+    !value.startsWith('eip155:') ||
+    !/^[0-9]+$/.test(value.slice('eip155:'.length))
+  ) {
+    throw providerError(
+      'PROVIDER_UNSUPPORTED_CHAIN',
+      'The DApp request chain is not a supported EVM chain.',
+    );
+  }
+  const chain = BigInt(value.slice('eip155:'.length));
+  if (chain > BigInt(Number.MAX_SAFE_INTEGER)) {
+    throw providerError(
+      'PROVIDER_UNSUPPORTED_CHAIN',
+      'The DApp request chain is outside the supported range.',
+    );
+  }
+  return chain;
+}
+
 function validExpiry(expirySeconds: number, now: number): number {
   if (!Number.isSafeInteger(expirySeconds) || expirySeconds * 1_000 <= now) {
     throw providerError(
@@ -159,6 +188,7 @@ export class WalletConnectDAppTransport implements DAppTransport {
   private readonly repository: DAppSessionRepository;
   private readonly sessionScopes = new Map<string, SessionScope>();
   private readonly pendingProposals = new Map<string, PendingProposal>();
+  private readonly pendingRequests = new Map<string, PendingRequest>();
   private readonly now: () => number;
 
   private readonly onSessionProposal = (
@@ -186,8 +216,12 @@ export class WalletConnectDAppTransport implements DAppTransport {
     void event;
   };
 
-  private readonly onSessionRequestExpire = (): void => {
-    this.emitError('PROVIDER_UNSUPPORTED_REQUEST');
+  private readonly onSessionRequestExpire = (
+    event: WalletKitTypes.EventArguments['session_request_expire'],
+  ): void => {
+    const requestId = String(event.id);
+    this.pendingRequests.delete(requestId);
+    this.emitError('PROVIDER_SESSION_EXPIRED');
   };
 
   private readonly onSessionUpdate = (
@@ -297,11 +331,41 @@ export class WalletConnectDAppTransport implements DAppTransport {
     }
   }
 
-  async sendResponse(_response: DAppTransportResponse): Promise<void> {
-    throw new DAppError(
-      'PROVIDER_UNSUPPORTED_REQUEST',
-      'DApp request execution is not available in this wallet phase.',
-    );
+  async sendResponse(response: DAppTransportResponse): Promise<void> {
+    const pending = this.pendingRequests.get(response.requestId);
+    if (!pending) {
+      throw new DAppError('INVALID_REQUEST', 'The DApp request is no longer available.');
+    }
+    const id = Number(response.requestId);
+    if (!Number.isSafeInteger(id)) {
+      throw new DAppError('INVALID_REQUEST', 'The DApp request ID is invalid.');
+    }
+    try {
+      if (
+        (response.status === 'approved' || response.status === 'completed') &&
+        typeof response.result === 'string'
+      ) {
+        await this.walletKit.respondSessionRequest({
+          topic: pending.event.topic,
+          response: { id, jsonrpc: '2.0', result: response.result },
+        });
+      } else {
+        await this.walletKit.respondSessionRequest({
+          topic: pending.event.topic,
+          response: {
+            id,
+            jsonrpc: '2.0',
+            error: getSdkError('USER_REJECTED'),
+          },
+        });
+      }
+      this.pendingRequests.delete(response.requestId);
+    } catch {
+      throw new DAppError(
+        'PROVIDER_TRANSPORT_ERROR',
+        'The DApp request response could not be delivered.',
+      );
+    }
   }
 
   async approveProposal(proposalId: string): Promise<DAppSession> {
@@ -460,20 +524,78 @@ export class WalletConnectDAppTransport implements DAppTransport {
   private async handleSessionRequest(
     event: WalletKitTypes.EventArguments['session_request'],
   ): Promise<void> {
+    const scope = this.sessionScopes.get(event.topic);
+    if (!scope) {
+      await this.rejectSessionRequest(event, getSdkError('UNAUTHORIZED_METHOD'));
+      this.emitError('SESSION_NOT_FOUND');
+      return;
+    }
+    let session: DAppSession | null = null;
+    try {
+      session = this.repository.get(event.topic, scope);
+      if (
+        !session ||
+        session.status !== 'active' ||
+        (session.expiresAt !== null && session.expiresAt <= this.now())
+      ) {
+        throw new DAppError(
+          'PROVIDER_SESSION_EXPIRED',
+          'The DApp session is no longer active.',
+        );
+      }
+      const chain = parseEip155Chain(event.params.chainId);
+      const network = this.options.registry.getByChainId(Number(chain));
+      if (
+        !network ||
+        !session.approvedChainIds.includes(chain) ||
+        !session.approvedNetworkIds.includes(network.id)
+      ) {
+        throw new DAppError('NETWORK_MISMATCH', 'The request network is not approved.');
+      }
+      const input: SigningSessionRequestInput = {
+        requestId: String(event.id),
+        sessionId: event.topic,
+        identity: session.identity,
+        accountId: session.accountId,
+        walletAddress: session.walletAddress,
+        networkId: network.id,
+        chainId: chain,
+        method: event.params.request.method,
+        params: event.params.request.params,
+        createdAt: this.now(),
+        expiresAt: event.params.request.expiryTimestamp
+          ? event.params.request.expiryTimestamp * 1_000
+          : session.expiresAt,
+      };
+      const request = normalizeSigningRequest(input);
+      this.pendingRequests.set(String(event.id), { event, request });
+      this.emit({ type: 'request', request });
+      return;
+    } catch (error) {
+      const normalized =
+        error instanceof DAppError
+          ? error
+          : providerError(
+              'PROVIDER_UNSUPPORTED_REQUEST',
+              'The DApp request could not be validated.',
+            );
+      await this.rejectSessionRequest(event, providerRejectionReason(normalized));
+      this.emitError(normalized.code);
+    }
+  }
+
+  private async rejectSessionRequest(
+    event: WalletKitTypes.EventArguments['session_request'],
+    reason: ReturnType<typeof getSdkError>,
+  ): Promise<void> {
     try {
       await this.walletKit.respondSessionRequest({
         topic: event.topic,
-        response: {
-          id: event.id,
-          jsonrpc: '2.0',
-          error: getSdkError('UNSUPPORTED_METHODS'),
-        },
+        response: { id: event.id, jsonrpc: '2.0', error: reason },
       });
     } catch {
       this.emitError('PROVIDER_TRANSPORT_ERROR');
-      return;
     }
-    this.emitError('PROVIDER_UNSUPPORTED_REQUEST');
   }
 
   private async handleSessionDelete(topic: string): Promise<void> {

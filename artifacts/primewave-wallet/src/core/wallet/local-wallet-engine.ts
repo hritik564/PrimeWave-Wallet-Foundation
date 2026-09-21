@@ -4,7 +4,13 @@ import { keccak256, type Hex } from 'viem';
 import { mnemonicToAccount } from 'viem/accounts';
 import { secureLogger } from '@/src/core/security/logging';
 import { consumeSigningCapability } from '@/src/core/security/signing-capability';
-import type { SigningCapability } from '@/src/core/security/contracts';
+import {
+  consumeMessageSigningCapability,
+} from '@/src/core/security/message-signing-capability';
+import type {
+  MessageSigningCapability,
+  SigningCapability,
+} from '@/src/core/security/contracts';
 import type { AccountDerivationRequest, SecureVault } from '@/src/core/security/contracts';
 import type { WalletEngine, WalletSetupResult } from './contracts';
 import type { Wallet, WalletAccount } from './models';
@@ -13,6 +19,7 @@ import type {
   Eip1559UnsignedTransaction,
 } from '@/src/core/transactions/construction';
 import type { LocalSigningKeyAccess } from '@/src/core/transactions/signing';
+import type { DAppTypedDataDocument, MessageSigningKeyAccess } from '@/src/core/dapp/signing/models';
 import {
   derivePublicAccountFromMnemonic,
   EVM_DERIVATION_PREFIX,
@@ -35,7 +42,7 @@ type InMemorySecretState = {
 
 const secretStates = new WeakMap<LocalWalletEngine, InMemorySecretState>();
 
-export class LocalWalletEngine implements WalletEngine, LocalSigningKeyAccess {
+export class LocalWalletEngine implements WalletEngine, LocalSigningKeyAccess, MessageSigningKeyAccess {
   private accounts: WalletAccount[] = [];
   private walletId: string | null = null;
   private createdAt: string | null = null;
@@ -355,6 +362,78 @@ export class LocalWalletEngine implements WalletEngine, LocalSigningKeyAccess {
     } finally {
       localAccount = null;
     }
+  }
+
+  async signPersonalMessage(
+    capability: MessageSigningCapability,
+    accountId: string,
+    message: `0x${string}`,
+    requestDigest: `0x${string}`,
+  ): Promise<`0x${string}`> {
+    if (
+      !consumeMessageSigningCapability(capability, {
+        accountId,
+        requestDigest,
+      })
+    ) {
+      throw new WalletCoreError(
+        'SIGNING_ACCESS_DENIED',
+        'The wallet message-signing operation is not authorized.',
+      );
+    }
+    const state = secretStates.get(this);
+    const account = this.accounts.find((candidate) => candidate.accountId === accountId);
+    if (!state || !account) {
+      throw new WalletCoreError('WALLET_NOT_CREATED', 'Unlock the wallet before signing.');
+    }
+    const localAccount = mnemonicToAccount(state.mnemonic, {
+      accountIndex: 0,
+      changeIndex: 0,
+      addressIndex: account.index,
+    });
+    if (localAccount.address.toLowerCase() !== account.address.toLowerCase()) {
+      throw new WalletCoreError(
+        'SIGNING_ACCOUNT_MISMATCH',
+        'The wallet account does not match the signing address.',
+      );
+    }
+    return localAccount.signMessage({ message: { raw: message } });
+  }
+
+  async signTypedData(
+    capability: MessageSigningCapability,
+    accountId: string,
+    typedData: DAppTypedDataDocument,
+    requestDigest: `0x${string}`,
+  ): Promise<`0x${string}`> {
+    if (
+      !consumeMessageSigningCapability(capability, {
+        accountId,
+        requestDigest,
+      })
+    ) {
+      throw new WalletCoreError(
+        'SIGNING_ACCESS_DENIED',
+        'The wallet typed-data signing operation is not authorized.',
+      );
+    }
+    const state = secretStates.get(this);
+    const account = this.accounts.find((candidate) => candidate.accountId === accountId);
+    if (!state || !account) {
+      throw new WalletCoreError('WALLET_NOT_CREATED', 'Unlock the wallet before signing.');
+    }
+    const localAccount = mnemonicToAccount(state.mnemonic, {
+      accountIndex: 0,
+      changeIndex: 0,
+      addressIndex: account.index,
+    });
+    if (localAccount.address.toLowerCase() !== account.address.toLowerCase()) {
+      throw new WalletCoreError(
+        'SIGNING_ACCOUNT_MISMATCH',
+        'The wallet account does not match the signing address.',
+      );
+    }
+    return localAccount.signTypedData(typedData as never);
   }
 
   private async getVault(): Promise<SecureVault> {

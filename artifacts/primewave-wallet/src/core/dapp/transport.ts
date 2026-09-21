@@ -7,7 +7,7 @@ import type {
 
 export interface DAppTransportRequestEvent {
   readonly type: 'request';
-  readonly request: unknown;
+  readonly request: DAppRequest;
 }
 
 export interface DAppTransportSessionEvent {

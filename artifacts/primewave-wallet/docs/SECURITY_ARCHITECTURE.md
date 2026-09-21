@@ -51,10 +51,11 @@ DApp request → validation → WaveX review → existing construction
   → existing broadcast/confirmation
 ```
 
-Typed-data payloads are retained as exact provider-supplied input for future
-cryptographic binding; this phase does not parse or sign them. The transport
-interface is provider-neutral and no WalletConnect, pairing, deep-link, QR,
-backend, or persistent-session implementation exists.
+Typed-data payloads are retained as exact provider-supplied input for
+cryptographic binding. The signing review may parse a bounded representation
+for display, but the original JSON is passed unchanged to the local signing
+boundary. The transport interface is provider-neutral and provider-specific
+calls remain isolated under `src/core/dapp/providers/walletconnect`.
 
 ## Phase 7.2 WalletConnect transport boundary
 
@@ -70,7 +71,9 @@ input; proposal observation never implies approval. The adapter approves only
 explicitly authorized public account/network namespaces and rejects all
 signing or transaction requests with sanitized provider errors. Session
 updates that change the authorized account or primary network are revoked
-instead of silently rebinding the session.
+instead of silently rebinding the session. It normalizes only the supported
+message-signing methods and responds through the SDK only after the UI
+explicitly approves or rejects the request.
 
 ## Phase 7.3 approval UI boundary
 
@@ -91,6 +94,35 @@ The preview build has no fake DApp connection path. Real proposals require the
 native WalletConnect transport and a configured public project ID. Physical
 native-device pairing and deep-link behavior remain unverified until a
 standalone native test build is available.
+
+## Phase 7.4 message-signing boundary
+
+Only already-connected sessions may create a signing request. The provider
+request is checked against the live session topic, approved account, approved
+chain, registered network, request expiry, method, and exact two-parameter
+shape before it reaches the UI. The supported methods are:
+
+- `personal_sign`
+- `eth_signTypedData`
+- `eth_signTypedData_v4`
+
+Transaction methods, raw transaction methods, signing methods outside this
+list, network-switch methods, and automatic network changes remain unsupported.
+
+`personal_sign` accepts either provider ordering for address/message,
+preserves the original message bytes, and uses a bounded sanitized display
+only for review. Typed data must be valid JSON with a domain, type
+declarations, primary type, message, and safe optional chain/verifying-contract
+values. The raw JSON is retained for signing; display fields are bounded and
+may be marked as normalized.
+
+The UI is the only approval boundary. A Sign action captures request ID,
+account, network, and payload digest, then invokes the existing authentication
+flow. The local wallet engine receives a one-shot opaque message-signing
+capability and never exposes a private key, mnemonic, raw signer, SecureStore
+value, or vault handle. The capability is consumed exactly once and rejects
+replay or context mismatch. The provider receives only the resulting signature
+or an explicit rejection/error.
 
 ## 1. Security principles
 

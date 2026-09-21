@@ -79,3 +79,22 @@ export type {
   DAppTransportErrorEvent,
   DAppTransportSessionEvent,
 } from './transport';
+export {
+  normalizeSigningRequest,
+  parsePersonalSigningRequest,
+  parseTypedDataSigningRequest,
+} from './signing/validation';
+export type {
+  BoundedDisplay,
+  ParsedPersonalMessage,
+  ParsedTypedData,
+  SigningSessionRequestInput,
+} from './signing/validation';
+export type {
+  DAppMessageSigningAuthorization,
+  DAppTypedDataDocument,
+  DAppTypedDataField,
+  MessageSigningEngineOptions,
+  MessageSigningKeyAccess,
+} from './signing/models';
+export { MessageSigningEngine } from './signing/service';
