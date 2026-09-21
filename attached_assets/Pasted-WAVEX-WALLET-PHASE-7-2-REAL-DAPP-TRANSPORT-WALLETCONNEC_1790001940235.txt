@@ -1,0 +1,598 @@
+WAVEX WALLET — PHASE 7.2
+REAL DAPP TRANSPORT / WALLETCONNECT-COMPATIBLE SESSION LAYER
+
+IMPORTANT:
+This phase introduces the real external DApp transport/session layer.
+
+Architecture-first and security-first.
+
+Do NOT implement DApp signing or transaction execution in this phase.
+
+==================================================
+1. WORKFLOW RULES
+==================================================
+
+Implement ONLY Phase 7.2.
+
+Do not start Phase 7.3 automatically.
+
+Do not redesign existing WaveX screens.
+
+Do not modify existing wallet, transaction, signing, broadcasting, swap, or Activity behavior except where a clean adapter boundary is required.
+
+Keep implementation incremental and auditable.
+
+Before installing any Web3/DApp transport dependency:
+
+1. Inspect the current package ecosystem.
+2. Verify the CURRENT official documentation for the selected provider/SDK.
+3. Verify current React Native / Expo SDK 57 compatibility.
+4. Verify whether the provider has a wallet-side SDK suitable for building a wallet, rather than a DApp/client SDK.
+5. Verify required native modules, Expo config plugins, deep-link requirements, universal links, and development-build requirements.
+6. Record the exact package/version and compatibility reasoning in the implementation report.
+
+Do NOT use obsolete WalletConnect v1 APIs.
+
+If the current ecosystem has renamed WalletConnect products/packages under Reown, use the current officially documented wallet-side architecture while preserving our provider-neutral DApp core.
+
+Do not guess APIs.
+
+==================================================
+2. SECURITY INVARIANT
+==================================================
+
+WaveX remains strictly non-custodial.
+
+The transport layer must NEVER receive:
+
+- mnemonic
+- recovery phrase
+- private key
+- PIN
+- biometric secret
+- vault encryption key
+- SecureStore secret
+- raw signer object
+- derived private-key material
+
+The transport layer may receive public information required for DApp sessions:
+
+- public address
+- chain ID
+- network information
+- DApp metadata
+- session metadata
+- approved public capabilities
+
+A connected DApp does NOT automatically receive signing authority.
+
+==================================================
+3. USE EXISTING PHASE 7.1 CORE
+==================================================
+
+Treat the existing:
+
+src/core/dapp/
+
+as the authoritative provider-neutral domain layer.
+
+Do not duplicate:
+
+- DAppIdentity
+- DAppSession
+- DAppPermission
+- DAppRequest
+- DAppTransactionRequest
+- DAppTypedDataRequest
+- chain request models
+- lifecycle models
+
+The external provider must adapt into Phase 7.1 models.
+
+Architecture:
+
+External DApp Transport
+        ↓
+Provider Adapter
+        ↓
+Phase 7.1 DApp Core
+        ↓
+Future WaveX Authorization
+        ↓
+Existing Wallet Security / Transaction Engines
+
+The provider must NOT become the source of truth for wallet security.
+
+==================================================
+4. PROVIDER ADAPTER
+==================================================
+
+Create a provider-specific adapter under a clearly isolated path, for example:
+
+src/core/dapp/providers/
+
+Do NOT spread provider-specific types throughout:
+
+src/core/dapp/
+
+The provider-specific layer should translate:
+
+Provider → WaveX DApp models
+
+and:
+
+WaveX DApp responses → Provider response format
+
+The rest of WaveX should remain provider-neutral.
+
+==================================================
+5. REAL PROVIDER / WALLET TRANSPORT
+==================================================
+
+Implement the currently supported wallet-side transport/session SDK selected after official documentation verification.
+
+The implementation must support the provider's current wallet-side session architecture.
+
+At minimum establish the foundation for:
+
+- DApp pairing/connection
+- session proposal reception
+- DApp metadata reception
+- supported EVM namespace handling
+- supported chain/account declarations
+- session approval
+- session rejection
+- session establishment
+- session update where safely supported
+- session delete/disconnect
+- provider transport errors
+- expiry/disconnect events
+
+Do NOT implement signing requests yet.
+
+Do NOT implement transaction requests yet.
+
+==================================================
+6. SUPPORTED CHAINS
+==================================================
+
+Use the existing NetworkRegistry as the source of truth.
+
+Do NOT create a second hardcoded WaveX network registry.
+
+Initially support only networks that are:
+
+- registered
+- enabled
+- configured
+
+in the existing NetworkRegistry.
+
+PrimeWave Mainnet must remain unavailable if it is still a placeholder/unconfigured network.
+
+Ethereum, BNB, Polygon, Arbitrum, Base, Optimism, and Ethereum Sepolia must follow their existing configuration state.
+
+Do not silently add new chains.
+
+A DApp request for an unsupported/unconfigured chain must be rejected cleanly.
+
+Never claim a chain is supported merely because a provider SDK supports it.
+
+WaveX support is determined by our NetworkRegistry.
+
+==================================================
+7. SESSION APPROVAL BOUNDARY
+==================================================
+
+Create a clear internal flow:
+
+DApp proposes connection
+        ↓
+Provider adapter validates proposal
+        ↓
+WaveX DApp core validates metadata/session
+        ↓
+WaveX determines requested chains/accounts/capabilities
+        ↓
+Future UI authorization boundary
+        ↓
+Session approved OR rejected
+        ↓
+Provider receives response
+
+For this phase, establish the authorization service boundary.
+
+Do NOT silently auto-approve arbitrary DApp proposals.
+
+If the current UI cannot yet provide a real user approval screen, use an explicit non-production-safe authorization boundary/state rather than silently approving.
+
+Do not create fake successful production sessions merely to make Preview work.
+
+==================================================
+8. SESSION PERMISSIONS
+==================================================
+
+A session must explicitly record:
+
+- session ID
+- DApp identity
+- public account/address
+- approved chain IDs
+- approved capabilities/namespaces
+- creation time
+- expiration
+- status
+
+Do not infer signing permission from session existence.
+
+Connection/session approval must remain separate from future:
+
+- personal_sign
+- eth_sign
+- eth_signTypedData
+- eth_sendTransaction
+
+authorization.
+
+==================================================
+9. ACCOUNT BOUNDARY
+==================================================
+
+Use the currently active WaveX public account only when explicitly authorized by the future session approval layer.
+
+Do not expose:
+
+- other accounts
+- account private keys
+- recovery phrases
+
+unless a future explicit multi-account authorization flow is implemented.
+
+If account context changes later, the session architecture must be capable of detecting/rejecting stale account context.
+
+Do not silently rebind an existing DApp session to another account.
+
+==================================================
+10. NETWORK BOUNDARY
+==================================================
+
+A DApp session must be bound to its approved chain context.
+
+Do NOT allow:
+
+DApp → automatic WaveX network switch.
+
+If a DApp requests a chain not currently active, the architecture must return a controlled unsupported/pending/requires-user-decision state according to the provider protocol.
+
+Do not implement actual network switching in this phase.
+
+==================================================
+11. PAIRING / DEEP LINK / QR
+==================================================
+
+Implement only what is required by the verified current provider SDK to establish the real transport.
+
+If QR/deep linking is required:
+
+- isolate it inside the provider adapter
+- do not expose raw provider URLs to unrelated wallet code
+- validate incoming pairing data
+- reject malformed or unsupported pairing requests
+- do not place secrets in pairing URLs
+- document Expo development-build/native requirements
+
+Do not build a polished DApp QR scanner UI in this phase.
+
+A later UI phase will handle presentation.
+
+==================================================
+12. SESSION STORAGE
+==================================================
+
+Phase 7.1 intentionally created an in-memory repository.
+
+For Phase 7.2:
+
+- use the existing repository abstraction
+- do not introduce arbitrary AsyncStorage/localStorage
+- do not persist secrets
+- do not create custom persistence unless required by the verified provider SDK
+
+If the provider SDK internally requires session persistence:
+
+1. verify exactly what it stores
+2. determine whether the data is public session metadata only
+3. document its storage mechanism
+4. do not store wallet secrets in it
+5. do not bypass our security architecture
+
+If persistent provider sessions cannot be safely supported in this phase, keep the integration session-scoped/in-memory and document the limitation.
+
+==================================================
+13. PREVIEW TEST MODE
+==================================================
+
+Do NOT make Preview Test Mode pretend that a real DApp is connected.
+
+Preview must not:
+
+- generate fake pairing URIs
+- fake successful provider sessions
+- fake signing
+- fake transaction requests
+- fake blockchain responses
+
+If the provider cannot run in web Preview, show a controlled unavailable state.
+
+Native development builds are the intended environment for real provider transport testing.
+
+==================================================
+14. ERROR HANDLING
+==================================================
+
+Normalize provider errors into WaveX DApp errors.
+
+Do not leak:
+
+- full pairing URLs containing sensitive values
+- raw provider payloads
+- authentication secrets
+- internal stack traces
+- private wallet information
+
+Distinguish at minimum:
+
+- malformed proposal
+- unsupported namespace
+- unsupported chain
+- unsupported account
+- invalid DApp metadata
+- duplicate session
+- expired session
+- rejected session
+- disconnected session
+- provider transport error
+- timeout
+- internal validation failure
+
+Preserve enough provider error context to correctly respond to the DApp.
+
+==================================================
+15. SESSION EVENTS
+==================================================
+
+The provider adapter should translate external lifecycle events into the existing WaveX DApp lifecycle.
+
+Support where applicable:
+
+- proposal received
+- session approved
+- session rejected
+- session updated
+- session deleted
+- transport disconnected
+- session expired
+
+No signing request handling yet.
+
+No transaction request handling yet.
+
+==================================================
+16. PROVIDER SDK BOUNDARY
+==================================================
+
+The provider SDK must not be imported throughout the application.
+
+Only the provider adapter should know provider-specific types.
+
+For example:
+
+BAD:
+
+UI → provider SDK
+Wallet core → provider SDK
+Transaction engine → provider SDK
+
+GOOD:
+
+UI/future DApp authorization
+        ↓
+WaveX DApp Core
+        ↓
+Provider Adapter
+        ↓
+Provider SDK
+
+This keeps the wallet portable if the provider changes in the future.
+
+==================================================
+17. NO SIGNING
+==================================================
+
+STRICTLY OUT OF SCOPE.
+
+Do NOT implement:
+
+- personal_sign
+- eth_sign
+- eth_signTypedData
+- eth_signTypedData_v4
+- transaction signing
+- raw transaction signing
+- EIP-712 signing execution
+- private-key access
+- SecureStore access from provider adapter
+- WalletAccessManager calls from provider adapter
+
+Requests for these capabilities should be recognized as future unsupported/pending request categories where necessary, but must not be executed.
+
+==================================================
+18. NO TRANSACTION EXECUTION
+==================================================
+
+STRICTLY OUT OF SCOPE.
+
+Do NOT implement:
+
+- eth_sendTransaction
+- eth_sendRawTransaction
+- provider transaction construction
+- provider gas estimation
+- transaction broadcasting
+- Activity writes
+- swap execution
+- approval execution
+
+Existing transaction engines remain authoritative.
+
+==================================================
+19. NO AUTOMATIC NETWORK SWITCHING
+==================================================
+
+STRICTLY OUT OF SCOPE.
+
+Do not implement:
+
+- wallet_switchEthereumChain
+- wallet_addEthereumChain
+- automatic network selection
+- silent chain changes
+
+Create only the architecture required to recognize and safely reject/defer such requests later.
+
+==================================================
+20. TESTING
+==================================================
+
+Add focused tests for:
+
+Provider Adapter:
+
+- valid proposal
+- malformed proposal
+- unsupported namespace
+- unsupported chain
+- unconfigured chain
+- invalid DApp metadata
+- valid session approval translation
+- session rejection translation
+- duplicate session
+- expired session
+- disconnect
+- session deletion
+- account isolation
+- network isolation
+- provider error normalization
+
+Security:
+
+- provider cannot access private key
+- provider cannot access mnemonic
+- provider cannot access PIN
+- provider cannot access SecureStore
+- provider cannot access raw signer
+- provider cannot broadcast
+- provider cannot automatically change active network
+- session does not imply signing authorization
+- unsupported signing request is never executed
+
+Boundary:
+
+- provider-specific types do not leak into provider-neutral models
+- NetworkRegistry remains network source of truth
+- DApp core remains provider-neutral
+- no duplicate session repository logic
+- no fake Preview sessions
+
+If actual native provider SDK tests require native runtime, separate:
+
+- deterministic unit tests
+- native/manual validation requirements
+
+Do not fabricate successful native test results.
+
+==================================================
+21. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+src/core/dapp/README.md
+
+Document:
+
+- selected provider/SDK and exact version
+- official documentation verified
+- Expo SDK 57 compatibility findings
+- native requirements
+- provider adapter boundary
+- supported chains
+- session lifecycle
+- account/network authorization
+- storage behavior
+- security limitations
+- signing intentionally deferred
+- transaction execution intentionally deferred
+- network switching intentionally deferred
+- Preview limitations
+
+==================================================
+22. VALIDATION
+==================================================
+
+Run:
+
+1. DApp focused tests
+2. Full test suite
+3. TypeScript
+4. Expo validation
+5. Static iOS/Android bundle validation
+6. git diff --check
+7. security-boundary inspection
+8. dependency inspection
+
+Confirm:
+
+- provider SDK version is explicitly identified
+- no obsolete WalletConnect v1 package/API
+- no unverified dependency introduced
+- no secret handling introduced
+- no signing path introduced
+- no broadcast path introduced
+- no automatic network switching
+- no backend dependency
+- no fake production sessions
+- no unrelated modifications
+
+IMPORTANT:
+If the current provider SDK is NOT compatible with Expo SDK 57 / React Native architecture without a substantial native migration, STOP and report the blocker rather than forcing a workaround.
+
+==================================================
+23. FINAL REPORT
+==================================================
+
+Return:
+
+- exact provider/SDK selected
+- exact version
+- official documentation/version compatibility basis
+- files created/changed
+- architecture implemented
+- session flow
+- supported networks
+- storage behavior
+- security boundaries
+- focused test count
+- total test count
+- TypeScript result
+- Expo/build validation
+- dependency changes
+- limitations
+- anything requiring native physical-device validation
+
+STOP after Phase 7.2.
+
+Do NOT implement Phase 7.3 automatically.
