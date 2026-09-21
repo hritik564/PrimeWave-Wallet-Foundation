@@ -1,0 +1,1095 @@
+WAVEX WALLET — PHASE 7.5
+DAPP TRANSACTION REQUESTS & SECURE EXECUTION
+
+We are continuing the existing WaveX Wallet project.
+
+Completed:
+- Phase 7.1 — Provider-neutral DApp/Web3 architecture
+- Phase 7.2 — Real WalletConnect/Reown transport/session layer
+- Phase 7.3 — DApp connection & approval UI
+- Phase 7.4 — DApp message & typed-data signing
+
+Now implement ONLY Phase 7.5:
+REAL DAPP TRANSACTION REQUESTS, REVIEW, SECURE LOCAL SIGNING, BROADCAST, CONFIRMATION, AND PROVIDER RESPONSE.
+
+This is a security-critical phase.
+
+==================================================
+1. STRICT WORKFLOW
+==================================================
+
+Implement ONLY Phase 7.5.
+
+Do NOT implement Phase 7.6 automatically.
+
+Do not create a second transaction engine.
+
+Do not create a second signing engine.
+
+Do not create a second broadcast engine.
+
+Reuse the existing WaveX transaction/security architecture.
+
+Existing authoritative layers include:
+
+Phase 2.4 — Gas/Fee Engine
+Phase 2.5 — Transaction Construction
+Phase 2.6 — Secure Local Transaction Signing
+Phase 2.7 — Broadcast & Confirmation
+
+Phase 4.6 — Transaction Review
+Phase 4.7 — Secure Local Authorization & Signing
+Phase 4.8 — Broadcast & Confirmation UI
+
+DApp transaction requests must adapt into these existing boundaries.
+
+==================================================
+2. OBJECTIVE
+==================================================
+
+Implement the secure flow:
+
+DApp
+ ↓
+WalletConnect/Reown request
+ ↓
+Phase 7.2 provider adapter
+ ↓
+DApp transaction request validation
+ ↓
+WaveX transaction intent
+ ↓
+Existing transaction construction
+ ↓
+WaveX transaction review UI
+ ↓
+User explicitly approves
+ ↓
+Existing wallet authentication
+ ↓
+Exact transaction-bound signing authorization
+ ↓
+Existing local signing
+ ↓
+Existing broadcast/confirmation
+ ↓
+Provider response to DApp
+
+NEVER:
+
+DApp
+ ↓
+private key
+ ↓
+raw signer
+ ↓
+eth_sendRawTransaction
+
+==================================================
+3. SUPPORTED PROVIDER METHOD
+==================================================
+
+Implement the verified current provider-side handling for:
+
+eth_sendTransaction
+
+Do NOT implement:
+
+eth_sendRawTransaction from DApps.
+
+DApps must never provide WaveX with a raw signed transaction that WaveX blindly broadcasts.
+
+The WaveX wallet constructs, reviews, signs, and broadcasts the transaction itself.
+
+Before implementation:
+
+- verify the installed Reown/WalletConnect request event/API
+- use the existing provider adapter
+- do not call provider SDK methods directly from UI
+- keep provider-specific response formatting inside the provider adapter
+
+==================================================
+4. DAPP TRANSACTION REQUEST MODEL
+==================================================
+
+Create/extend a provider-neutral DApp transaction request.
+
+It must include:
+
+- requestId
+- sessionId
+- DApp identity
+- accountId
+- from
+- to
+- chainId
+- value
+- calldata/data
+- optional nonce
+- optional gas
+- optional gasPrice
+- optional maxFeePerGas
+- optional maxPriorityFeePerGas
+- provider/request context
+- createdAt
+- expiry
+
+All numeric Ethereum transaction fields must be represented safely.
+
+Prefer canonical string/bigint representations internally.
+
+Never use JavaScript floating-point numbers for transaction quantities.
+
+==================================================
+5. STRICT REQUEST VALIDATION
+==================================================
+
+Before showing the transaction review UI validate:
+
+- session exists
+- session is active
+- request belongs to session
+- request has not expired
+- request ID is valid
+- request ID has not already been handled
+- requested account is authorized
+- from address is valid
+- from address matches the authorized WaveX account
+- chainId is valid
+- chainId matches an approved session network
+- chain exists in NetworkRegistry
+- network is enabled
+- network is configured
+- network is not a placeholder
+- to address is valid when present
+- value is valid non-negative integer
+- calldata is valid hex
+- gas values are valid non-negative integers
+- fee fields are valid integers
+- mutually exclusive fee models are rejected
+- malformed fields are rejected
+
+Do not silently repair malformed transaction fields.
+
+Do not silently change:
+
+- from
+- to
+- value
+- data
+- nonce
+- gas
+- fee fields
+- chainId
+
+==================================================
+6. ACCOUNT BINDING
+==================================================
+
+The DApp cannot choose an arbitrary WaveX account.
+
+Require:
+
+DApp request.from
+==
+approved session account
+==
+current authorized WaveX public address
+
+If any mismatch exists:
+
+BLOCK the request.
+
+Never silently replace the DApp's from address with the current account.
+
+Return a controlled provider error.
+
+==================================================
+7. NETWORK BINDING
+==================================================
+
+The DApp request chainId must:
+
+- match the approved session network
+- match a configured WaveX network
+- match the actual remote chain during transaction construction
+
+Do not automatically switch the active WaveX network.
+
+If the DApp requests a chain that is not approved for the session:
+
+- reject/defer safely
+- do not switch networks
+- do not ask the user to approve a hidden network change
+
+Network switching is intentionally deferred.
+
+==================================================
+8. TRANSACTION INTENT ADAPTER
+==================================================
+
+Convert the validated DApp transaction request into the existing WaveX TransactionIntent.
+
+Do NOT create a parallel DApp transaction model that bypasses:
+
+Transaction Construction
+Gas/Fee Engine
+Secure Local Signing
+Broadcast/Confirmation
+
+The adapter must preserve the exact public transaction intent.
+
+The resulting WaveX transaction intent must be bound to:
+
+- DApp request ID
+- session ID
+- DApp identity
+- account
+- sender
+- network
+- chain ID
+- recipient
+- value
+- calldata
+- fee preferences
+- nonce where supplied
+
+==================================================
+9. NATIVE TRANSFERS
+==================================================
+
+Support DApp native-asset transactions.
+
+Example:
+
+from
+to
+value
+data = 0x
+
+Use the existing transaction construction and fee engine.
+
+Review must clearly show:
+
+- network
+- native asset
+- amount
+- recipient
+- gas
+- estimated network fee
+- maximum possible network fee
+- maximum total native amount
+
+Do not subtract gas silently from a user-requested amount.
+
+If funds are insufficient:
+
+BLOCK signing.
+
+==================================================
+10. CONTRACT INTERACTIONS
+==================================================
+
+DApp transactions may contain arbitrary contract calldata.
+
+Treat calldata as untrusted.
+
+Do NOT assume:
+
+- contract is safe
+- contract is verified
+- method is safe
+- selector is harmless
+- DApp is trustworthy
+
+Where possible, decode known standard interactions using existing token/ABI knowledge.
+
+Otherwise clearly classify the request as:
+
+"Contract interaction"
+
+and show:
+
+- destination contract
+- value
+- calldata
+- gas/fee information
+- network
+- DApp identity
+
+Do not invent a human-readable meaning for unknown calldata.
+
+==================================================
+11. ERC-20 / TOKEN INTERACTIONS
+==================================================
+
+Where the calldata can be confidently decoded as a standard ERC-20 operation:
+
+- transfer
+- approve
+
+present useful human-readable information.
+
+For example:
+
+Token
+Amount
+Recipient
+Spender
+Contract
+
+But:
+
+TOKEN METADATA MUST NOT BE TREATED AS PROOF OF TRUST.
+
+Verification status remains independent.
+
+If decoding is uncertain:
+
+show raw/bounded contract interaction information.
+
+Do not falsely classify arbitrary calldata as an ERC-20 transfer.
+
+==================================================
+12. APPROVAL SECURITY
+==================================================
+
+This phase must explicitly handle ERC-20 approval transactions safely.
+
+If calldata represents:
+
+approve(spender, amount)
+
+show:
+
+- token
+- token contract
+- spender
+- amount
+- network
+- DApp
+
+Do NOT automatically label the spender trusted.
+
+Do NOT rewrite approval amount.
+
+Do NOT convert finite approval into unlimited approval.
+
+Do NOT automatically approve transactions.
+
+The exact calldata must remain bound to the signed transaction.
+
+Unlimited approvals must be presented clearly if the requested amount represents an effectively unlimited approval.
+
+Do not silently modify it.
+
+==================================================
+13. DANGEROUS / HIGH-RISK TRANSACTION PRESENTATION
+==================================================
+
+Use neutral, factual warnings for security-relevant conditions.
+
+Examples:
+
+- Contract interaction
+- Token approval
+- Large native value
+- Unlimited/very large token allowance
+- Unknown contract method
+- Unverified token metadata
+- Unavailable metadata
+- Network fee unusually high relative to value where measurable
+
+Do NOT call a DApp malicious without authoritative evidence.
+
+Do NOT claim a contract is safe simply because it is verified.
+
+==================================================
+14. TRANSACTION REVIEW UI
+==================================================
+
+Reuse/adapt the existing WaveX Transaction Review architecture.
+
+Do not create a completely separate DApp transaction review system.
+
+The review screen must clearly show:
+
+DApp:
+- name
+- domain
+- icon/fallback
+
+Account:
+- account label
+- shortened address
+
+Network:
+- network name
+- chain ID where appropriate
+
+Transaction:
+- asset/value
+- recipient
+- contract interaction status
+- token information where confidently decoded
+- calldata information where needed
+
+Fees:
+- gas limit
+- fee model
+- fee per gas
+- estimated fee
+- maximum fee
+- maximum total native amount
+
+Warnings:
+- contract interaction
+- approval
+- unverified metadata
+- unknown calldata
+- other factual risk conditions
+
+Actions:
+
+PRIMARY:
+"Confirm Transaction"
+
+SECONDARY:
+"Reject"
+
+No transaction may be signed merely because the review screen opened.
+
+==================================================
+15. EXACT REVIEW BINDING
+==================================================
+
+The reviewed transaction must have an immutable binding digest.
+
+Bind at minimum:
+
+- DApp identity
+- request ID
+- session ID
+- account
+- sender
+- network ID
+- chain ID
+- recipient
+- value
+- calldata
+- nonce
+- gas limit
+- fee model
+- fee values
+- transaction type
+- decoded/public presentation context where security-relevant
+
+Do NOT include volatile presentation timestamps in the cryptographic transaction identity.
+
+The digest must remain stable across re-rendering.
+
+If the transaction changes after review:
+
+BLOCK signing.
+
+==================================================
+16. STALE REQUEST PROTECTION
+==================================================
+
+Before signing, revalidate:
+
+- session
+- request
+- DApp identity
+- account
+- sender
+- network
+- chain
+- recipient
+- value
+- calldata
+- nonce
+- gas
+- fee model
+- fee values
+- balance
+- canonical transaction identity
+
+If any relevant value changed:
+
+invalidate the review.
+
+Do not silently refresh and sign the new transaction.
+
+Require a new review.
+
+==================================================
+17. BALANCE / FEE VALIDATION
+==================================================
+
+Use existing authoritative balance and fee engines.
+
+For native transactions:
+
+value + maximum network fee <= available native balance
+
+For token transactions:
+
+token amount <= token balance
+
+AND:
+
+maximum network fee <= native balance
+
+Do not assume token balance pays gas.
+
+Do not use stale balance data for final signing.
+
+If balance cannot be authoritatively validated:
+
+BLOCK signing.
+
+==================================================
+18. GAS / FEE MODEL
+==================================================
+
+Reuse Phase 2.4.
+
+Support:
+
+- EIP-1559
+- Legacy
+
+Clearly identify the model.
+
+Do not silently convert one model to another.
+
+If fallback occurs:
+
+show the existing fallback warning.
+
+Do not introduce:
+
+- hidden gas multipliers
+- hidden fee markup
+- hidden fee padding
+
+==================================================
+19. NONCE
+==================================================
+
+If DApp supplies a nonce:
+
+- preserve it exactly
+- validate it
+- bind it into the transaction identity
+
+If nonce is omitted:
+
+use existing transaction construction behavior.
+
+Do not silently replace a DApp-supplied nonce.
+
+If nonce becomes stale before signing:
+
+invalidate the review and require reconstruction.
+
+==================================================
+20. AUTHENTICATION
+==================================================
+
+After the user explicitly confirms the transaction:
+
+use the existing WaveX authentication architecture.
+
+Support existing:
+
+- PIN
+- biometric authentication where available
+
+Do NOT let DApp requests bypass wallet authentication.
+
+Do not access PIN or biometric APIs from the DApp layer.
+
+Preserve the previously fixed AppState/unlock race protections.
+
+==================================================
+21. SIGNING AUTHORIZATION
+==================================================
+
+Create a one-shot signing capability bound to the exact DApp transaction.
+
+Bind authorization to:
+
+- request ID
+- session ID
+- DApp identity
+- account
+- sender
+- network
+- chain ID
+- recipient
+- value
+- calldata
+- nonce
+- gas
+- fee model
+- fee values
+- canonical transaction digest
+
+Never authorize:
+
+"DApp X can sign transactions."
+
+Authorize only:
+
+"This exact transaction request may be signed."
+
+==================================================
+22. LOCAL SIGNING
+==================================================
+
+Reuse the existing Phase 2.6/4.7 local signing infrastructure.
+
+Do NOT create:
+
+- generic private-key export
+- DApp private-key signer
+- new mnemonic derivation path
+- new vault
+- new SecureStore access path
+
+The DApp layer must receive only the resulting signed transaction/hash information required by the existing execution flow.
+
+Private key material remains inside the existing wallet boundary.
+
+==================================================
+23. FINAL PRE-SIGN CHECKPOINT
+==================================================
+
+Immediately before signing:
+
+Revalidate the entire transaction binding.
+
+Also verify:
+
+- wallet still unlocked/authenticated
+- account still matches
+- session still active
+- request not expired
+- network still configured
+- remote chain ID still matches
+- balance still sufficient
+- fee data still valid
+- transaction identity unchanged
+
+If any check fails:
+
+DO NOT SIGN.
+
+Return a controlled failure/stale state.
+
+==================================================
+24. BROADCAST
+==================================================
+
+Reuse Phase 2.7 TransactionBroadcastEngine.
+
+Do not call:
+
+eth_sendRawTransaction
+
+directly from the DApp/provider adapter.
+
+The execution path must remain:
+
+DApp
+ ↓
+WaveX transaction pipeline
+ ↓
+Local signing
+ ↓
+BroadcastEngine
+ ↓
+RPC
+ ↓
+Confirmation
+
+No automatic rebroadcast.
+
+No automatic retry after an ambiguous send.
+
+==================================================
+25. CONFIRMATION
+==================================================
+
+Reuse existing bounded confirmation behavior.
+
+States must distinguish:
+
+- broadcasting
+- broadcasted
+- confirming
+- confirmed
+- reverted
+- failed
+- unknown
+
+If the transaction was submitted but confirmation becomes ambiguous:
+
+return a controlled unknown state.
+
+Do NOT rebroadcast automatically.
+
+==================================================
+26. PROVIDER RESPONSE
+==================================================
+
+Only after successful broadcast according to the existing execution contract:
+
+return the transaction hash to the DApp through the provider adapter.
+
+The DApp response must contain only what the provider protocol expects.
+
+Do not expose:
+
+- private key
+- mnemonic
+- signing capability
+- vault information
+- internal wallet security state
+
+If transaction execution fails:
+
+return the appropriate provider error.
+
+User rejection must be distinguished from wallet execution failure.
+
+==================================================
+27. USER REJECTION
+==================================================
+
+If the user rejects:
+
+- do not authenticate
+- do not sign
+- do not broadcast
+- do not create Activity as a successful transaction
+- return the correct provider rejection
+- preserve the DApp session
+
+Rejecting one transaction must NOT disconnect the DApp.
+
+==================================================
+28. ACTIVITY INTEGRATION
+==================================================
+
+Use the existing Activity architecture only after an actual transaction execution event.
+
+Do NOT create fake activity when:
+
+- DApp request arrives
+- review opens
+- user rejects
+- authentication fails
+
+Once a transaction is actually broadcast:
+
+record it through the existing ActivityService.
+
+Preserve:
+
+- DApp provenance where appropriate
+- transaction hash
+- account
+- network
+- asset/contract information
+- lifecycle status
+
+Do not invent "confirmed" before confirmation exists.
+
+==================================================
+29. CONCURRENCY / DUPLICATES
+==================================================
+
+Prevent:
+
+- duplicate request handling
+- double confirmation
+- double signing
+- double broadcast
+- replaying completed request IDs
+
+Only one sensitive transaction signing flow should be active for a given wallet context.
+
+If another request arrives:
+
+use a bounded safe queue OR reject/defer safely.
+
+Do not permit concurrent private-key signing operations.
+
+==================================================
+30. REQUEST LIFECYCLE
+==================================================
+
+The lifecycle should distinguish:
+
+received
+→ validating
+→ review
+→ user_confirmed
+→ authenticating
+→ signing
+→ signed
+→ broadcasting
+→ confirming
+→ completed
+
+And failure states:
+
+rejected_by_user
+expired
+stale
+invalid
+authentication_failed
+signing_failed
+broadcast_failed
+reverted
+unknown
+
+Do not collapse all failures into one generic state.
+
+==================================================
+31. PREVIEW TEST MODE
+==================================================
+
+Preview/browser mode must NOT:
+
+- fabricate DApp transaction requests
+- create fake signatures
+- create fake transaction hashes
+- simulate successful broadcasts
+- bypass authentication
+- bypass signing
+- create fake Activity
+
+If DApp transaction execution is unavailable in Preview:
+
+show a controlled unavailable state.
+
+No fake production blockchain behavior.
+
+==================================================
+32. SECURITY TESTS
+==================================================
+
+Add focused tests proving:
+
+REQUEST VALIDATION
+
+- invalid session
+- expired session
+- revoked session
+- wrong account
+- wrong chain
+- unsupported network
+- unconfigured network
+- malformed recipient
+- malformed value
+- malformed calldata
+- invalid gas
+- invalid fee fields
+- conflicting fee models
+- duplicate request
+
+TRANSACTION BINDING
+
+- stable digest
+- exact calldata preservation
+- exact value preservation
+- exact recipient preservation
+- exact nonce preservation
+- exact fee preservation
+- account binding
+- network binding
+- DApp/session binding
+- mutation detection
+
+REVIEW
+
+- user must explicitly confirm
+- stale review rejected
+- changed fee rejected
+- changed gas rejected
+- changed balance rejected
+- changed network rejected
+- changed calldata rejected
+- changed recipient rejected
+
+SECURITY
+
+- no private key
+- no mnemonic
+- no PIN
+- no SecureStore access
+- no raw signer exposure
+- no direct broadcast from DApp layer
+- no automatic network switching
+- no signing without explicit authorization
+- no authorization reuse
+
+EXECUTION
+
+- authentication failure
+- signing failure
+- broadcast failure
+- confirmation timeout
+- reverted transaction
+- unknown transaction state
+- duplicate broadcast prevention
+
+PROVIDER
+
+- successful tx hash response
+- user rejection response
+- execution failure response
+- no sensitive data in provider response
+
+ACTIVITY
+
+- no activity before broadcast
+- broadcast creates correct activity
+- confirmation updates activity
+- rejection creates no successful activity
+
+==================================================
+33. CONTRACT / TOKEN TEST CASES
+==================================================
+
+Add deterministic tests for:
+
+1. Native transfer
+
+2. ERC-20 transfer
+
+3. ERC-20 approval with finite amount
+
+4. ERC-20 approval with very large/unlimited amount
+
+5. Unknown contract calldata
+
+6. Contract call with native value
+
+7. Malformed ERC-20 calldata
+
+8. Fake token metadata
+
+9. Unverified token
+
+10. Recipient/address mismatch
+
+The system must never rely solely on:
+
+- token symbol
+- token name
+- decimals
+- contract name
+- DApp name
+
+for trust decisions.
+
+==================================================
+34. DOCUMENTATION
+==================================================
+
+Update:
+
+docs/ARCHITECTURE.md
+docs/SECURITY_ARCHITECTURE.md
+docs/DEVELOPMENT_STATE.md
+src/core/dapp/README.md
+
+Document:
+
+- DApp transaction flow
+- provider adapter boundary
+- transaction intent mapping
+- review binding
+- exact transaction authorization
+- authentication
+- local signing
+- broadcast/confirmation
+- Activity integration
+- rejection behavior
+- stale protection
+- contract interaction handling
+- approval handling
+- Preview limitations
+- physical-device validation deferred
+
+==================================================
+35. VALIDATION
+==================================================
+
+Run:
+
+1. DApp transaction focused tests
+2. Full project test suite
+3. TypeScript
+4. Expo validation
+5. Static iOS bundle
+6. Static Android bundle
+7. git diff --check
+8. dependency inspection
+9. security-boundary inspection
+
+Confirm:
+
+- no second transaction engine
+- no second signer
+- no second broadcaster
+- no private key exposure
+- no mnemonic exposure
+- no SecureStore access from provider layer
+- no automatic network switching
+- no raw DApp transaction broadcasting
+- no fake Preview transactions
+- no fake transaction hashes
+- no fake Activity
+- existing wallet transaction architecture remains authoritative
+
+IMPORTANT:
+Do NOT claim real DApp transaction execution has been physically tested.
+
+Physical validation will occur later using the standalone APK as previously planned.
+
+==================================================
+36. FINAL REPORT
+==================================================
+
+Return:
+
+- files created/changed
+- DApp request handling
+- transaction intent mapping
+- review UI
+- transaction binding
+- authentication
+- signing integration
+- broadcast integration
+- confirmation behavior
+- provider response behavior
+- Activity integration
+- contract/token handling
+- security boundaries
+- focused test count
+- total test count
+- TypeScript result
+- Expo/static build results
+- dependency changes
+- limitations
+- physical-device validation requirements
+
+STOP after Phase 7.5.
+
+Do NOT implement Phase 7.6 automatically.
