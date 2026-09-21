@@ -1209,7 +1209,7 @@ website layout.
          integration. Complete.
      18. **Future ecosystem capabilities:** external token verification,
          state-changing token operations, NFTs, portfolio valuation, swaps, DApp
-     connectivity beyond the Phase 7.5 transaction flow, and PrimeWave
+     connectivity beyond the Phase 7.6 session-management flow, and PrimeWave
      integrations remain deferred.
 
 ## Phase 7.5 — DApp transaction requests
@@ -1233,3 +1233,24 @@ balance; approvals and unknown calldata remain factual, untrusted contract
 interactions. Activity is created only after a broadcast result exists and is
 then updated by confirmation. Provider responses contain only the transaction
 hash after broadcast or a controlled protocol error.
+
+## Phase 7.6 — DApp session management and security hardening
+
+Phase 7.6 keeps provider state inside the WalletConnect/Reown adapter while
+exposing only provider-neutral sessions, requests, lifecycle events, and
+sanitized errors to the app. Sessions remain account-scoped and in-memory; the
+Active DApps surface lists only sessions belonging to the selected wallet
+account and labels provider metadata as unverified.
+
+The request manager now uses bounded, explicit lifecycle states for review,
+authentication, signing, broadcasting, expiry, stale context, cancellation,
+completion, rejection, and failure. Request IDs are single-use, concurrent
+responses are locked, and provider expiry, disconnect, revocation, or transport
+shutdown invalidates associated pending requests before the UI can continue.
+
+Disconnecting a session is an adapter operation. It asks the provider to close
+the session, updates the local session state, removes the provider scope, and
+invalidates pending requests. Account, wallet-address, network, and foreground
+context checks never silently rebind an open DApp request. Preview remains
+unavailable for native provider behavior and creates no fake sessions or
+requests. Physical-device validation is still deferred.

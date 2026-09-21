@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 7.4 — Real DApp message and typed-data signing (implemented)**
+**Phase 7.6 — DApp session management and security hardening (implemented)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -591,4 +591,23 @@ increment.
   requests, signatures, hashes, broadcasts, or Activity. Physical-device
   validation remains deferred.
 
-Phase 7.6 was not started.
+## Phase 7.6 completion
+
+- Added bounded request lifecycle states for review, authentication, signing,
+  broadcasting, completion, rejection, failure, expiry, stale context, and
+  cancellation.
+- Added account-wide in-memory session listing through the existing session
+  repository boundary. Provider SDK state remains inside the WalletConnect/Reown
+  adapter.
+- Added request ID duplicate protection, concurrent response locks, expiry
+  cleanup, session-close cleanup, adapter-backed disconnect, and sanitized
+  provider lifecycle/error events.
+- Added account and network context invalidation. Open requests become stale
+  instead of being silently rebound after account, wallet-address, or active
+  network changes.
+- Added the Active DApps wallet entry point and session-detail surface with
+  public metadata, account/network scope, permissions, expiry, search, empty
+  state, native-unavailable state, and confirmed disconnect.
+- Preview remains unavailable for native DApp transport and creates no fake
+  sessions, requests, signatures, broadcasts, or Activity. Physical-device
+  validation remains deferred.

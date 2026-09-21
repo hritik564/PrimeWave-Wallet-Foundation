@@ -365,6 +365,66 @@ test('keeps request lifecycle states deterministic and distinguishes rejection f
   );
 });
 
+test('tracks review and security lifecycle states and invalidates stale context', () => {
+  const service = new DAppRequestService();
+  service.create(makeRequest());
+  assert.equal(service.markPending('request-1').status, 'pending');
+  assert.equal(service.markReviewing('request-1').status, 'reviewing');
+  assert.equal(service.markAuthenticating('request-1').status, 'authenticating');
+  assert.equal(service.markSigning('request-1').status, 'signing');
+  assert.equal(service.complete('request-1').status, 'completed');
+
+  const staleService = new DAppRequestService();
+  staleService.create(makeRequest({ requestId: 'request-stale' }));
+  staleService.markPending('request-stale');
+  const invalidated = staleService.invalidateContext({
+    accountId: 'account-1',
+    walletAddress,
+    networkId: 'polygon',
+  });
+  assert.equal(invalidated[0]?.status, 'stale');
+  assert.equal(staleService.get('request-stale')?.status, 'stale');
+  assert.throws(
+    () => staleService.complete('request-stale'),
+    (error: unknown) =>
+      error instanceof DAppError && error.code === 'INVALID_LIFECYCLE',
+  );
+});
+
+test('invalidates every active request for a disconnected session', () => {
+  const service = new DAppRequestService();
+  service.create(makeRequest({ requestId: 'request-a' }));
+  service.create(makeRequest({ requestId: 'request-b' }));
+  service.markPending('request-a');
+  service.markPending('request-b');
+  const invalidated = service.invalidateSession('session-1');
+  assert.deepEqual(
+    invalidated.map((request) => request.status),
+    ['cancelled', 'cancelled'],
+  );
+  assert.equal(service.listForSession('session-1').every((request) => request.status === 'cancelled'), true);
+});
+
+test('lists sessions by account without crossing account scope', () => {
+  const repository = new InMemoryDAppSessionRepository();
+  repository.create(makeSession());
+  repository.create(
+    makeSession({
+      sessionId: 'session-2',
+      accountId: 'account-2',
+      identity: { ...identity, dappId: 'other-dapp' },
+    }),
+  );
+  assert.deepEqual(
+    repository.listForAccount('account-1').map((session) => session.sessionId),
+    ['session-1'],
+  );
+  assert.deepEqual(
+    repository.listForAccount('account-2').map((session) => session.sessionId),
+    ['session-2'],
+  );
+});
+
 test('bounds in-memory session storage', () => {
   const repository = new InMemoryDAppSessionRepository(1);
   repository.create(makeSession());

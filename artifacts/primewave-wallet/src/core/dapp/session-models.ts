@@ -25,6 +25,7 @@ export interface DAppSessionRepository {
   create(session: DAppSession): DAppSession;
   get(sessionId: string, scope: DAppSessionScope): DAppSession | null;
   list(scope: DAppSessionScope): readonly DAppSession[];
+  listForAccount(accountId: string): readonly DAppSession[];
   update(
     sessionId: string,
     scope: DAppSessionScope,
@@ -105,6 +106,17 @@ export class InMemoryDAppSessionRepository implements DAppSessionRepository {
     return Object.freeze(
       [...this.sessions.values()]
         .filter((session) => scopeMatches(session, scope))
+        .map(cloneSession),
+    );
+  }
+
+  listForAccount(accountId: string): readonly DAppSession[] {
+    if (typeof accountId !== 'string' || accountId.trim().length === 0) {
+      throw new DAppError('SESSION_SCOPE_MISMATCH', 'DApp account scope is invalid.');
+    }
+    return Object.freeze(
+      [...this.sessions.values()]
+        .filter((session) => session.accountId === accountId)
         .map(cloneSession),
     );
   }

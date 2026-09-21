@@ -847,6 +847,7 @@ export default function FoundationScreen() {
   const [dappStatus, setDappStatus] = useState<DAppApprovalStatus>('none');
   const [dappError, setDappError] = useState<string | null>(null);
   const [dappSession, setDappSession] = useState<DAppSession | null>(null);
+  const [dappSessions, setDappSessions] = useState<readonly DAppSession[]>([]);
   const [dappRequest, setDappRequest] = useState<DAppRequest | null>(null);
   const [dappSigningModel, setDappSigningModel] = useState<DAppSigningViewModel | null>(null);
   const [dappSigningStatus, setDappSigningStatus] = useState<DAppSigningStatus>('received');
@@ -1016,7 +1017,34 @@ export default function FoundationScreen() {
         }
       } else if (event.type === 'session' && event.event === 'approved') {
         setDappSession(event.session);
+        setDappSessions((current) => [
+          ...current.filter((session) => session.sessionId !== event.session.sessionId),
+          event.session,
+        ]);
         setDappStatus('approved');
+      } else if (event.type === 'session') {
+        setDappSessions((current) => {
+          if (event.event === 'updated') {
+            return [
+              ...current.filter((session) => session.sessionId !== event.session.sessionId),
+              event.session,
+            ];
+          }
+          return current.filter((session) => session.sessionId !== event.session.sessionId);
+        });
+        if (dappRequestRef.current?.sessionId === event.session.sessionId) {
+          setDappRequest(null);
+          dappRequestRef.current = null;
+          setDappSigningModel(null);
+          setDappSigningStatus('stale');
+          setDappSigningError(
+            event.event === 'expired'
+              ? 'This request expired because the DApp session expired.'
+              : 'This request is no longer valid because the DApp session was disconnected.',
+          );
+          setDappError('The DApp session is no longer active.');
+          setView('wallet');
+        }
       } else if (event.type === 'request') {
         try {
           const request = event.request;
@@ -1061,6 +1089,10 @@ export default function FoundationScreen() {
         } else {
           if (dappRequestRef.current) setDappSigningStatus('failed');
           else setDappStatus('failed');
+        }
+      } else if (event.type === 'lifecycle') {
+        if (event.event === 'transport-disconnected') {
+          setDappError('The DApp provider transport is disconnected. Requests fail closed until it is restored.');
         }
       }
     };
@@ -1126,6 +1158,9 @@ export default function FoundationScreen() {
         }
         setDappTransport(transport);
         await transport.start(listener);
+        setDappSessions(
+          transport.listSessions(walletRef.current?.accounts[0]?.accountId ?? ''),
+        );
       } catch (transportError) {
         if (mounted) {
           setDappError(safeMessage(transportError));
@@ -1139,6 +1174,49 @@ export default function FoundationScreen() {
       setDappTransport(null);
     };
   }, [currentWallet?.walletId, previewMode]);
+
+  useEffect(() => {
+    if (!dappTransport || !currentWallet?.accounts[0]) {
+      setDappSessions([]);
+      return;
+    }
+    setDappSessions(dappTransport.listSessions(currentWallet.accounts[0].accountId));
+    if (selectedNetwork.chainId === null) return;
+    void dappTransport.invalidateContext({
+      accountId: currentWallet.accounts[0].accountId,
+      walletAddress: currentWallet.accounts[0].address,
+      networkId: selectedNetwork.id,
+    });
+  }, [
+    currentWallet?.accounts[0]?.accountId,
+    currentWallet?.accounts[0]?.address,
+    dappTransport,
+    selectedNetwork.id,
+    selectedNetwork.chainId,
+  ]);
+
+  useEffect(() => {
+    if (
+      backgrounded ||
+      !dappTransport ||
+      !currentWallet?.accounts[0] ||
+      selectedNetwork.chainId === null
+    ) {
+      return;
+    }
+    void dappTransport.invalidateContext({
+      accountId: currentWallet.accounts[0].accountId,
+      walletAddress: currentWallet.accounts[0].address,
+      networkId: selectedNetwork.id,
+    });
+  }, [
+    backgrounded,
+    currentWallet?.accounts[0]?.accountId,
+    currentWallet?.accounts[0]?.address,
+    dappTransport,
+    selectedNetwork.id,
+    selectedNetwork.chainId,
+  ]);
 
   useEffect(() => {
     if (
@@ -1410,6 +1488,9 @@ export default function FoundationScreen() {
     if (!dappTransport || !dappSession) return;
     try {
       await dappTransport.disconnect(dappSession.sessionId);
+      setDappSessions((current) =>
+        current.filter((session) => session.sessionId !== dappSession.sessionId),
+      );
       setDappSession(null);
       setDappProposal(null);
       setDappSnapshot(null);
@@ -1544,7 +1625,12 @@ export default function FoundationScreen() {
       />
     );
   }
-  else if (view === 'wallet' && currentWallet) content = <WalletHomeShell activityService={activityService} activityReadModelService={activityReadModelService} createConstructionEngine={createConstructionEngine} createSigningDependency={createSigningDependency} createBroadcastDependency={createBroadcastDependency} previewMode={previewMode} wallet={currentWallet} network={selectedNetwork} networkRegistry={defaultNetworkRegistry} readModelService={portfolioReadModelService} swapQuoteService={swapQuoteService} onNetworkSelect={handleNetworkSelect} onComingSoon={(message) => setError(message)} onLock={() => void run(async () => {
+  else if (view === 'wallet' && currentWallet) content = <WalletHomeShell activityService={activityService} activityReadModelService={activityReadModelService} createConstructionEngine={createConstructionEngine} createSigningDependency={createSigningDependency} createBroadcastDependency={createBroadcastDependency} dappAvailable={dappTransport !== null && !previewMode} dappSessions={dappSessions} onDAppDisconnect={async (sessionId) => {
+    if (!dappTransport) throw new Error('DApp provider transport is unavailable.');
+    await dappTransport.disconnect(sessionId);
+    setDappSessions((current) => current.filter((session) => session.sessionId !== sessionId));
+    if (dappSession?.sessionId === sessionId) setDappSession(null);
+  }} previewMode={previewMode} wallet={currentWallet} network={selectedNetwork} networkRegistry={defaultNetworkRegistry} readModelService={portfolioReadModelService} swapQuoteService={swapQuoteService} onNetworkSelect={handleNetworkSelect} onComingSoon={(message) => setError(message)} onLock={() => void run(async () => {
     if (previewMode) {
       previewTestMode.lockPreviewWallet();
     } else {

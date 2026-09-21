@@ -26,6 +26,7 @@ import type { ActivityReadModelService } from '@/src/core/activity';
 import type { SwapQuote, SwapQuoteService } from '@/src/core/swaps';
 import type { SwapReviewApproval, SwapReviewSnapshot } from '@/src/core/swaps';
 import type { Wallet } from '@/src/core/wallet/models';
+import type { DAppSession } from '@/src/core/dapp';
 import { ReceiveScreen } from './ReceiveScreen';
 import {
   TransactionReviewScreen,
@@ -44,6 +45,7 @@ import { WalletSwapReviewScreen } from './WalletSwapReviewScreen';
 import { WalletSwapExecutionScreen } from './WalletSwapExecutionScreen';
 import { assetIdentityKey, type PublicSendDraft } from './WalletSendScreen.logic';
 import { copyPublicAddress } from './public-address-actions';
+import { DAppSessionsScreen } from './dapp/DAppSessionsScreen';
 import {
   assetDisplayName,
   assetDisplaySubtitle,
@@ -58,7 +60,7 @@ import {
 
 const iconSource = require('../../assets/images/icon.png');
 
-type Destination = 'home' | 'assets' | 'receive' | 'send' | 'swap' | 'activity' | 'settings';
+type Destination = 'home' | 'assets' | 'receive' | 'send' | 'swap' | 'activity' | 'settings' | 'dapps';
 type PortfolioState = 'loading' | 'available' | 'empty' | 'unavailable' | 'error';
 
 export type NetworkSelectionResult =
@@ -114,7 +116,7 @@ function Header({
   onSettingsPress,
 }: {
   wallet: Wallet;
-  detailMode: 'receive' | 'send' | 'swap' | 'activity' | null;
+  detailMode: 'receive' | 'send' | 'swap' | 'activity' | 'dapps' | null;
   onBack: () => void;
   onAccountPress: () => void;
   onSettingsPress: () => void;
@@ -953,7 +955,7 @@ function PlaceholderDestination({
   destination,
   onBack,
 }: {
-  destination: Exclude<Destination, 'home' | 'assets' | 'receive' | 'send'>;
+  destination: Exclude<Destination, 'home' | 'assets' | 'receive' | 'send' | 'dapps'>;
   onBack: () => void;
 }) {
   const details = {
@@ -1010,6 +1012,9 @@ export function WalletHomeShell({
   activityService,
   activityReadModelService,
   swapQuoteService,
+  dappSessions = [],
+  dappAvailable = false,
+  onDAppDisconnect = async () => undefined,
   onNetworkSelect,
   onLock,
   onComingSoon,
@@ -1033,6 +1038,9 @@ export function WalletHomeShell({
   activityService?: TransactionActivityDependency | null;
   activityReadModelService?: Pick<ActivityReadModelService, 'getActivity'> | null;
   swapQuoteService?: SwapQuoteService | null;
+  dappSessions?: readonly DAppSession[];
+  dappAvailable?: boolean;
+  onDAppDisconnect?: (sessionId: string) => Promise<void>;
   onNetworkSelect: (networkId: string) => NetworkSelectionResult;
   onLock: () => void;
   onComingSoon: (label: string) => void;
@@ -1135,6 +1143,8 @@ export function WalletHomeShell({
                   ? 'swap'
                 : destination === 'activity'
                   ? 'activity'
+                  : destination === 'dapps'
+                    ? 'dapps'
                   : null
           }
           onAccountPress={() => setAccountPanelVisible(true)}
@@ -1212,6 +1222,27 @@ export function WalletHomeShell({
               onViewAll={() => setDestination('assets')}
               state={portfolioState}
             />
+            <Pressable
+              accessibilityLabel="Open Connected DApps"
+              accessibilityRole="button"
+              onPress={() => setDestination('dapps')}
+              style={({ pressed }) => [styles.dappEntryCard, pressed && styles.pressed]}
+            >
+              <View style={styles.dappEntryIcon}>
+                <Ionicons name="link-outline" size={21} color={theme.colors.accent} />
+              </View>
+              <View style={styles.dappEntryCopy}>
+                <Text style={styles.dappEntryTitle}>Connected DApps</Text>
+                <Text style={styles.dappEntryBody}>
+                  {dappAvailable
+                    ? dappSessions.length === 0
+                      ? 'Review and manage public wallet connections.'
+                      : `${dappSessions.length} connected session${dappSessions.length === 1 ? '' : 's'}`
+                    : 'Native provider connections are unavailable in Preview.'}
+                </Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={theme.colors.mutedForeground} />
+            </Pressable>
             <Pressable
               accessibilityLabel="Lock wallet"
               accessibilityRole="button"
@@ -1337,6 +1368,15 @@ export function WalletHomeShell({
               wallet={wallet}
             />
           )
+        ) : destination === 'dapps' ? (
+          <DAppSessionsScreen
+            available={dappAvailable}
+            networkRegistry={networkRegistry}
+            onBack={() => setDestination('home')}
+            onDisconnect={onDAppDisconnect}
+            sessions={dappSessions}
+            wallet={wallet}
+          />
         ) : (
           <PlaceholderDestination
             destination={destination}
@@ -1447,6 +1487,11 @@ const styles = StyleSheet.create({
   previewBannerTitle: { color: theme.states.warning, fontFamily: theme.typography.label.fontFamily, fontSize: 10, letterSpacing: 1.1 },
   previewBannerBody: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 12, lineHeight: 17 },
   homeScrollContent: { paddingHorizontal: theme.spacing.lg, gap: theme.spacing.lg },
+  dappEntryCard: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, padding: theme.spacing.md, borderRadius: theme.radius.lg, backgroundColor: 'rgba(80, 217, 255, 0.08)', borderWidth: 1, borderColor: 'rgba(80, 217, 255, 0.25)' },
+  dappEntryIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: 'rgba(80, 217, 255, 0.12)' },
+  dappEntryCopy: { flex: 1, gap: 3 },
+  dappEntryTitle: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14 },
+  dappEntryBody: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 11, lineHeight: 17 },
   greeting: { marginTop: theme.spacing.lg, gap: theme.spacing.sm },
   eyebrow: { color: theme.colors.accent, fontFamily: theme.typography.eyebrow.fontFamily, fontSize: theme.typography.eyebrow.fontSize, letterSpacing: theme.typography.eyebrow.letterSpacing, lineHeight: theme.typography.eyebrow.lineHeight },
   heroTitle: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 34, lineHeight: 40, letterSpacing: -1.2 },

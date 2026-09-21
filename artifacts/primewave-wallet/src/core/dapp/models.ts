@@ -71,11 +71,17 @@ export type DAppRequestType =
 export type DAppRequestStatus =
   | 'created'
   | 'pending'
+  | 'reviewing'
+  | 'authenticating'
+  | 'signing'
+  | 'broadcasting'
   | 'approved'
   | 'rejected'
   | 'completed'
   | 'failed'
-  | 'expired';
+  | 'expired'
+  | 'stale'
+  | 'cancelled';
 
 export interface DAppRequestContext {
   readonly requestId: string;

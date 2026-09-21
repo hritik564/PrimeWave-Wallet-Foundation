@@ -22,6 +22,7 @@ import {
   normalizeTransactionRequest,
   type SigningSessionRequestInput,
   InMemoryDAppSessionRepository,
+  DAppRequestService,
   type DAppSessionRepository,
 } from '@/src/core/dapp';
 import type { NetworkRegistry } from '@/src/core/networks';
@@ -131,7 +132,12 @@ function providerRejectionReason(error: DAppError): ReturnType<typeof getSdkErro
     case 'PROVIDER_UNSUPPORTED_REQUEST':
       return getSdkError('UNSUPPORTED_METHODS');
     case 'PROVIDER_SESSION_EXPIRED':
+    case 'REQUEST_EXPIRED':
       return getSdkError('USER_REJECTED');
+    case 'PROVIDER_SESSION_DELETED':
+    case 'PROVIDER_DISCONNECTED':
+    case 'REQUEST_CANCELLED':
+      return getSdkError('USER_DISCONNECTED');
     default:
       return getSdkError('USER_REJECTED');
   }
@@ -187,10 +193,13 @@ export class WalletConnectDAppTransport implements DAppTransport {
   private listener: ((event: DAppTransportEvent) => void) | null = null;
   private started = false;
   private readonly repository: DAppSessionRepository;
+  private readonly requestService = new DAppRequestService();
   private readonly sessionScopes = new Map<string, SessionScope>();
   private readonly pendingProposals = new Map<string, PendingProposal>();
   private readonly pendingRequests = new Map<string, PendingRequest>();
   private readonly handledRequestIds = new Set<string>();
+  private readonly responseLocks = new Set<string>();
+  private readonly closingSessions = new Set<string>();
   private readonly now: () => number;
 
   private readonly onSessionProposal = (
@@ -214,16 +223,15 @@ export class WalletConnectDAppTransport implements DAppTransport {
   private readonly onProposalExpire = (
     event: WalletKitTypes.EventArguments['proposal_expire'],
   ): void => {
+    const proposalId = String(event.id);
+    this.pendingProposals.delete(proposalId);
     this.emitError('PROVIDER_SESSION_EXPIRED');
-    void event;
   };
 
   private readonly onSessionRequestExpire = (
     event: WalletKitTypes.EventArguments['session_request_expire'],
   ): void => {
-    const requestId = String(event.id);
-    this.pendingRequests.delete(requestId);
-    this.emitError('PROVIDER_SESSION_EXPIRED');
+    void this.handleRequestExpire(String(event.id));
   };
 
   private readonly onSessionUpdate = (
@@ -288,10 +296,18 @@ export class WalletConnectDAppTransport implements DAppTransport {
       this.onSessionExpire,
     );
     this.started = true;
+    this.emit({ type: 'lifecycle', event: 'initialized' });
+    this.emit({ type: 'lifecycle', event: 'connected' });
   }
 
   async stop(): Promise<void> {
     if (!this.started) return;
+    await this.invalidateAllPending(
+      new DAppError(
+        'PROVIDER_DISCONNECTED',
+        'The provider transport is no longer available.',
+      ),
+    );
     this.walletKit.off('session_proposal', this.onSessionProposal);
     this.walletKit.off('session_request', this.onSessionRequest);
     this.walletKit.off('session_delete', this.onSessionDelete);
@@ -310,6 +326,29 @@ export class WalletConnectDAppTransport implements DAppTransport {
     );
     this.listener = null;
     this.started = false;
+  }
+
+  listSessions(accountId: string): readonly DAppSession[] {
+    return this.repository.listForAccount(accountId);
+  }
+
+  async invalidateContext(context: {
+    readonly accountId: string;
+    readonly walletAddress: string;
+    readonly networkId: string;
+  }): Promise<void> {
+    const invalidated = this.requestService.invalidateContext(context);
+    for (const request of invalidated) {
+      const pending = this.pendingRequests.get(request.requestId);
+      if (!pending) continue;
+      await this.rejectPendingRequest(
+        pending,
+        new DAppError(
+          'REQUEST_STALE',
+          'The wallet account or network context changed while this request was open.',
+        ),
+      );
+    }
   }
 
   async pair(uri: string): Promise<void> {
@@ -338,12 +377,26 @@ export class WalletConnectDAppTransport implements DAppTransport {
     if (!pending) {
       throw new DAppError('INVALID_REQUEST', 'The DApp request is no longer available.');
     }
+    if (
+      this.responseLocks.has(response.requestId) ||
+      this.handledRequestIds.has(response.requestId)
+    ) {
+      throw new DAppError('DUPLICATE_REQUEST', 'The DApp request response was already handled.');
+    }
+    this.responseLocks.add(response.requestId);
     const id = Number(response.requestId);
     if (!Number.isSafeInteger(id)) {
+      this.responseLocks.delete(response.requestId);
       throw new DAppError('INVALID_REQUEST', 'The DApp request ID is invalid.');
     }
     try {
-      if (response.status === 'completed' && typeof response.result === 'string') {
+      if (response.status === 'completed' && typeof response.result !== 'string') {
+        throw new DAppError(
+          'INVALID_REQUEST',
+          'A completed DApp response must contain a result.',
+        );
+      }
+      if (response.status === 'completed') {
         await this.walletKit.respondSessionRequest({
           topic: pending.event.topic,
           response: { id, jsonrpc: '2.0', result: response.result },
@@ -356,6 +409,10 @@ export class WalletConnectDAppTransport implements DAppTransport {
               ? { code: -32000, message: 'The transaction request is stale.' }
               : response.errorCode === 'UNKNOWN_RESULT'
                 ? { code: -32000, message: 'The transaction result is unknown.' }
+                  : response.errorCode === 'REQUEST_STALE'
+                    ? { code: -32000, message: 'The request is no longer current.' }
+                    : response.errorCode === 'REQUEST_CANCELLED'
+                      ? getSdkError('USER_DISCONNECTED')
                 : getSdkError('USER_REJECTED');
         await this.walletKit.respondSessionRequest({
           topic: pending.event.topic,
@@ -366,6 +423,12 @@ export class WalletConnectDAppTransport implements DAppTransport {
           },
         });
       }
+      const lifecycle = this.requestService.get(response.requestId);
+      if (lifecycle && !['completed', 'rejected', 'failed'].includes(lifecycle.status)) {
+        if (response.status === 'completed') this.requestService.complete(response.requestId);
+        else if (response.status === 'rejected') this.requestService.reject(response.requestId);
+        else this.requestService.fail(response.requestId);
+      }
       this.pendingRequests.delete(response.requestId);
       this.handledRequestIds.add(response.requestId);
     } catch {
@@ -373,6 +436,8 @@ export class WalletConnectDAppTransport implements DAppTransport {
         'PROVIDER_TRANSPORT_ERROR',
         'The DApp request response could not be delivered.',
       );
+    } finally {
+      this.responseLocks.delete(response.requestId);
     }
   }
 
@@ -483,22 +548,23 @@ export class WalletConnectDAppTransport implements DAppTransport {
     if (!scope) {
       throw new DAppError('SESSION_NOT_FOUND', 'DApp session was not found.');
     }
+    if (this.closingSessions.has(sessionId)) {
+      throw new DAppError('INVALID_LIFECYCLE', 'The DApp session is already closing.');
+    }
+    this.closingSessions.add(sessionId);
     try {
       await this.walletKit.disconnectSession({
         topic: sessionId,
         reason: getSdkError('USER_DISCONNECTED'),
       });
-      const session = this.repository.update(sessionId, scope, {
-        status: 'disconnected',
-        lastActivityAt: this.now(),
-      });
-      this.emit({ type: 'session', event: 'disconnected', session });
-      this.sessionScopes.delete(sessionId);
+      await this.handleSessionClose(sessionId, 'disconnected', 'disconnected');
     } catch {
       throw new DAppError(
         'PROVIDER_TRANSPORT_ERROR',
         'The WalletConnect session could not be disconnected.',
       );
+    } finally {
+      this.closingSessions.delete(sessionId);
     }
   }
 
@@ -603,6 +669,8 @@ export class WalletConnectDAppTransport implements DAppTransport {
               params: event.params.request.params,
             })
           : normalizeSigningRequest(input);
+      this.requestService.create(request);
+      this.requestService.markPending(requestId);
       this.pendingRequests.set(requestId, { event, request });
       this.emit({ type: 'request', request });
       return;
@@ -614,6 +682,9 @@ export class WalletConnectDAppTransport implements DAppTransport {
               'PROVIDER_UNSUPPORTED_REQUEST',
               'The DApp request could not be validated.',
             );
+      if (normalized.code === 'PROVIDER_SESSION_EXPIRED') {
+        await this.handleSessionClose(event.topic, 'expired', 'expired');
+      }
       await this.rejectSessionRequest(event, providerRejectionReason(normalized));
       this.emitError(normalized.code);
     }
@@ -643,13 +714,28 @@ export class WalletConnectDAppTransport implements DAppTransport {
     event: 'disconnected' | 'expired' | 'revoked',
   ): Promise<void> {
     const scope = this.sessionScopes.get(topic);
-    if (!scope) return;
+    await this.invalidateSessionRequests(topic, status === 'expired'
+      ? new DAppError('REQUEST_EXPIRED', 'The DApp session expired while this request was open.')
+      : new DAppError('REQUEST_CANCELLED', 'The DApp session is no longer connected.'));
+    if (!scope) {
+      this.sessionScopes.delete(topic);
+      return;
+    }
     try {
       const session = this.repository.update(topic, scope, {
         status,
         lastActivityAt: this.now(),
       });
       this.emit({ type: 'session', event, session });
+      this.emit({
+        type: 'lifecycle',
+        event:
+          event === 'expired'
+            ? 'session-deleted'
+            : event === 'revoked'
+              ? 'session-deleted'
+              : 'session-deleted',
+      });
     } catch {
       this.emitError(
         event === 'expired'
@@ -699,6 +785,7 @@ export class WalletConnectDAppTransport implements DAppTransport {
         lastActivityAt: this.now(),
       });
       this.emit({ type: 'session', event: 'updated', session: updated });
+      this.emit({ type: 'lifecycle', event: 'session-updated' });
     } catch (error) {
       this.emitError(safeErrorCode(error));
     }
@@ -803,5 +890,69 @@ export class WalletConnectDAppTransport implements DAppTransport {
 
   private emitError(errorCode: string): void {
     this.emit({ type: 'error', errorCode });
+  }
+
+  private async invalidateSessionRequests(
+    sessionId: string,
+    error: DAppError,
+  ): Promise<void> {
+    const invalidated = this.requestService.invalidateSession(
+      sessionId,
+      error.code === 'REQUEST_EXPIRED' ? 'stale' : 'cancelled',
+    );
+    for (const request of invalidated) {
+      const pending = this.pendingRequests.get(request.requestId);
+      if (pending) await this.rejectPendingRequest(pending, error);
+    }
+  }
+
+  private async invalidateAllPending(error: DAppError): Promise<void> {
+    const pending = [...this.pendingRequests.values()];
+    for (const item of pending) {
+      await this.rejectPendingRequest(item, error);
+    }
+  }
+
+  private async rejectPendingRequest(
+    pending: PendingRequest,
+    error: DAppError,
+  ): Promise<void> {
+    if (!this.pendingRequests.has(pending.request.requestId)) return;
+    const requestId = pending.request.requestId;
+    if (this.responseLocks.has(requestId)) return;
+    this.responseLocks.add(requestId);
+    try {
+      await this.walletKit.respondSessionRequest({
+        topic: pending.event.topic,
+        response: {
+          id: pending.event.id,
+          jsonrpc: '2.0',
+          error: providerRejectionReason(error),
+        },
+      });
+    } catch {
+      this.emitError('PROVIDER_TRANSPORT_ERROR');
+    } finally {
+      this.pendingRequests.delete(requestId);
+      this.handledRequestIds.add(requestId);
+      this.responseLocks.delete(requestId);
+      this.emitError(error.code);
+    }
+  }
+
+  private async handleRequestExpire(requestId: string): Promise<void> {
+    const pending = this.pendingRequests.get(requestId);
+    const lifecycle = this.requestService.get(requestId);
+    if (lifecycle && !['completed', 'rejected', 'failed', 'expired', 'stale', 'cancelled'].includes(lifecycle.status)) {
+      this.requestService.expire(requestId);
+    }
+    if (pending) {
+      await this.rejectPendingRequest(
+        pending,
+        new DAppError('REQUEST_EXPIRED', 'The DApp request expired.'),
+      );
+      return;
+    }
+    this.emitError('REQUEST_EXPIRED');
   }
 }

@@ -31,11 +31,26 @@ export interface DAppTransportErrorEvent {
   readonly errorCode: string;
 }
 
+export interface DAppTransportLifecycleEvent {
+  readonly type: 'lifecycle';
+  readonly event:
+    | 'initialized'
+    | 'connected'
+    | 'pairing'
+    | 'session-established'
+    | 'session-updated'
+    | 'session-deleted'
+    | 'transport-disconnected'
+    | 'transport-reconnected'
+    | 'provider-error';
+}
+
 export type DAppTransportEvent =
   | DAppTransportRequestEvent
   | DAppTransportSessionEvent
   | DAppTransportProposalEvent
-  | DAppTransportErrorEvent;
+  | DAppTransportErrorEvent
+  | DAppTransportLifecycleEvent;
 
 export interface DAppTransportResponse {
   readonly requestId: string;
@@ -50,6 +65,12 @@ export interface DAppTransport {
   stop(): Promise<void> | void;
   sendResponse(response: DAppTransportResponse): Promise<void> | void;
   disconnect(sessionId: string): Promise<void> | void;
+  listSessions(accountId: string): readonly DAppSession[];
+  invalidateContext(context: {
+    readonly accountId: string;
+    readonly walletAddress: string;
+    readonly networkId: string;
+  }): Promise<void> | void;
   approveProposal(proposalId: string): Promise<DAppSession>;
   rejectProposal(proposalId: string): Promise<void>;
 }

@@ -1,4 +1,4 @@
-# DApp core — Phases 7.1–7.3
+# DApp core — Phases 7.1–7.6
 
 This module defines the provider-neutral architecture and approval boundary for
 Web3 connections. WalletConnect-specific SDK code remains isolated under
@@ -52,10 +52,13 @@ rewritten by this layer.
 `DAppRequestService` keeps the provider-neutral lifecycle explicit:
 
 ```text
-created → pending → approved → completed
-                   ├→ rejected
-                   ├→ failed
-                   └→ expired
+created → pending → reviewing → authenticating → signing → broadcasting → completed
+     │         ├→ approved ────────────────────────────────────────────────┘
+     │         ├→ rejected
+     │         ├→ failed
+     │         ├→ expired
+     │         ├→ stale
+     │         └→ cancelled
 ```
 
 User rejection, validation failure, expiry, disconnect, unsupported requests,
@@ -66,8 +69,10 @@ account mismatch, and network mismatch remain distinguishable errors/states.
 `DAppTransport` translates provider-specific messages at the edge without
 leaking provider concepts into the wallet core. The WalletConnect/Reown
 adapter handles pairing, namespaces, proposal lifecycle, explicit approval,
-rejection, session updates, expiry, and disconnects. The approval UI never
-constructs raw provider namespaces or calls the SDK directly.
+rejection, session updates, expiry, disconnects, pending request cleanup,
+response locking, and account/network context invalidation. The approval and
+Active DApps UI never constructs raw provider namespaces or calls the SDK
+directly.
 
 ## Connection approval UI
 
@@ -89,8 +94,10 @@ performed.
 
 The connected state is intentionally lightweight and supports disconnecting
 through the existing adapter boundary. Message signing, typed-data signing,
-transaction execution, broadcasting, automatic network switching, and DApp
-management are deferred.
+transaction execution, broadcasting, and automatic network switching remain
+deferred. Active DApp session listing and adapter-backed disconnect are
+implemented in Phase 7.6; provider metadata remains unverified and Preview
+does not simulate native sessions.
 
 ## Phase 7.5 transaction requests
 

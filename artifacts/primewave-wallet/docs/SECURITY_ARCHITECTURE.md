@@ -1380,3 +1380,24 @@ deduplication and unknown-result behavior remain authoritative; no automatic
 rebroadcast occurs. Activity begins only after an actual broadcast result and
 confirmation updates the resulting lifecycle record. Preview mode cannot
 fabricate a DApp request, signature, hash, broadcast, or Activity record.
+
+## Phase 7.6 session and request hardening
+
+Connected DApp sessions are managed through the provider adapter, not by
+directly mutating provider SDK state from the UI. The Active DApps screen
+displays public metadata, approved account/network scope, expiry, and
+capabilities, but metadata is explicitly unverified. Session listing is
+account-scoped and never exposes provider sessions for another wallet account.
+
+The request lifecycle is bounded and fail-closed. A request can move through
+review, authentication, signing, and broadcasting only through explicit
+transitions; terminal requests cannot be replayed. Duplicate request IDs,
+duplicate responses, invalid response payloads, stale account/network context,
+provider expiry, session deletion, user disconnect, revocation, and transport
+shutdown are handled as distinct controlled outcomes.
+
+Disconnect and revocation invalidate all associated pending requests before
+future signing or transaction responses can be delivered. Account or network
+changes mark open requests stale rather than rebinding them. The adapter and
+provider-neutral DApp core still receive no PIN, SecureStore value, mnemonic,
+private key, raw signer, signing handle, or direct broadcast access.
