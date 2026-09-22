@@ -1369,3 +1369,46 @@ point conversion or fiat inference is performed. ERC-20 Transfer observations
 use network identity, canonical contract address, exact raw amount, block
 identity, transaction hash, and log index. A Transfer event is evidence only;
 it does not establish token legitimacy, trust, or verification.
+
+## Phase 8.4 — transaction history synchronization and activity reconciliation
+
+Phase 8.4 adds a backend synchronization boundary above the Phase 8.3
+observations. It does not replace the existing Phase 5 Activity repository,
+service, read model, presentation model, local lifecycle, signing, broadcast,
+or confirmation behavior. Mobile UI integration is intentionally deferred.
+
+The boundary is:
+
+```text
+local wallet Activity context ──┐
+                                ├─> deterministic reconciliation records
+Phase 8.3 indexed observations ┘
+                                      ↓
+                           existing future Activity read integration
+```
+
+Synchronization is always scoped by `networkId`, exact configured `chainId`,
+and canonical public account address. A transaction uses
+`networkId + transactionHash` as its identity. An ERC-20 Transfer uses
+`networkId + transactionHash + logIndex`. Token metadata remains supplementary
+and is not duplicated.
+
+`account_sync_state` stores a bounded account/network cursor and sanitized
+status. `reconciliation_records` stores only the link/state evidence needed to
+connect a public indexed identity to a future local Activity identity; it does
+not duplicate complete blockchain transactions. The cursor advances only for
+an explicit bounded range that is already present in `indexed_blocks`.
+
+Hash equality is authoritative for matching. Amount, timestamp, recipient,
+asset, and counterparty are supporting signals only. Insufficient evidence
+remains separate and unresolved; conflicting mappings remain explicit
+`conflict` records. States remain distinct: `local_only`, `indexed`, `matched`,
+`confirmed`, `reverted`, `unknown`, `conflict`, and `unresolved`.
+
+The backend exposes only bounded status, activity, reconciliation, and
+already-indexed checkpoint endpoints. It does not provide arbitrary RPC/SQL,
+unlimited history, signing, broadcasting, custody, authentication, recovery,
+analytics, notifications, price data, swap classification, or DApp services.
+Public blockchain facts are not removed when local wallet state changes;
+application-owned synchronization metadata is a separate future deletion
+boundary.

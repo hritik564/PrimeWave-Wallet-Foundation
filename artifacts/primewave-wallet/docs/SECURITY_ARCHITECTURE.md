@@ -1579,3 +1579,36 @@ raw RPC responses, database details, or a start-indexing command.
 The mobile wallet does not consume indexed data in Phase 8.3. Activity
 synchronization, mobile Activity UI changes, notifications, pricing, analytics,
 and future transaction reconciliation remain separate phases.
+
+## Phase 8.4 synchronization and reconciliation boundary
+
+Phase 8.4 consumes only public rows already persisted by the read-only Phase
+8.3 indexer. It cannot sign, broadcast, construct, authorize, recover, or
+custody a transaction. The backend has no access to SecureStore, wallet
+vaults, mnemonic material, private keys, PINs, signing capabilities, or raw
+signed transactions.
+
+The synchronization scope is the exact tuple
+`networkId + chainId + canonical public account address`. Account and network
+filters are applied together; a public address on one network or chain cannot
+read another scope. Every requested block range and page is bounded. The
+checkpoint operation requires indexed block coverage and never calls RPC.
+Existing request-body limits, secret-material rejection, rate limiting, and
+sanitized errors remain in the request path.
+
+The backend stores only an account cursor and derived reconciliation metadata.
+It does not copy full indexed transactions or token metadata into a second
+Activity store. Transaction identity is `networkId + transactionHash`;
+ERC-20 Transfer identity adds `logIndex`. Hash equality is the only
+authoritative merge evidence. Amount, time, recipient, asset, and counterparty
+cannot silently merge records. `conflict`, `unresolved`, and `unknown` are
+preserved rather than mapped to `failed`.
+
+The provider-neutral local context contract contains only a public scope, local
+Activity ID, optional public transaction hash, and local lifecycle state.
+Local intent and authorization remain wallet-owned, while indexed block,
+receipt, hash, and timestamp fields remain backend evidence. A future
+authenticated deletion flow may remove application-owned cursor and
+reconciliation metadata; it must not pretend to delete public blockchain
+facts. This phase adds no wallet authentication or public-address ownership
+claim and no mobile Activity synchronization UI.

@@ -1,0 +1,1 @@
+DROP INDEX "reconciliation_scope_local_activity_idx";

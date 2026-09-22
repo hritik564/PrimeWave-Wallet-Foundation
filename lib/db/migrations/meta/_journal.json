@@ -15,6 +15,20 @@
       "when": 1790051493094,
       "tag": "0001_silly_silverclaw",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790054599237,
+      "tag": "0002_nebulous_captain_cross",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790055085974,
+      "tag": "0003_salty_kylun",
+      "breakpoints": true
     }
   ]
 }

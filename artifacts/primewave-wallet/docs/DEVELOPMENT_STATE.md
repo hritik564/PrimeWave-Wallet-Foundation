@@ -2,7 +2,8 @@
 
 ## Current phase
 
-**Phase 8.3 — WaveX blockchain indexing foundation (implemented; pending
+**Phase 8.4 — WaveX transaction history synchronization and activity
+reconciliation (implemented; pending
 security review)**
 
 The native wallet/security path remains the production-controlled path. A
@@ -691,6 +692,27 @@ increment.
 - No mobile Activity architecture, local ActivityRepository, signing,
   broadcasting, DApp, swap, notification, price, analytics, or custody
   behavior was changed.
-- Deferred complete transaction synchronization, mobile Activity integration,
-  deep reorg reconciliation, production worker deployment, production
-  deployment, and Phase 8.4.
+
+## Phase 8.4 completion
+
+- Added a backend-only synchronization and reconciliation boundary above the
+  Phase 8.3 indexed transaction and ERC-20 Transfer observations.
+- Added deterministic scoped identities:
+  `networkId + transactionHash` for transactions and
+  `networkId + transactionHash + logIndex` for Transfer observations.
+- Added bounded `account_sync_state` and `reconciliation_records` schema with
+  composite scope constraints, explicit lifecycle/state enums, and generated
+  Drizzle migration `0002_nebulous_captain_cross.sql`.
+- Added account/network/chain-scoped status, activity, reconciliation, and
+  already-indexed checkpoint endpoints. No endpoint invokes RPC or performs
+  unlimited historical scanning.
+- Added provider-neutral local activity context handling for local-only,
+  hash-matched, confirmed, reverted, unknown, unresolved, and conflict states.
+- Preserved local wallet Activity architecture and did not integrate mobile UI,
+  signing, broadcasting, custody, authentication, analytics, notifications,
+  prices, swaps, DApp backend services, or Phase 8.5 work.
+- Added deterministic tests for identity, local/indexed-only activity,
+  matching, unresolved/conflict handling, account/network isolation, bounded
+  ranges, cursor advancement, duplicate prevention, and pagination.
+- Migration files were generated and validated but not applied to a development
+  or production database.

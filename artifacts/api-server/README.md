@@ -140,3 +140,31 @@ Recognized ERC-20 Transfer events retain exact integer amounts as decimal
 strings. Token metadata is referenced conceptually through the existing
 `networkId + canonical contractAddress` identity; verification and trust are
 not copied into indexing records.
+
+## Phase 8.4 transaction synchronization and reconciliation
+
+Phase 8.4 consumes Phase 8.3 indexed rows without creating a second mobile
+Activity database or confirmation engine. The mobile Activity system remains
+authoritative for local intent, authorization, signing lifecycle, broadcast
+lifecycle, and local presentation. The backend is authoritative only for
+indexed public transaction evidence.
+
+Synchronization is scoped by `networkId + chainId + canonical accountAddress`.
+Transaction identity is `networkId + transactionHash`; ERC-20 Transfer
+identity is `networkId + transactionHash + logIndex`. Amounts, timestamps,
+recipients, and token names are supporting data only and never merge records.
+The states `local_only`, `indexed`, `matched`, `confirmed`, `reverted`,
+`unknown`, `conflict`, and `unresolved` remain distinct.
+
+Bounded routes:
+
+- `GET /api/v1/synchronization/status`
+- `GET /api/v1/synchronization/activity`
+- `GET /api/v1/synchronization/reconciliation`
+- `POST /api/v1/synchronization/checkpoint`
+
+The checkpoint route reads only already-indexed block coverage. It never calls
+RPC, starts indexing, signs, broadcasts, or performs unlimited historical
+scanning. Pages, ranges, request bodies, and errors are bounded; the existing
+rate limiter and secret-material guard apply. No mobile Activity UI
+integration is included in Phase 8.4.
