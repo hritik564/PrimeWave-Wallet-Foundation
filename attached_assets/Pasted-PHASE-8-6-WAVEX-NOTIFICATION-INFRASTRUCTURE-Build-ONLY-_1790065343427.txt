@@ -1,0 +1,752 @@
+PHASE 8.6 — WAVEX NOTIFICATION INFRASTRUCTURE
+
+Build ONLY Phase 8.6.
+
+Do not begin Phase 8.7 or any later Phase 8 work automatically.
+
+The existing WaveX architecture is authoritative:
+
+- Phase 8.1 Backend Foundation & Security Boundary
+- Phase 8.2 Public Metadata
+- Phase 8.3 Read-only Blockchain Indexing
+- Phase 8.4 Transaction Synchronization & Reconciliation
+- Phase 8.5 Market/Price Data Infrastructure
+- Existing mobile wallet security architecture
+- Existing Activity architecture
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Build a provider-neutral notification infrastructure for WaveX.
+
+The system should establish the backend architecture required to eventually notify users about events such as:
+
+- transaction confirmed
+- transaction reverted
+- incoming public blockchain activity
+- swap completion
+- security/session events
+
+This phase establishes:
+
+- device registration
+- notification preferences
+- notification event model
+- notification generation boundary
+- delivery queue abstraction
+- deduplication
+- delivery state
+- account/device isolation
+- provider abstraction
+
+Do NOT integrate a production push provider unless an existing approved provider is already configured and explicitly required.
+
+==================================================
+2. SECURITY PRINCIPLE
+==================================================
+
+Notifications are an OUTPUT channel.
+
+They must never become a storage or transport mechanism for wallet secrets.
+
+Never include:
+
+- seed phrases
+- mnemonics
+- private keys
+- wallet PINs
+- PIN hashes
+- SecureStore contents
+- vault keys
+- encryption keys
+- signing capabilities
+- raw signed transactions
+- authentication credentials
+- provider API keys
+- database credentials
+
+in:
+
+- notification payloads
+- notification database records
+- logs
+- delivery queues
+- provider requests
+
+==================================================
+3. INSPECT EXISTING ARCHITECTURE
+==================================================
+
+Before modifying anything, inspect:
+
+- Phase 8.1 backend security
+- Phase 8.2 metadata
+- Phase 8.3 indexer
+- Phase 8.4 synchronization
+- Phase 8.5 market data
+- existing mobile Activity models
+- existing wallet account/network models
+- existing authentication boundaries
+
+Reuse existing public identity and network abstractions.
+
+Do not create competing account/network identity systems.
+
+==================================================
+4. NOTIFICATION ARCHITECTURE
+==================================================
+
+Use this conceptual architecture:
+
+Blockchain / WaveX Event
+        ↓
+Notification Event
+        ↓
+Preference Evaluation
+        ↓
+Notification Record
+        ↓
+Delivery Queue
+        ↓
+Push Provider Adapter
+        ↓
+User Device
+
+Keep each layer separate.
+
+The event generator must not know provider-specific push APIs.
+
+The provider adapter must not know wallet secrets.
+
+==================================================
+5. PROVIDER-NEUTRAL PUSH INTERFACE
+==================================================
+
+Create a provider-neutral notification delivery interface.
+
+Conceptually:
+
+NotificationProvider
+
+- provider identity
+- register/unregister device if applicable
+- send notification
+- normalize provider response
+- normalize provider errors
+
+Keep provider-specific implementation isolated.
+
+Do not hardcode Firebase/APNs/Expo notification APIs unless explicitly required.
+
+Do not install a production push SDK merely to demonstrate the interface.
+
+==================================================
+6. DEVICE REGISTRATION MODEL
+==================================================
+
+Create a secure device registration model.
+
+A registration may contain:
+
+- registration ID
+- account/public address
+- device identifier or installation identifier
+- platform
+- push token reference
+- app version
+- environment
+- enabled/disabled state
+- createdAt
+- updatedAt
+- lastDeliveryAt where appropriate
+
+Do NOT store:
+
+- private keys
+- seed phrases
+- PINs
+- biometric secrets
+- SecureStore data
+- wallet vault data
+
+Push tokens must be treated as sensitive infrastructure identifiers.
+
+They must not appear in API responses unless strictly necessary.
+
+They must never be logged.
+
+==================================================
+7. ACCOUNT ISOLATION
+==================================================
+
+Device registrations must be explicitly scoped.
+
+A registration must not automatically gain access to every wallet/account.
+
+Use explicit:
+
+- account/public address
+- network/environment context where appropriate
+- registration identity
+
+Prevent one account from receiving notifications belonging to another account.
+
+Do not infer account ownership from device identity alone.
+
+==================================================
+8. DEVICE REGISTRATION API
+==================================================
+
+Create bounded API endpoints under:
+
+/api/v1/...
+
+Conceptually:
+
+POST /notifications/devices
+DELETE /notifications/devices/:registrationId
+GET /notifications/preferences
+PUT /notifications/preferences
+
+Exact endpoint names may follow existing project conventions.
+
+All inputs must be validated.
+
+Do not expose push tokens in GET responses.
+
+Do not expose internal provider credentials.
+
+Do not create an unrestricted "send notification" public endpoint.
+
+==================================================
+9. NOTIFICATION PREFERENCES
+==================================================
+
+Create explicit preference categories.
+
+At minimum consider:
+
+- transaction confirmations
+- incoming transactions
+- transaction failures/reverts
+- swaps
+- security/session events
+
+Preferences should be explicit booleans or clearly bounded settings.
+
+Do not assume notifications are enabled merely because a device is registered.
+
+Default behavior should be documented.
+
+==================================================
+10. NOTIFICATION EVENT MODEL
+==================================================
+
+Create a provider-neutral event model.
+
+Possible fields:
+
+- notificationEventId
+- account/public address
+- event type
+- networkId
+- transaction hash where applicable
+- asset identity where applicable
+- public amount where appropriate
+- timestamp
+- source
+- deduplication identity
+- metadata needed for presentation
+
+Only include the minimum public information required.
+
+Do NOT put complete blockchain transaction objects into notification payloads.
+
+Do NOT include raw calldata unless a future explicit notification type requires it.
+
+==================================================
+11. NOTIFICATION TYPES
+==================================================
+
+Create typed event categories such as:
+
+- transaction_confirmed
+- transaction_reverted
+- incoming_transaction
+- swap_completed
+- security_event
+
+Do not automatically generate every event type in this phase.
+
+The architecture must allow future event generators.
+
+Do not infer swaps from arbitrary transactions or ERC-20 Transfer events.
+
+Do not create fake security events.
+
+==================================================
+12. PUBLIC DATA ONLY
+==================================================
+
+Notification content may use public information such as:
+
+- asset symbol/name when available
+- exact public blockchain amount where appropriate
+- network display name
+- shortened public address
+- transaction hash where appropriate
+- neutral status
+
+Never include sensitive wallet material.
+
+Do not include unnecessary full wallet addresses in visible notification text.
+
+Use shortened addresses where an address must be displayed.
+
+==================================================
+13. DEDUPLICATION
+==================================================
+
+Notifications must be idempotent.
+
+A single blockchain event must not generate unlimited duplicate notifications.
+
+Create deterministic deduplication identities.
+
+For transaction-based notifications, use concepts such as:
+
+networkId
++
+transactionHash
++
+notificationType
++
+account
+
+For ERC-20 transfer notifications where applicable, include:
+
+logIndex
+
+Do not deduplicate solely by timestamp.
+
+Database uniqueness should provide a second line of defense.
+
+==================================================
+14. DELIVERY STATES
+==================================================
+
+Create explicit delivery lifecycle states.
+
+For example:
+
+- pending
+- sending
+- sent
+- delivered
+- failed
+- disabled
+- expired
+
+Do not collapse provider failure into successful delivery.
+
+Provider delivery semantics vary.
+
+If the provider cannot confirm actual delivery, represent that honestly.
+
+==================================================
+15. RETRY POLICY
+==================================================
+
+Create a bounded retry abstraction.
+
+Do not create infinite retries.
+
+Distinguish:
+
+- transient provider failure
+- permanent invalid-token/device failure
+- disabled registration
+- rate limit
+- malformed request
+
+Retries must have:
+
+- bounded attempts
+- bounded delay/backoff
+- no retry loops
+
+Do not retry invalid or disabled device registrations indefinitely.
+
+==================================================
+16. NOTIFICATION QUEUE
+==================================================
+
+Create a provider-neutral queue/repository abstraction.
+
+It should support:
+
+- enqueue
+- deduplicate
+- claim
+- mark sending
+- mark sent
+- mark failed
+- retry where permitted
+- expire
+
+Do not require a continuously running worker in this phase.
+
+A bounded/manual execution model is acceptable.
+
+Do not create an infinite background worker solely to demonstrate functionality.
+
+==================================================
+17. DATABASE
+==================================================
+
+Use existing PostgreSQL/Drizzle architecture if persistence is introduced.
+
+Possible conceptual tables:
+
+- notification_devices
+- notification_preferences
+- notification_events
+- notification_deliveries
+
+Use appropriate uniqueness constraints.
+
+Do not duplicate blockchain transaction/indexing tables.
+
+Do not duplicate token metadata.
+
+Do not store provider credentials in the database.
+
+Push tokens should be stored only where necessary and should not be returned or logged.
+
+==================================================
+18. DEVICE TOKEN PROTECTION
+==================================================
+
+Treat push tokens as sensitive identifiers.
+
+Do not:
+
+- log them
+- expose them in ordinary GET APIs
+- include them in analytics
+- include them in error messages
+- include them in notification payloads
+- expose them to unrelated accounts
+
+If hashing/encryption is appropriate, document the design and use existing secure server-side configuration.
+
+Do not invent cryptography unnecessarily.
+
+==================================================
+19. EVENT SOURCES
+==================================================
+
+Create clean boundaries for future event sources.
+
+Potential sources include:
+
+- Phase 8.4 synchronized transaction activity
+- Phase 8.3 blockchain indexing
+- future swap execution state
+- future security/session events
+
+Do NOT implement automatic event generation from every existing source in this sprint.
+
+Define the interfaces and test deterministic synthetic events.
+
+==================================================
+20. MARKET DATA SEPARATION
+==================================================
+
+Do not integrate Phase 8.5 price data into notification generation yet.
+
+Notifications must not fabricate fiat values.
+
+If future notifications display fiat:
+
+they must explicitly identify the price source and observation time.
+
+Historical fiat notification behavior is deferred.
+
+==================================================
+21. API SECURITY
+==================================================
+
+All notification APIs must use:
+
+- request validation
+- bounded payloads
+- account isolation
+- rate limiting
+- sanitized errors
+- request IDs
+- existing secret-material rejection
+
+Do not expose:
+
+- provider API keys
+- database credentials
+- push tokens
+- internal queue state unnecessarily
+- raw provider errors
+
+There must be NO public endpoint equivalent to:
+
+POST /send-notification-to-any-token
+
+==================================================
+22. AUTHENTICATION BOUNDARY
+==================================================
+
+Do not invent a complete authentication system in this phase.
+
+The notification layer should consume the existing/future backend authentication boundary.
+
+Clearly distinguish:
+
+- authenticated application identity
+- public blockchain account identity
+- device registration
+- wallet ownership
+- transaction signing authorization
+
+Registering a device must never grant signing authority.
+
+==================================================
+23. PRIVACY
+==================================================
+
+Do not build global notification profiles.
+
+Keep notification data scoped to the minimum required:
+
+- account
+- device registration
+- notification preference
+- event
+- delivery state
+
+Do not add:
+
+- advertising identifiers
+- behavioral profiles
+- cross-account notification graphs
+- unnecessary location data
+
+==================================================
+24. CLEANUP
+==================================================
+
+Define cleanup behavior for:
+
+- disabled devices
+- expired registrations
+- invalid push tokens
+- expired notification events
+- old delivery records
+
+Do not delete blockchain facts.
+
+Notification records are application-owned operational data.
+
+Use bounded retention where appropriate.
+
+Do not implement an uncontrolled permanent notification archive.
+
+==================================================
+25. SECURITY EVENTS
+==================================================
+
+Define a safe future security-event boundary.
+
+Security notifications must never contain:
+
+- authentication secrets
+- PINs
+- private keys
+- recovery material
+
+A security notification should communicate only the minimum necessary public/application information.
+
+Do not implement speculative security alerts.
+
+==================================================
+26. TESTING
+==================================================
+
+Add focused tests for:
+
+- device registration validation
+- account isolation
+- registration uniqueness
+- preference defaults
+- preference updates
+- notification event validation
+- secret-field rejection
+- notification deduplication
+- transaction-based deduplication
+- ERC-20 log-index deduplication
+- delivery state transitions
+- retry limits
+- permanent failure handling
+- disabled device handling
+- queue claiming
+- bounded queue behavior
+- push-token redaction
+- sanitized provider errors
+- API rate limits
+- API response privacy
+
+Use deterministic mock provider behavior.
+
+Do NOT require real push credentials.
+
+==================================================
+27. LIVE SMOKE TEST
+==================================================
+
+No production push-provider smoke test is required in this phase.
+
+If no provider is configured:
+
+- test provider-neutral interfaces
+- test deterministic mock delivery
+- verify unconfigured behavior is explicit
+
+Do NOT fabricate a successful push delivery.
+
+==================================================
+28. DATABASE MIGRATIONS
+==================================================
+
+If database schema is introduced:
+
+- generate Drizzle migrations
+- validate migration consistency
+- verify constraints
+- do not apply destructive migrations to production
+
+If a clean development database is available, verify migration application.
+
+If not, clearly report the limitation.
+
+Do not claim successful persistence without verification.
+
+==================================================
+29. MOBILE INTEGRATION BOUNDARY
+==================================================
+
+Do NOT modify the WaveX mobile notification UI in this phase.
+
+Do NOT require native push permissions yet.
+
+Do NOT add Expo Notifications/APNs/FCM SDKs yet unless explicitly required for the provider abstraction.
+
+Do not change wallet authentication, SecureStore, signing, broadcasting, DApp, swap, or Activity architecture.
+
+The mobile push integration belongs to a later validation/integration phase.
+
+==================================================
+30. DOCUMENTATION
+==================================================
+
+Update:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- backend README
+- notification README if created
+
+Document:
+
+- notification architecture
+- device registration
+- preference model
+- event types
+- deduplication
+- delivery states
+- retry behavior
+- privacy boundary
+- push-token protection
+- provider abstraction
+- mobile integration boundary
+
+==================================================
+31. STRICTLY DO NOT IMPLEMENT
+==================================================
+
+Do NOT implement:
+
+- Firebase/FCM production integration
+- APNs production integration
+- Expo push production integration
+- native notification permissions
+- mobile notification UI
+- analytics
+- price-based alerts
+- arbitrary user messaging
+- marketing campaigns
+- DApp notifications
+- server-side signing
+- transaction broadcasting
+- custody
+- private-key storage
+- seed-phrase storage
+- cloud recovery
+- production worker deployment
+- production cloud migration
+
+==================================================
+32. VALIDATION
+==================================================
+
+Before reporting completion:
+
+1. Run Phase 8.6 focused tests.
+2. Run complete existing test suite.
+3. Run TypeScript validation.
+4. Run backend build.
+5. Run Expo validation/static build.
+6. Run Drizzle migration consistency checks if schema changed.
+7. Run git diff --check.
+8. Inspect dependencies.
+9. Perform notification security source audit.
+10. Confirm push tokens cannot leak through logs or ordinary APIs.
+11. Confirm account isolation.
+12. Confirm no Phase 8.7 work was started.
+13. Confirm no production push provider was introduced unless explicitly already approved.
+
+Final report must include:
+
+- files created/changed
+- notification architecture
+- device registration model
+- preference model
+- event model
+- delivery lifecycle
+- deduplication strategy
+- retry strategy
+- database schema
+- API endpoints
+- provider abstraction
+- security audit
+- migration status
+- test results
+- build results
+- warnings
+- deferred work
+
+If everything passes, finish exactly with:
+
+PHASE 8.6 DEVELOPMENT COMPLETE — PENDING SECURITY REVIEW
+
+STOP.
+
+Do not begin Phase 8.7.
