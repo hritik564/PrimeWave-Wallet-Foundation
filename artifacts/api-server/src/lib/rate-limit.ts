@@ -13,15 +13,20 @@ export class MemoryRateLimiter {
     public readonly windowMs: number,
     public readonly maxRequests: number,
     private readonly now: () => number = Date.now,
+    public readonly maxKeys = 10_000,
   ) {}
 
   check(key: string): { allowed: boolean; retryAfterSeconds: number } {
     const currentTime = this.now();
+    this.removeExpired(currentTime);
     const existing = this.buckets.get(key);
-    const bucket =
-      !existing || existing.resetAt <= currentTime
-        ? { count: 0, resetAt: currentTime + this.windowMs }
-        : existing;
+    if (!existing && this.buckets.size >= this.maxKeys) {
+      return { allowed: false, retryAfterSeconds: 1 };
+    }
+    const bucket = existing ?? {
+      count: 0,
+      resetAt: currentTime + this.windowMs,
+    };
     bucket.count += 1;
     this.buckets.set(key, bucket);
     if (bucket.count <= this.maxRequests) {
@@ -35,6 +40,18 @@ export class MemoryRateLimiter {
 
   clear(): void {
     this.buckets.clear();
+  }
+
+  get keyCount(): number {
+    return this.buckets.size;
+  }
+
+  private removeExpired(currentTime: number): void {
+    for (const [key, bucket] of this.buckets) {
+      if (bucket.resetAt <= currentTime) {
+        this.buckets.delete(key);
+      }
+    }
   }
 }
 

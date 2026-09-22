@@ -255,6 +255,30 @@ test("malformed provider responses become invalid without leaking provider field
   assert.equal(JSON.stringify(result).includes("apiKey"), false);
 });
 
+test("oversized provider response arrays are rejected before response iteration", async () => {
+  const provider: PriceProvider = {
+    providerId: "test-provider",
+    supportedQuoteCurrencies: ["USD"],
+    maxBatchSize: 2,
+    async fetchPrices() {
+      return [
+        { providerAssetId: "eth", price: "1", observedAt: null },
+        { providerAssetId: "bnb", price: "2", observedAt: null },
+        { providerAssetId: "extra", price: "3", observedAt: null },
+      ];
+    },
+  };
+  const mapping = mappings("test-provider", [
+    { asset: asset("native", "ethereum"), providerAssetId: "eth" },
+    { asset: asset("native", "bnb-smart-chain"), providerAssetId: "bnb" },
+  ]);
+  const result = await service(provider, mapping).getPrices({
+    assetDescriptors: ["native:ethereum", "native:bnb-smart-chain"],
+    quoteCurrency: "USD",
+  });
+  assert.ok(result.items.every((item) => item.reason === "malformed_provider_response"));
+});
+
 test("unavailable mappings do not become zero and the unconfigured provider is honest", async () => {
   const provider: PriceProvider = {
     providerId: "test-provider",

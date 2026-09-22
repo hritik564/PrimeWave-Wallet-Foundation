@@ -26,6 +26,14 @@ and held only in platform-secure storage. Failed attempts use an in-record
 exponential retry delay capped at 10 seconds; this is not a permanent lockout,
 so a valid PIN remains recoverable.
 
+The default wallet-access policy locks immediately when the app is backgrounded,
+subject to the in-flight unlock guard. Native biometric prompts are a fallback
+relationship around the same wallet-access boundary: biometric data is never
+returned to the app, and PIN authentication remains available when the native
+prompt is unavailable, cancelled, or fails. There is no automatic wallet wipe
+after failed PIN attempts. This is client-side protection and does not resist a
+compromised device, JavaScript runtime, or platform secure-storage boundary.
+
 Future verifier changes must introduce a new record version and an explicit
 migration path. JavaScript buffer clearing is best-effort and is not a
 guarantee of memory wiping.

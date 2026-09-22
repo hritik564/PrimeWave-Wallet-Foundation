@@ -238,12 +238,27 @@ test("RPC client rejects chain mismatch and exposes only read-only methods", asy
       requests.push({ method: body.method, params: body.params });
       return {
         status: 200,
-        async text() {
-          return JSON.stringify({
-            jsonrpc: "2.0",
-            id: body.id,
-            result: "0xaa36a7",
-          });
+        body: {
+          getReader() {
+            let read = false;
+            return {
+              async read() {
+                if (read) return { done: true as const };
+                read = true;
+                return {
+                  done: false as const,
+                  value: new TextEncoder().encode(
+                    JSON.stringify({
+                      jsonrpc: "2.0",
+                      id: body.id,
+                      result: "0xaa36a7",
+                    }),
+                  ),
+                };
+              },
+              async cancel() {},
+            };
+          },
         },
       };
     },
@@ -255,4 +270,38 @@ test("RPC client rejects chain mismatch and exposes only read-only methods", asy
   );
   assert.deepEqual(requests, [{ method: "eth_chainId", params: [] }]);
   assert.equal(requests.some(({ method }) => method === "eth_sendRawTransaction"), false);
+});
+
+test("RPC client enforces the response byte limit while streaming", async () => {
+  let reads = 0;
+  const client = new ReadOnlyEvmRpcClient(
+    network,
+    1_000,
+    async () => ({
+      status: 200,
+      body: {
+        getReader() {
+          return {
+            async read() {
+              reads += 1;
+              return reads === 1
+                ? { done: false, value: new TextEncoder().encode("x".repeat(20)) }
+                : { done: true };
+            },
+            async cancel() {},
+          };
+        },
+      },
+      async text() {
+        throw new Error("text() must not be used for streamed responses");
+      },
+    }),
+    10,
+  );
+  await assert.rejects(
+    () => client.getBlockNumber(),
+    (error: unknown) =>
+      error instanceof IndexingError && error.code === "RESPONSE_LIMIT",
+  );
+  assert.equal(reads, 1);
 });

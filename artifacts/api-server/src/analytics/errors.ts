@@ -3,6 +3,7 @@ export type AnalyticsErrorCode =
   | "INVALID_EVENT"
   | "PAYLOAD_TOO_LARGE"
   | "BATCH_LIMIT"
+  | "ADMISSION_LIMIT"
   | "PERSISTENCE_FAILURE";
 
 export class AnalyticsRequestError extends Error {

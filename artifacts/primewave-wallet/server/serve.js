@@ -64,9 +64,12 @@ function toScriptString(value) {
 }
 
 function serveManifest(platform, res) {
-  const manifestPath = path.join(STATIC_ROOT, platform, 'manifest.json');
+  const manifestPath = resolveStaticFilePath(
+    STATIC_ROOT,
+    `/${platform}/manifest.json`,
+  );
 
-  if (!fs.existsSync(manifestPath)) {
+  if (!manifestPath || !fs.existsSync(manifestPath)) {
     res.writeHead(404, { 'content-type': 'application/json' });
     res.end(
       JSON.stringify({ error: `Manifest not found for platform: ${platform}` }),
@@ -100,11 +103,57 @@ function serveLandingPage(req, res, landingPageTemplate, appName) {
   res.end(html);
 }
 
-function serveStaticFile(urlPath, res) {
-  const safePath = path.normalize(urlPath).replace(/^(\.\.(\/|\\|$))+/, '');
-  const filePath = path.join(STATIC_ROOT, safePath);
+function isWithinRoot(root, candidate) {
+  const resolvedRoot = path.resolve(root);
+  const resolvedCandidate = path.resolve(candidate);
+  const rootWithSeparator = resolvedRoot.endsWith(path.sep)
+    ? resolvedRoot
+    : `${resolvedRoot}${path.sep}`;
+  return (
+    resolvedCandidate === resolvedRoot ||
+    resolvedCandidate.startsWith(rootWithSeparator)
+  );
+}
 
-  if (!filePath.startsWith(STATIC_ROOT)) {
+function resolveStaticFilePath(staticRoot, urlPath) {
+  let decodedPath;
+  try {
+    decodedPath = decodeURIComponent(urlPath);
+  } catch {
+    return null;
+  }
+
+  // Treat both slash styles as separators so the same boundary is enforced
+  // when this code is run on Windows or when a Windows-style path is sent to
+  // a POSIX server.
+  const portablePath = decodedPath.replaceAll('\\', '/');
+  if (portablePath.startsWith('//')) return null;
+  const relativePath = portablePath.replace(/^\/+/, '');
+  if (path.win32.isAbsolute(relativePath) || path.posix.isAbsolute(relativePath)) {
+    return null;
+  }
+
+  const resolvedRoot = path.resolve(staticRoot);
+  const candidate = path.resolve(resolvedRoot, relativePath);
+  if (!isWithinRoot(resolvedRoot, candidate)) return null;
+  if (!fs.existsSync(candidate)) return candidate;
+
+  // A lexical check is not sufficient when an attacker can place a symlink
+  // below the static root. Resolve the existing target before serving it.
+  let realRoot;
+  let realCandidate;
+  try {
+    realRoot = fs.realpathSync(resolvedRoot);
+    realCandidate = fs.realpathSync(candidate);
+  } catch {
+    return null;
+  }
+  return isWithinRoot(realRoot, realCandidate) ? realCandidate : null;
+}
+
+function serveStaticFile(urlPath, res) {
+  const filePath = resolveStaticFilePath(STATIC_ROOT, urlPath);
+  if (!filePath) {
     res.writeHead(403);
     res.end('Forbidden');
     return;
@@ -123,32 +172,45 @@ function serveStaticFile(urlPath, res) {
   res.end(content);
 }
 
-const landingPageTemplate = fs.readFileSync(TEMPLATE_PATH, 'utf-8');
-const appName = getAppName();
+function startServer() {
+  const landingPageTemplate = fs.readFileSync(TEMPLATE_PATH, 'utf-8');
+  const appName = getAppName();
 
-const server = http.createServer((req, res) => {
-  const url = new URL(req.url || '/', `http://${req.headers.host}`);
-  let pathname = url.pathname;
+  const server = http.createServer((req, res) => {
+    const url = new URL(req.url || '/', `http://${req.headers.host}`);
+    let pathname = url.pathname;
 
-  if (basePath && pathname.startsWith(basePath)) {
-    pathname = pathname.slice(basePath.length) || '/';
-  }
-
-  if (pathname === '/' || pathname === '/manifest') {
-    const platform = req.headers['expo-platform'];
-    if (platform === 'ios' || platform === 'android') {
-      return serveManifest(platform, res);
+    if (basePath && pathname.startsWith(basePath)) {
+      pathname = pathname.slice(basePath.length) || '/';
     }
 
-    if (pathname === '/') {
-      return serveLandingPage(req, res, landingPageTemplate, appName);
+    if (pathname === '/' || pathname === '/manifest') {
+      const platform = req.headers['expo-platform'];
+      if (platform === 'ios' || platform === 'android') {
+        return serveManifest(platform, res);
+      }
+
+      if (pathname === '/') {
+        return serveLandingPage(req, res, landingPageTemplate, appName);
+      }
     }
-  }
 
-  serveStaticFile(pathname, res);
-});
+    serveStaticFile(pathname, res);
+  });
 
-const port = parseInt(process.env.PORT || '3000', 10);
-server.listen(port, '0.0.0.0', () => {
-  console.log(`Serving static Expo build on port ${port}`);
-});
+  const port = parseInt(process.env.PORT || '3000', 10);
+  server.listen(port, '0.0.0.0', () => {
+    console.log(`Serving static Expo build on port ${port}`);
+  });
+  return server;
+}
+
+if (require.main === module) {
+  startServer();
+}
+
+module.exports = {
+  isWithinRoot,
+  resolveStaticFilePath,
+  startServer,
+};

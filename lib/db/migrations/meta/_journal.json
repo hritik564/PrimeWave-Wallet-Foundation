@@ -43,6 +43,13 @@
       "when": 1790067775263,
       "tag": "0005_pale_overlord",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790075660021,
+      "tag": "0006_striped_maginty",
+      "breakpoints": true
     }
   ]
 }

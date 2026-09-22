@@ -22,6 +22,7 @@ import type {
 type RpcFactory = (
   network: IndexerNetworkConfig,
   timeoutMs: number,
+  maxResponseBytes: number,
 ) => ReadOnlyRpcClient;
 
 function isoDate(value: Date | string | null): string | null {
@@ -34,8 +35,8 @@ export class IndexerService {
   constructor(
     private readonly config: IndexerConfig,
     private readonly repository: IndexingRepository,
-    private readonly createRpc: RpcFactory = (network, timeoutMs) =>
-      new ReadOnlyEvmRpcClient(network, timeoutMs),
+    private readonly createRpc: RpcFactory = (network, timeoutMs, maxResponseBytes) =>
+      new ReadOnlyEvmRpcClient(network, timeoutMs, undefined, maxResponseBytes),
   ) {}
 
   async getStatus(): Promise<IndexingStatusSnapshot> {
@@ -93,7 +94,11 @@ export class IndexerService {
 
   async indexNextRange(networkId: string): Promise<IndexingRunResult> {
     const network = this.requireNetwork(networkId);
-    const rpc = this.createRpc(network, this.config.rpcTimeoutMs);
+    const rpc = this.createRpc(
+      network,
+      this.config.rpcTimeoutMs,
+      this.config.bounds.maxRpcResponseBytes ?? 2_097_152,
+    );
     await rpc.verifyChainId();
     const latestObservedBlock = await rpc.getBlockNumber();
     const state = await this.repository.getState(networkId);
@@ -143,7 +148,11 @@ export class IndexerService {
       endBlock,
       Math.min(this.config.bounds.maxBlockRange, this.config.bounds.maxLogRange),
     );
-    const rpc = this.createRpc(network, this.config.rpcTimeoutMs);
+    const rpc = this.createRpc(
+      network,
+      this.config.rpcTimeoutMs,
+      this.config.bounds.maxRpcResponseBytes ?? 2_097_152,
+    );
     await rpc.verifyChainId();
     const latestObservedBlock = await rpc.getBlockNumber();
     if (endBlock > latestObservedBlock) {

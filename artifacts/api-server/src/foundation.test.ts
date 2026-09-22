@@ -77,6 +77,13 @@ test("configuration separates environments and requires production database conf
       error instanceof ConfigurationError &&
       error.message.includes("DATABASE_URL"),
   );
+  assert.equal(testConfig({ REQUEST_BODY_LIMIT: "512kb" }).requestBodyLimit, "512kb");
+  assert.throws(
+    () => testConfig({ REQUEST_BODY_LIMIT: "2mb" }),
+    (error: unknown) =>
+      error instanceof ConfigurationError &&
+      error.message.includes("cannot exceed"),
+  );
   assert.throws(
     () =>
       loadConfig({
@@ -206,6 +213,31 @@ test("rate limiter uses a server-observed connection key and returns bounded ret
   });
   now = 2001;
   assert.equal(limiter.check("server-address").allowed, true);
+});
+
+test("rate limiter removes expired buckets and fails closed at bounded capacity", async () => {
+  let now = 1_000;
+  const limiter = new MemoryRateLimiter(1_000, 100, () => now, 3);
+  for (const key of ["one", "two", "three"]) {
+    assert.equal(limiter.check(key).allowed, true);
+  }
+  assert.equal(limiter.keyCount, 3);
+  assert.equal(limiter.check("attacker-unique-key").allowed, false);
+  assert.equal(limiter.keyCount, 3);
+  assert.equal(limiter.check("one").allowed, true);
+
+  now = 2_001;
+  assert.equal(limiter.keyCount, 3);
+  assert.equal(limiter.check("fresh-key").allowed, true);
+  assert.equal(limiter.keyCount, 1);
+
+  const results = await Promise.all(
+    Array.from({ length: 100 }, (_, index) =>
+      Promise.resolve(limiter.check(`flood-${index}`)),
+    ),
+  );
+  assert.equal(results.filter((result) => result.allowed).length, 2);
+  assert.equal(limiter.keyCount, 3);
 });
 
 test("logger redaction bounds nested diagnostics and never includes sensitive values", () => {

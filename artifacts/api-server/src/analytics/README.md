@@ -40,6 +40,21 @@ worker. Analytics persistence and provider delivery are independent. A
 provider timeout, unavailable server, malformed event, or missing provider
 never blocks wallet functionality.
 
+Anonymous ingestion remains intentionally unauthenticated. Admission is
+bounded per anonymous installation/session identity, across the active
+anonymous-identity set, and globally per abuse window. These controls do not
+use wallet addresses, hardware identifiers, or fingerprinting. The limits are
+process-local and reset when the API process restarts; a multi-instance
+production deployment requires a shared admission/rate-limit service.
+
+`AnalyticsService.cleanupExpired` is a bounded maintenance entry point that
+deletes expired events, errors, and performance rows in separate bounded
+operations. `ANALYTICS_CLEANUP_ON_STARTUP=true` enables a non-blocking,
+best-effort startup invocation, but startup invocation is not a guaranteed
+retention scheduler. Production must run this entry point from an existing
+controlled maintenance mechanism at an interval appropriate for the configured
+retention values.
+
 The deterministic mock provider is test-only. No Firebase, Google Analytics,
 Mixpanel, Amplitude, PostHog, Segment, advertising tracker, or production
 analytics provider SDK is installed.

@@ -37,13 +37,21 @@ export class EmptyMetadataRepository implements MetadataRepository {
 }
 
 export class PostgresMetadataRepository implements MetadataRepository {
+  constructor(private readonly maxNetworkRows = 100) {}
+
   private async database() {
     return import("@workspace/db").then(({ db }) => db);
   }
 
   async listNetworks(): Promise<readonly StoredNetworkMetadata[]> {
     const db = await this.database();
-    const rows = await db.select().from(publicNetworkMetadataTable);
+    const rows = await db
+      .select()
+      .from(publicNetworkMetadataTable)
+      .limit(this.maxNetworkRows + 1);
+    if (rows.length > this.maxNetworkRows) {
+      throw new Error("NETWORK_METADATA_LIMIT");
+    }
     return rows.map(networkRow);
   }
 
@@ -89,6 +97,8 @@ export class InMemoryMetadataRepository implements MetadataRepository {
   private readonly networks = new Map<string, StoredNetworkMetadata>();
   private readonly tokens = new Map<string, StoredTokenMetadata>();
 
+  constructor(private readonly maxNetworkRows = 100) {}
+
   addNetwork(network: StoredNetworkMetadata): void {
     this.networks.set(network.networkId, network);
   }
@@ -102,7 +112,11 @@ export class InMemoryMetadataRepository implements MetadataRepository {
   }
 
   async listNetworks(): Promise<readonly StoredNetworkMetadata[]> {
-    return [...this.networks.values()];
+    const rows = [...this.networks.values()];
+    if (rows.length > this.maxNetworkRows) {
+      throw new Error("NETWORK_METADATA_LIMIT");
+    }
+    return rows;
   }
 
   async getToken(
@@ -129,6 +143,6 @@ export function createMetadataRepository(
   config: ServerConfig,
 ): MetadataRepository {
   return config.databaseUrl
-    ? new PostgresMetadataRepository()
+    ? new PostgresMetadataRepository(config.maxNetworkMetadataRows ?? 100)
     : new EmptyMetadataRepository();
 }

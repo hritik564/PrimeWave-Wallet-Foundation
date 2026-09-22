@@ -4,8 +4,8 @@ description: Shared Metro port behavior when validating the Expo artifact's stat
 ---
 
 The static Expo build script checks and starts Metro on port 8081. If another
-artifact workflow already owns that port, Expo enters a non-interactive port
-prompt and the build fails before bundling.
+artifact workflow, commonly the mockup preview server, already owns that port,
+Expo enters a non-interactive port prompt and the build fails before bundling.
 
 **Why:** The failure is an environment/workflow collision, not an application
 bundle error; the normal Expo preview workflow can still be healthy on its

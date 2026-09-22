@@ -229,6 +229,12 @@ export class MarketPriceService {
         "The market provider response was invalid.",
       );
     }
+    if (rawResponses.length > batch.length) {
+      throw new MarketProviderError(
+        "MALFORMED_RESPONSE",
+        "The market provider returned too many assets.",
+      );
+    }
     const requestsByProviderId = new Map(
       batch.map((request) => [request.providerAssetId, request]),
     );

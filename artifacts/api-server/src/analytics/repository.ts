@@ -62,10 +62,11 @@ export class InMemoryAnalyticsRepository implements AnalyticsRepository {
   }
 
   async deleteExpired(now: Date, limit: number) {
-    let remaining = Math.max(0, limit);
     const remove = <T extends { readonly expiresAt: Date }>(
       records: Map<string, T>,
+      recordLimit: number,
     ): number => {
+      let remaining = Math.max(0, recordLimit);
       let deleted = 0;
       for (const [id, record] of records) {
         if (remaining <= 0) break;
@@ -77,9 +78,9 @@ export class InMemoryAnalyticsRepository implements AnalyticsRepository {
       }
       return deleted;
     };
-    const events = remove(this.events);
-    const errors = remove(this.errors);
-    const performance = remove(this.performance);
+    const events = remove(this.events, limit);
+    const errors = remove(this.errors, limit);
+    const performance = remove(this.performance, limit);
     return { events, errors, performance };
   }
 }

@@ -14,6 +14,8 @@ import { createIndexerRepository } from "./indexing/repository";
 import { IndexerService } from "./indexing/service";
 import type { NotificationRepository } from "./notifications/types";
 import type { AnalyticsProvider, AnalyticsRepository } from "./analytics/types";
+import { createAnalyticsRepository } from "./analytics/repository";
+import { AnalyticsService } from "./analytics/service";
 import {
   createFailClosedAccountAuthorizationBoundary,
   type AccountAuthorizationBoundary,
@@ -30,6 +32,8 @@ export function createApp(
 ): Express {
   const app: Express = express();
   const metadataRepository = repository ?? createMetadataRepository(config);
+  const resolvedAnalyticsRepository =
+    analyticsRepository ?? createAnalyticsRepository(config);
   const indexerService = new IndexerService(
     config.indexer,
     createIndexerRepository(config),
@@ -37,7 +41,20 @@ export function createApp(
   const rateLimiter = new MemoryRateLimiter(
     config.rateLimitWindowMs,
     config.rateLimitMaxRequests,
+    Date.now,
+    config.rateLimitMaxKeys,
   );
+  if (config.analytics.cleanupOnStartup) {
+    void new AnalyticsService(
+      config.analytics,
+      resolvedAnalyticsRepository,
+      analyticsProvider,
+    )
+      .cleanupExpired()
+      .catch(() => {
+        logger.warn("Analytics startup cleanup failed.");
+      });
+  }
   const corsOptions: CorsOptions = {
     credentials: false,
     methods: ["GET", "HEAD", "OPTIONS", "POST", "PUT", "PATCH", "DELETE"],
@@ -86,7 +103,7 @@ export function createApp(
       metadataRepository,
       indexerService,
       notificationRepository,
-      analyticsRepository,
+      resolvedAnalyticsRepository,
       analyticsProvider,
       accountAuthorization,
     ),
@@ -98,7 +115,7 @@ export function createApp(
       metadataRepository,
       indexerService,
       notificationRepository,
-      analyticsRepository,
+      resolvedAnalyticsRepository,
       analyticsProvider,
       accountAuthorization,
     ),

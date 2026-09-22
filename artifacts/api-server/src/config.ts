@@ -6,6 +6,8 @@ import type { NotificationConfig } from "./notifications/types";
 import type { AnalyticsConfig } from "./analytics/types";
 
 export type ServerEnvironment = "development" | "test" | "production";
+export const MAX_REQUEST_BODY_BYTES = 1_048_576;
+export const MAX_ANALYTICS_PROPERTY_BYTES = 16_384;
 
 export interface ServerConfig {
   readonly environment: ServerEnvironment;
@@ -20,8 +22,10 @@ export interface ServerConfig {
   readonly notifications: NotificationConfig;
   readonly analytics: AnalyticsConfig;
   readonly requestBodyLimit: string;
+  readonly maxNetworkMetadataRows?: number;
   readonly rateLimitWindowMs: number;
   readonly rateLimitMaxRequests: number;
+  readonly rateLimitMaxKeys: number;
   readonly logLevel: "fatal" | "error" | "warn" | "info" | "debug" | "trace";
 }
 
@@ -52,6 +56,26 @@ function parsePositiveInteger(
     throw new ConfigurationError(`${name} must be a positive integer.`);
   }
   return parsed;
+}
+
+function parseRequestBodyLimit(value: string | undefined): string {
+  const configured = (value ?? "64kb").trim().toLowerCase();
+  const match = /^([1-9]\d*)\s*(b|kb|mb)?$/.exec(configured);
+  if (!match) {
+    throw new ConfigurationError(
+      "REQUEST_BODY_LIMIT must be a positive byte value using b, kb, or mb.",
+    );
+  }
+  const amount = Number(match[1]);
+  const multiplier =
+    match[2] === "mb" ? 1_048_576 : match[2] === "kb" ? 1_024 : 1;
+  const bytes = amount * multiplier;
+  if (!Number.isSafeInteger(bytes) || bytes > MAX_REQUEST_BODY_BYTES) {
+    throw new ConfigurationError(
+      `REQUEST_BODY_LIMIT cannot exceed ${MAX_REQUEST_BODY_BYTES} bytes.`,
+    );
+  }
+  return configured;
 }
 
 function parseOrigins(value: string | undefined, environment: ServerEnvironment) {
@@ -165,6 +189,16 @@ function createNotificationConfig(
 }
 
 function createAnalyticsConfig(environment: NodeJS.ProcessEnv): AnalyticsConfig {
+  const maxEventPayloadBytes = parsePositiveInteger(
+    environment.ANALYTICS_MAX_EVENT_PAYLOAD_BYTES,
+    MAX_ANALYTICS_PROPERTY_BYTES,
+    "ANALYTICS_MAX_EVENT_PAYLOAD_BYTES",
+  );
+  if (maxEventPayloadBytes > MAX_ANALYTICS_PROPERTY_BYTES) {
+    throw new ConfigurationError(
+      `ANALYTICS_MAX_EVENT_PAYLOAD_BYTES cannot exceed ${MAX_ANALYTICS_PROPERTY_BYTES} bytes.`,
+    );
+  }
   return {
     enabled: parseBoolean(environment.ANALYTICS_ENABLED, true),
     maxBatchEvents: parsePositiveInteger(
@@ -172,11 +206,7 @@ function createAnalyticsConfig(environment: NodeJS.ProcessEnv): AnalyticsConfig 
       20,
       "ANALYTICS_MAX_BATCH_EVENTS",
     ),
-    maxEventPayloadBytes: parsePositiveInteger(
-      environment.ANALYTICS_MAX_EVENT_PAYLOAD_BYTES,
-      16_384,
-      "ANALYTICS_MAX_EVENT_PAYLOAD_BYTES",
-    ),
+    maxEventPayloadBytes,
     eventRetentionMs: parsePositiveInteger(
       environment.ANALYTICS_EVENT_RETENTION_MS,
       90 * 24 * 60 * 60 * 1_000,
@@ -196,6 +226,30 @@ function createAnalyticsConfig(environment: NodeJS.ProcessEnv): AnalyticsConfig 
       environment.ANALYTICS_CLEANUP_BATCH_SIZE,
       1_000,
       "ANALYTICS_CLEANUP_BATCH_SIZE",
+    ),
+    abuseWindowMs: parsePositiveInteger(
+      environment.ANALYTICS_ABUSE_WINDOW_MS,
+      60_000,
+      "ANALYTICS_ABUSE_WINDOW_MS",
+    ),
+    maxAnonymousIdentities: parsePositiveInteger(
+      environment.ANALYTICS_MAX_ANONYMOUS_IDENTITIES,
+      10_000,
+      "ANALYTICS_MAX_ANONYMOUS_IDENTITIES",
+    ),
+    maxEventsPerIdentity: parsePositiveInteger(
+      environment.ANALYTICS_MAX_EVENTS_PER_IDENTITY,
+      120,
+      "ANALYTICS_MAX_EVENTS_PER_IDENTITY",
+    ),
+    maxTotalEvents: parsePositiveInteger(
+      environment.ANALYTICS_MAX_TOTAL_EVENTS,
+      10_000,
+      "ANALYTICS_MAX_TOTAL_EVENTS",
+    ),
+    cleanupOnStartup: parseBoolean(
+      environment.ANALYTICS_CLEANUP_ON_STARTUP,
+      false,
     ),
   };
 }
@@ -304,6 +358,11 @@ function createIndexerConfig(
         512,
         "INDEXER_MAX_ERROR_LENGTH",
       ),
+      maxRpcResponseBytes: parsePositiveInteger(
+        env.INDEXER_MAX_RPC_RESPONSE_BYTES,
+        2_097_152,
+        "INDEXER_MAX_RPC_RESPONSE_BYTES",
+      ),
     },
   };
 }
@@ -353,6 +412,16 @@ export function loadConfig(
     120,
     "RATE_LIMIT_MAX_REQUESTS",
   );
+  const rateLimitMaxKeys = parsePositiveInteger(
+    environment.RATE_LIMIT_MAX_KEYS,
+    10_000,
+    "RATE_LIMIT_MAX_KEYS",
+  );
+  const maxNetworkMetadataRows = parsePositiveInteger(
+    environment.METADATA_MAX_NETWORK_ROWS,
+    100,
+    "METADATA_MAX_NETWORK_ROWS",
+  );
 
   const sepoliaRpcConfigured = Boolean(environment.SEPOLIA_RPC_URL?.trim());
   return Object.freeze({
@@ -374,9 +443,11 @@ export function loadConfig(
     market: createMarketPriceConfig(environment),
     notifications: createNotificationConfig(environment),
     analytics: createAnalyticsConfig(environment),
-    requestBodyLimit: environment.REQUEST_BODY_LIMIT ?? "64kb",
+    requestBodyLimit: parseRequestBodyLimit(environment.REQUEST_BODY_LIMIT),
+    maxNetworkMetadataRows,
     rateLimitWindowMs,
     rateLimitMaxRequests,
+    rateLimitMaxKeys,
     logLevel: logLevel.data,
   });
 }

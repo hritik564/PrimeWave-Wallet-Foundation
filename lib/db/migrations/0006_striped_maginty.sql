@@ -1,0 +1,1 @@
+ALTER TABLE "analytics_events" ADD CONSTRAINT "analytics_events_properties_size" CHECK (octet_length("analytics_events"."properties"::text) <= 16384);

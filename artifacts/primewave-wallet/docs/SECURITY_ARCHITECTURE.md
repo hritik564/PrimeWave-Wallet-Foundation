@@ -1195,7 +1195,7 @@ User backs it up offline
   ↓
 User verifies backup
   ↓
-Encrypted local wallet vault created
+Platform-protected local wallet vault created
 ```
 
 If the user loses the recovery phrase and access to the wallet, PrimeWave
@@ -1312,15 +1312,53 @@ The current vault version is `1`. The protected value has this shape:
 
 The JSON is not treated as an application-level encryption primitive. The
 entire value is handed to SecureStore, which provides the native protected
-storage boundary. The parser rejects malformed data, invalid BIP-39 phrases,
-duplicate or unsafe account indexes, and unsupported versions with sanitized
-errors. Future migrations must be explicit and versioned; unknown versions are
-never guessed or silently downgraded.
+storage boundary. PrimeWave does not implement a second encryption layer for
+this payload. Before the value reaches SecureStore, the mnemonic exists as
+plaintext JSON in application memory; JavaScript garbage collection does not
+provide guaranteed zeroization. A device compromise or compromise of the
+platform keychain/keystore remains in the threat model. The parser rejects
+malformed data, invalid BIP-39 phrases, duplicate or unsafe account indexes,
+and unsupported versions with sanitized errors. Future migrations must be
+explicit and versioned; unknown versions are never guessed or silently
+downgraded.
 
 The engine creates a new opaque vault handle for saves and consumes it inside
 the security boundary. Retrieval returns an opaque handle rather than raw
 secret material through the public engine model. No public API provides
 `getMnemonic`, `getPrivateKey`, `exportPrivateKey`, or equivalent access.
+
+### SecureStore terminology and threat model
+
+SecureStore is the native protected-storage boundary; it is not an
+application-level encryption implementation. References to protected wallet
+state must not be read as a claim that the JavaScript JSON payload is
+independently encrypted before persistence. The application does not claim
+cryptographic zeroization of JavaScript values. Device compromise, an
+unlocked compromised device, and compromise of the platform Keychain or
+Keystore remain outside this local boundary.
+
+### PIN threat model
+
+The implemented local authentication policy is:
+
+- exactly six decimal digits;
+- a versioned verifier derived with a random 128-bit salt and scrypt
+  (`N=16384`, `r=8`, `p=1`);
+- failed-attempt retry delay beginning at 500 ms and increasing
+  exponentially, capped at 10 seconds;
+- no permanent lockout and no automatic wallet wipe after failed attempts;
+- biometric authentication is a native prompt that never exposes biometric
+  data to the app, with the PIN path retained as fallback when the native
+  prompt is unavailable, cancelled, or fails;
+- immediate default auto-lock behavior for background transitions, subject to
+  the explicit in-flight unlock guard.
+
+The PIN protects access through client-side local state; it is not a
+server-verifiable wallet-ownership credential. A compromised device,
+compromised JavaScript runtime, or compromised platform secure-storage
+boundary can defeat this client-side protection. These limitations are part
+of the threat model and are not claims of permanent lockout, guaranteed
+zeroization, or protection from device compromise.
 
 ## 22. Phase 1B-1 verification and limitations
 

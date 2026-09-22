@@ -33,6 +33,10 @@ export const analyticsEventsTable = pgTable(
       "analytics_events_version_positive",
       sql`${table.eventVersion} > 0`,
     ),
+    check(
+      "analytics_events_properties_size",
+      sql`octet_length(${table.properties}::text) <= 16384`,
+    ),
   ],
 );
 

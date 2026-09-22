@@ -11,6 +11,11 @@ export interface AnalyticsConfig {
   readonly errorRetentionMs: number;
   readonly performanceRetentionMs: number;
   readonly cleanupBatchSize: number;
+  readonly abuseWindowMs: number;
+  readonly maxAnonymousIdentities: number;
+  readonly maxEventsPerIdentity: number;
+  readonly maxTotalEvents: number;
+  readonly cleanupOnStartup: boolean;
 }
 
 export interface AnalyticsEventRecord {

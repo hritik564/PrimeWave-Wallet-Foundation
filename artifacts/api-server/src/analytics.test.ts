@@ -161,6 +161,56 @@ test("analytics ingestion is rate limited", async () => {
   );
 });
 
+test("analytics admission bounds identities, events, global intake, and expiry", async () => {
+  let now = new Date("2026-09-22T00:00:00.000Z");
+  const config = testConfig({
+    ANALYTICS_ABUSE_WINDOW_MS: "1000",
+    ANALYTICS_MAX_ANONYMOUS_IDENTITIES: "2",
+    ANALYTICS_MAX_EVENTS_PER_IDENTITY: "2",
+    ANALYTICS_MAX_TOTAL_EVENTS: "3",
+  });
+  const service = new AnalyticsService(
+    config.analytics,
+    new InMemoryAnalyticsRepository(),
+    new DeterministicMockAnalyticsProvider(),
+    () => now,
+  );
+  const ingest = (eventId: string, identity: string) =>
+    service.ingestEvent(
+      eventInput({ eventId, anonymousId: identity } as never),
+    );
+  const identityB = `installation_${"b".repeat(22)}`;
+  const identityC = `installation_${"c".repeat(22)}`;
+
+  assert.equal((await ingest("event-identity-a-1", anonymousId)).accepted, true);
+  assert.equal((await ingest("event-identity-a-2", anonymousId)).accepted, true);
+  await assert.rejects(
+    () => ingest("event-identity-a-3", anonymousId),
+    /temporarily rate limited/i,
+  );
+  assert.equal(
+    service.admissionIdentityCount,
+    1,
+  );
+  assert.equal(
+    (await ingest("event-identity-b-1", identityB))
+      .accepted,
+    true,
+  );
+  await assert.rejects(
+    () => ingest("event-identity-c-1", identityC),
+    /capacity|temporarily rate limited/i,
+  );
+
+  now = new Date(now.getTime() + 1_001);
+  assert.equal(
+    (await ingest("event-identity-c-2", identityC))
+      .accepted,
+    true,
+  );
+  assert.equal(service.admissionIdentityCount, 1);
+});
+
 test("anonymous identity is random-scoped and never wallet-derived", () => {
   assert.throws(
     () =>
@@ -310,6 +360,12 @@ test("retention cleanup is bounded and the unconfigured runtime is explicit", as
   assert.equal(result.accepted, true);
   const cleaned = await service.cleanupExpired(new Date(Date.now() + 2));
   assert.equal(cleaned.events, 1);
+  const concurrentCleanup = await Promise.all([
+    service.cleanupExpired(new Date(Date.now() + 2)),
+    service.cleanupExpired(new Date(Date.now() + 2)),
+  ]);
+  assert.equal(concurrentCleanup[0]?.events, 0);
+  assert.equal(concurrentCleanup[1]?.events, 0);
 
   const unconfigured = new AnalyticsService(
     config.analytics,

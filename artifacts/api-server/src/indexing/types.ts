@@ -34,6 +34,7 @@ export interface IndexingBounds {
   readonly maxCalldataBytes: number;
   readonly maxTopicsPerLog: number;
   readonly maxErrorLength: number;
+  readonly maxRpcResponseBytes?: number;
 }
 
 export interface IndexerConfig {

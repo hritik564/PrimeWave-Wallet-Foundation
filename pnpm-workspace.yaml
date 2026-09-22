@@ -75,6 +75,12 @@ onlyBuiltDependencies:
   - unrs-resolver
 
 overrides:
+  # query-string 7.x is retained for Expo compatibility; use the maintained
+  # URI decoder without upgrading the surrounding mobile toolchain.
+  decode-uri-component: "0.5.0"
+  # xcode@3.0.1 uses only uuid.v4(); keep the remediation scoped to this
+  # build-only path instead of changing uuid versions across the workspace.
+  "xcode>uuid": "11.1.1"
   # replit uses linux-x64 only, we can exclude all other platforms
   "esbuild>@esbuild/darwin-arm64": "-"
   "esbuild>@esbuild/darwin-x64": "-"

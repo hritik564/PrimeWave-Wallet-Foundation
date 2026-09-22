@@ -12,7 +12,15 @@ type FetchLike = (
   },
 ) => Promise<{
   readonly status: number;
-  text(): Promise<string>;
+  readonly body: {
+    getReader(): {
+      read(): Promise<{
+        readonly done: boolean;
+        readonly value?: Uint8Array;
+      }>;
+      cancel(): Promise<void>;
+    };
+  };
 }>;
 
 const READ_ONLY_METHODS = new Set([
@@ -41,6 +49,7 @@ export class ReadOnlyEvmRpcClient implements ReadOnlyRpcClient {
     private readonly network: IndexerNetworkConfig,
     private readonly timeoutMs: number,
     private readonly fetchImplementation: FetchLike = globalThis.fetch as FetchLike,
+    private readonly maxResponseBytes = 2_097_152,
   ) {}
 
   async verifyChainId(): Promise<void> {
@@ -100,7 +109,7 @@ export class ReadOnlyEvmRpcClient implements ReadOnlyRpcClient {
         body: JSON.stringify({ jsonrpc: "2.0", id, method, params }),
         signal: controller.signal,
       });
-      const bodyText = await response.text();
+      const bodyText = await this.readResponseBody(response);
       if (response.status < 200 || response.status >= 300) {
         throw new IndexingError("RPC_FAILURE", "The RPC endpoint rejected the request.");
       }
@@ -131,5 +140,28 @@ export class ReadOnlyEvmRpcClient implements ReadOnlyRpcClient {
     } finally {
       clearTimeout(timer);
     }
+  }
+
+  private async readResponseBody(
+    response: Awaited<ReturnType<FetchLike>>,
+  ): Promise<string> {
+    const reader = response.body.getReader();
+    const chunks: Uint8Array[] = [];
+    let totalBytes = 0;
+    while (true) {
+      const next = await reader.read();
+      if (next.done) break;
+      const chunk = next.value ?? new Uint8Array();
+      totalBytes += chunk.byteLength;
+      if (totalBytes > this.maxResponseBytes) {
+        await reader.cancel();
+        throw new IndexingError(
+          "RESPONSE_LIMIT",
+          "The RPC response exceeded the configured byte limit.",
+        );
+      }
+      chunks.push(chunk);
+    }
+    return Buffer.concat(chunks.map((chunk) => Buffer.from(chunk))).toString("utf8");
   }
 }

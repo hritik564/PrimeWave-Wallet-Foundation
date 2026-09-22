@@ -20,6 +20,8 @@ function toHttpError(error: unknown): HttpError {
   const status =
     error.code === "PAYLOAD_TOO_LARGE" || error.code === "BATCH_LIMIT"
       ? 413
+      : error.code === "ADMISSION_LIMIT"
+        ? 429
       : error.code === "PERSISTENCE_FAILURE"
         ? 503
         : error.code === "DISABLED"
