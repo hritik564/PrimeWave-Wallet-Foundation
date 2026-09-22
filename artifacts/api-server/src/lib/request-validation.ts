@@ -28,7 +28,7 @@ export function requestIdMiddleware(
   next();
 }
 
-export function validateBody<T>(schema: ZodType<T>) {
+export function validateBody<T>(schema: ZodType<T, any, any>) {
   return (request: Request, _response: Response, next: NextFunction): void => {
     const parsed = schema.safeParse(request.body);
     if (!parsed.success) {
@@ -41,7 +41,7 @@ export function validateBody<T>(schema: ZodType<T>) {
   };
 }
 
-export function validateQuery<T>(schema: ZodType<T>) {
+export function validateQuery<T>(schema: ZodType<T, any, any>) {
   return (request: Request, _response: Response, next: NextFunction): void => {
     const parsed = schema.safeParse(request.query);
     if (!parsed.success) {
@@ -53,7 +53,7 @@ export function validateQuery<T>(schema: ZodType<T>) {
   };
 }
 
-export function validateParams<T>(schema: ZodType<T>) {
+export function validateParams<T>(schema: ZodType<T, any, any>) {
   return (request: Request, _response: Response, next: NextFunction): void => {
     const parsed = schema.safeParse(request.params);
     if (!parsed.success) {

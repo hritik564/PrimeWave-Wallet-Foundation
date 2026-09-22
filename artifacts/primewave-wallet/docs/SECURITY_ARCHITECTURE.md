@@ -1653,3 +1653,36 @@ Phase 8.5 adds no persistence, cache, background polling, historical pricing,
 portfolio fiat valuation, Activity fiat valuation, signing, broadcasting,
 custody, authentication, or mobile market-data integration. Market data never
 becomes blockchain truth.
+
+## Phase 8.6 notification security boundary
+
+Notifications are output-only application data. The notification layer cannot
+access or transport seed phrases, mnemonics, private keys, PINs or PIN hashes,
+SecureStore/vault contents, encryption keys, signing capabilities, raw signed
+transactions, authentication credentials, provider keys, or database
+credentials. Complete blockchain transaction objects and raw calldata are
+also outside notification records.
+
+Registration, preferences, events, and deliveries are scoped to the explicit
+`networkId + chainId + accountAddress` tuple. Device identity never implies
+wallet ownership, authenticated application identity, or transaction-signing
+authorization. All notification API requests retain the existing request ID,
+validation, body-limit, rate-limit, secret-material rejection, and sanitized
+error pipeline.
+
+Push tokens are sensitive infrastructure identifiers. They are accepted only
+for registration, stored only where delivery requires them, never returned by
+ordinary GET responses, never logged or included in analytics/payloads/errors,
+and never selected by another account scope. Provider errors are normalized to
+bounded categories without echoing provider responses or token values.
+
+The event model retains minimum public data and uses deterministic scoped
+deduplication. Delivery states distinguish pending, sending, sent, delivered,
+failed, disabled, and expired. Transient failures have bounded attempts and
+backoff; invalid tokens, disabled registrations, malformed requests, and
+missing provider configuration do not retry indefinitely. Unconfigured
+providers fail explicitly, while deterministic mock delivery is test-only.
+
+No production push SDK, native notification permission, mobile notification
+surface, arbitrary messaging endpoint, worker deployment, analytics, campaign,
+price-alert, or speculative security-alert behavior is included in Phase 8.6.

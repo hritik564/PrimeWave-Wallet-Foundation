@@ -743,3 +743,24 @@ increment.
 - Focused market tests cover identity, network isolation, mapping, quote
   validation, exact decimal handling, freshness, unavailable/stale/invalid
   states, provider failures, bounded batches, and credential redaction.
+
+## Phase 8.6 completion
+
+- Added provider-neutral notification types, scoped device registration,
+  explicit disabled-by-default preferences, event validation, deduplication,
+  queue/repository abstractions, delivery states, and bounded retry behavior.
+- Added PostgreSQL/Drizzle notification tables for devices, preferences,
+  events, and deliveries with scoped uniqueness and operational state checks.
+- Added bounded device and preference routes under `/api/v1/notifications`.
+  Push tokens and installation identifiers are omitted from ordinary API
+  responses.
+- Added an explicit unconfigured provider and deterministic mock provider.
+  No Firebase, APNs, Expo Push, native permissions, mobile UI, worker,
+  analytics, price alerts, arbitrary messaging, or automatic source wiring was
+  added.
+- Added focused tests for validation, scope isolation, preference defaults and
+  updates, event and log-index deduplication, queue claiming, bounded retries,
+  permanent failures, disabled devices, schema constraints, response privacy,
+  and token redaction.
+- Database migration generation/application status must remain explicit in the
+  final Phase 8.6 validation report; no production migration is applied.

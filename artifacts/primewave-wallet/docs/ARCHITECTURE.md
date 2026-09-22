@@ -1456,3 +1456,40 @@ and does not represent live data. Phase 8.5 adds no database tables, price
 cache, background polling, historical prices, portfolio fiat valuation, or
 Activity fiat valuation. It does not fetch arbitrary URLs, proxy providers,
 store credentials, sign, broadcast, or access wallet secrets.
+
+## Phase 8.6 — notification infrastructure
+
+Phase 8.6 adds a backend-only, provider-neutral notification architecture. It
+does not alter the mobile wallet, Activity architecture, account/network
+identity, SecureStore, authentication, signing, broadcasting, DApp, swap, or
+market-data boundaries.
+
+```text
+future public event source
+  -> typed notification event
+  -> scoped preference evaluation
+  -> notification record
+  -> bounded delivery queue
+  -> provider adapter
+  -> explicitly registered device
+```
+
+Device and preference scope is the existing public identity tuple
+`networkId + chainId + accountAddress`. A device registration is not an
+ownership claim and does not grant signing permission. Preference categories
+are explicit booleans and default to disabled. The backend exposes only
+bounded device registration and preference operations; it does not expose an
+arbitrary notification-send route.
+
+Notification events are typed as transaction confirmation, transaction
+revert, incoming public activity, swap completion, or future security event.
+Only minimum public presentation fields are allowed. Transaction identities
+deduplicate by network, hash, event type, account, and applicable log index.
+Delivery states and bounded retry outcomes remain distinct. No event source is
+automatically connected to all indexed or synchronized records in this phase.
+
+Push tokens remain server-side sensitive infrastructure identifiers. They are
+not returned by ordinary APIs, logged, copied into notification payloads, or
+exposed across account scopes. No production push provider, native permission,
+mobile notification UI, worker, analytics, marketing, price alert, arbitrary
+messaging, or fiat valuation integration is included.

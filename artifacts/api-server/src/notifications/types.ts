@@ -41,6 +41,15 @@ export interface NotificationScope {
   readonly accountAddress: string;
 }
 
+export interface NotificationConfig {
+  readonly enabled: boolean;
+  readonly maxDevicesPerScope: number;
+  readonly maxPendingDeliveries: number;
+  readonly maxAttempts: number;
+  readonly maxBackoffMs: number;
+  readonly deliveryRetentionMs: number;
+}
+
 export interface NotificationDeviceRegistration extends NotificationScope {
   readonly registrationId: string;
   readonly deviceIdentifier: string;
@@ -173,9 +182,11 @@ export interface NotificationRepository {
     readonly event: NotificationEventRecord;
     readonly deliveries: readonly NotificationDeliveryRecord[];
   }>;
+  countPendingDeliveries(): Promise<number>;
   claimNextDelivery(now: Date): Promise<NotificationDeliveryWorkItem | null>;
   markDeliverySent(
     deliveryId: number,
+    providerId: string,
     result: NotificationProviderResult,
     now: Date,
   ): Promise<void>;

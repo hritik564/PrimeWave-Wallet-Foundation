@@ -21,7 +21,20 @@ export const notificationScopeSchema = z.object({
     .trim()
     .regex(EVM_ADDRESS_PATTERN)
     .transform((value) => value.toLowerCase()),
-});
+}).strict();
+
+export const notificationScopeQuerySchema = z.object({
+  networkId: z.string().trim().regex(NETWORK_ID_PATTERN),
+  chainId: z
+    .string()
+    .regex(/^[1-9][0-9]{0,9}$/)
+    .transform((value) => Number(value)),
+  accountAddress: z
+    .string()
+    .trim()
+    .regex(EVM_ADDRESS_PATTERN)
+    .transform((value) => value.toLowerCase()),
+}).strict();
 
 export const notificationDeviceBodySchema = notificationScopeSchema.extend({
   deviceIdentifier: z.string().trim().min(1).max(128),
@@ -29,7 +42,7 @@ export const notificationDeviceBodySchema = notificationScopeSchema.extend({
   pushToken: z.string().trim().min(1).max(512),
   appVersion: z.string().trim().min(1).max(64),
   environment: z.enum(["development", "testnet", "mainnet"]),
-});
+}).strict();
 
 export const notificationRegistrationParamsSchema = z.object({
   registrationId: z.string().trim().regex(/^[A-Za-z0-9._:-]{1,128}$/),
@@ -65,7 +78,7 @@ export const notificationEventSchema = notificationScopeSchema.extend({
   eventTimestamp: z.string().datetime({ offset: true }),
   source: z.string().trim().min(1).max(64),
   deduplicationKey: z.string().trim().min(1).max(256).optional(),
-});
+}).strict();
 
 export type NotificationDeviceBody = z.infer<
   typeof notificationDeviceBodySchema
@@ -78,7 +91,11 @@ export type NotificationEventInput = z.infer<typeof notificationEventSchema>;
 export function normalizeNotificationScope(
   input: z.input<typeof notificationScopeSchema>,
 ): NotificationScope {
-  const parsed = notificationScopeSchema.safeParse(input);
+  const parsed = notificationScopeSchema.safeParse({
+    networkId: input.networkId,
+    chainId: input.chainId,
+    accountAddress: input.accountAddress,
+  });
   if (!parsed.success) {
     throw new NotificationError("INVALID_SCOPE", "The notification scope is invalid.");
   }

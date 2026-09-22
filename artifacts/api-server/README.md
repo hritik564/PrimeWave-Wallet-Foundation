@@ -71,6 +71,12 @@ Configuration is loaded in `src/config.ts` and is environment-specific:
   `MARKET_PRICE_FRESHNESS_MAX_AGE_MS`, `MARKET_PRICE_MAX_FUTURE_SKEW_MS`, and
   `MARKET_PRICE_MAX_DECIMAL_PLACES` — bounded market-data validation and
   freshness policy values.
+- `NOTIFICATIONS_ENABLED` — enables the provider-neutral notification boundary.
+- `NOTIFICATIONS_MAX_DEVICES_PER_SCOPE` — maximum registered devices for one
+  account/network/chain scope.
+- `NOTIFICATIONS_MAX_PENDING_DELIVERIES`, `NOTIFICATIONS_MAX_ATTEMPTS`,
+  `NOTIFICATIONS_MAX_BACKOFF_MS`, and `NOTIFICATIONS_DELIVERY_RETENTION_MS` —
+  bounded queue, retry, and operational-retention policy values.
 
 No backend secret is placed in Expo public configuration. No credentials are
 invented in this repository.
@@ -205,3 +211,58 @@ size, and the existing rate limiter and sanitized error pipeline apply.
 No price persistence, cache, background polling, historical prices, portfolio
 fiat valuation, Activity fiat valuation, or mobile market-data integration is
 included in Phase 8.5.
+
+## Phase 8.6 notification infrastructure
+
+Phase 8.6 adds a provider-neutral, backend-only notification boundary. Its
+layers are:
+
+```text
+future public/WaveX event source
+  -> typed notification event
+  -> scoped preference evaluation
+  -> deduplicated event record
+  -> bounded delivery queue
+  -> provider adapter
+  -> registered device
+```
+
+The only public device and preference routes are:
+
+- `POST /api/v1/notifications/devices`
+- `DELETE /api/v1/notifications/devices/:registrationId` with explicit
+  `networkId`, `chainId`, and `accountAddress` query scope
+- `GET /api/v1/notifications/preferences` with explicit scope query
+- `PUT /api/v1/notifications/preferences` with explicit scope and five bounded
+  boolean preferences
+
+Registration is scoped to `networkId + chainId + accountAddress` and an
+installation identifier. Device registrations do not imply wallet ownership,
+authentication, signing authority, or access to another account. Push tokens
+are stored only in the server-side device record, are never returned by these
+routes, and are not logged or placed in notification content.
+
+Preferences default to disabled for transaction confirmations, incoming
+transactions, transaction failures, swaps, and security events. Event
+generation is an internal service boundary; there is no public
+`send-notification-to-any-token` route. Supported typed event categories are
+`transaction_confirmed`, `transaction_reverted`, `incoming_transaction`,
+`swap_completed`, and `security_event`. Only the minimum public event fields
+are retained; complete blockchain transactions and raw calldata are not
+copied.
+
+Transaction deduplication uses network, transaction hash, event type, account,
+and ERC-20 log index when applicable. Database uniqueness is a second line of
+defense. Delivery states remain explicit: `pending`, `sending`, `sent`,
+`delivered`, `failed`, `disabled`, and `expired`. Transient provider errors
+use bounded exponential backoff and a configured maximum attempt count;
+invalid-token, disabled-registration, malformed-request, and unconfigured
+provider errors are not retried indefinitely.
+
+The repository supports PostgreSQL/Drizzle persistence and deterministic
+in-memory tests. `UnconfiguredNotificationProvider` fails explicitly when no
+approved provider is configured. The deterministic mock provider is test-only;
+Firebase, APNs, Expo Push, native permissions, mobile notification UI,
+analytics, campaigns, price alerts, arbitrary messaging, and production
+workers are intentionally deferred. Phase 8.5 market data is not used to
+generate notifications and no fiat values are fabricated.

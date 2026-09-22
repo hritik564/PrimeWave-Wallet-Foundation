@@ -12,10 +12,12 @@ import type { MetadataRepository } from "./metadata/types";
 import { createMetadataRepository } from "./metadata/repository";
 import { createIndexerRepository } from "./indexing/repository";
 import { IndexerService } from "./indexing/service";
+import type { NotificationRepository } from "./notifications/types";
 
 export function createApp(
   config: ServerConfig = loadConfig(),
   repository?: MetadataRepository,
+  notificationRepository?: NotificationRepository,
 ): Express {
   const app: Express = express();
   const metadataRepository = repository ?? createMetadataRepository(config);
@@ -70,11 +72,11 @@ export function createApp(
   // namespace becomes the only new API boundary.
   app.use(
     `${config.apiPrefix}`,
-    createRouter(config, metadataRepository, indexerService),
+    createRouter(config, metadataRepository, indexerService, notificationRepository),
   );
   app.use(
     "/api",
-    createRouter(config, metadataRepository, indexerService),
+    createRouter(config, metadataRepository, indexerService, notificationRepository),
   );
   app.use((_request, _response, next) => {
     next(new HttpError(404, "NOT_FOUND", "The requested API resource was not found."));

@@ -2,6 +2,7 @@ import { z } from "zod";
 import { createPublicNetworkCatalog } from "./metadata/catalog";
 import type { IndexerConfig } from "./indexing/types";
 import type { MarketPriceConfig } from "./market/types";
+import type { NotificationConfig } from "./notifications/types";
 
 export type ServerEnvironment = "development" | "test" | "production";
 
@@ -15,6 +16,7 @@ export interface ServerConfig {
   readonly sepoliaRpcConfigured: boolean;
   readonly indexer: IndexerConfig;
   readonly market: MarketPriceConfig;
+  readonly notifications: NotificationConfig;
   readonly requestBodyLimit: string;
   readonly rateLimitWindowMs: number;
   readonly rateLimitMaxRequests: number;
@@ -124,6 +126,39 @@ function createMarketPriceConfig(
     ),
     maxDecimalPlaces,
     supportedQuoteCurrencies: Object.freeze(["USD"]),
+  };
+}
+
+function createNotificationConfig(
+  environment: NodeJS.ProcessEnv,
+): NotificationConfig {
+  return {
+    enabled: parseBoolean(environment.NOTIFICATIONS_ENABLED, true),
+    maxDevicesPerScope: parsePositiveInteger(
+      environment.NOTIFICATIONS_MAX_DEVICES_PER_SCOPE,
+      10,
+      "NOTIFICATIONS_MAX_DEVICES_PER_SCOPE",
+    ),
+    maxPendingDeliveries: parsePositiveInteger(
+      environment.NOTIFICATIONS_MAX_PENDING_DELIVERIES,
+      100,
+      "NOTIFICATIONS_MAX_PENDING_DELIVERIES",
+    ),
+    maxAttempts: parsePositiveInteger(
+      environment.NOTIFICATIONS_MAX_ATTEMPTS,
+      3,
+      "NOTIFICATIONS_MAX_ATTEMPTS",
+    ),
+    maxBackoffMs: parsePositiveInteger(
+      environment.NOTIFICATIONS_MAX_BACKOFF_MS,
+      300_000,
+      "NOTIFICATIONS_MAX_BACKOFF_MS",
+    ),
+    deliveryRetentionMs: parsePositiveInteger(
+      environment.NOTIFICATIONS_DELIVERY_RETENTION_MS,
+      30 * 24 * 60 * 60 * 1_000,
+      "NOTIFICATIONS_DELIVERY_RETENTION_MS",
+    ),
   };
 }
 
@@ -299,6 +334,7 @@ export function loadConfig(
       sepoliaRpcConfigured,
     ),
     market: createMarketPriceConfig(environment),
+    notifications: createNotificationConfig(environment),
     requestBodyLimit: environment.REQUEST_BODY_LIMIT ?? "64kb",
     rateLimitWindowMs,
     rateLimitMaxRequests,
