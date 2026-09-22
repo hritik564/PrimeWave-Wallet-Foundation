@@ -1,0 +1,536 @@
+WAVEX WALLET — FINAL PHASE 8 SECURITY RE-REVIEW
+TASK 36 — AUDIT ONLY
+
+IMPORTANT:
+This is the FINAL CONSOLIDATED SECURITY RE-REVIEW of Phase 8 after:
+
+- Original Phase 8 Security Review
+- Remediation Batch 1
+- Remediation Batch 2
+
+AUDIT ONLY.
+
+DO NOT MODIFY SOURCE CODE.
+DO NOT MODIFY DATABASE SCHEMAS.
+DO NOT MODIFY MIGRATIONS.
+DO NOT MODIFY DEPENDENCIES.
+DO NOT START PHASE 9.
+DO NOT IMPLEMENT THE DEFERRED WALLET-OWNERSHIP AUTHENTICATION PROTOCOL.
+DO NOT PERFORM CLEANUP OR REFACTORING.
+
+The purpose is to determine whether Phase 8 is now secure enough to pass the Phase 8 security gate, and to identify every remaining blocker or architectural dependency.
+
+==================================================
+1. REVIEW THE COMPLETE CURRENT STATE
+==================================================
+
+Review the actual current repository, not previous reports alone.
+
+Audit:
+
+8.1 Backend Foundation
+8.2 Public Metadata
+8.3 Blockchain Indexing
+8.4 Synchronization/Reconciliation
+8.5 Market/Price Infrastructure
+8.6 Notifications
+8.7 Analytics
+
+Also review:
+
+- Batch 1 authorization changes
+- Batch 2 infrastructure hardening
+- current database migrations
+- current dependency state
+- current configuration
+- current tests
+- current mobile/backend boundaries
+- current production-readiness documentation
+
+==================================================
+2. NON-CUSTODIAL INVARIANT
+==================================================
+
+Verify again that no backend component can:
+
+- receive seed phrases
+- receive private keys
+- receive wallet PINs
+- receive vault keys
+- receive signing capabilities
+- receive raw signed transactions
+- reconstruct wallet secrets
+- sign transactions
+- authorize local wallet signing
+- broadcast user transactions
+
+Confirm specifically that:
+
+eth_sendRawTransaction
+
+is not available through backend indexing/infrastructure.
+
+Search the current source rather than relying on previous reports.
+
+==================================================
+3. BATCH 1 REGRESSION
+==================================================
+
+Verify H-01/H-02/L-03/M-03 remediation remains intact.
+
+Check:
+
+- account-scoped synchronization routes
+- notification registration
+- notification deletion
+- notification preferences
+- notification event source authorization
+- concurrent notification quotas
+
+Test both:
+
+/api/v1
+
+and:
+
+/api
+
+compatibility routes.
+
+Verify unauthenticated account-scoped requests fail closed.
+
+Verify cross-account access is rejected.
+
+==================================================
+4. WALLET-OWNERSHIP AUTHENTICATION DEPENDENCY
+==================================================
+
+This remains intentionally deferred.
+
+DO NOT invent or implement an authentication protocol.
+
+Determine precisely:
+
+A. What authentication/authorization exists today?
+
+B. Which account-scoped routes require it?
+
+C. Are those routes fail-closed while the production wallet-ownership protocol is absent?
+
+D. Is there any path where a public wallet address alone is treated as proof of ownership?
+
+E. Is there any path where a client-controlled flag, installation ID, PIN, seed phrase, private key, or signing capability is treated as ownership proof?
+
+F. Does any current implementation accidentally claim that production wallet ownership authentication is complete?
+
+If wallet ownership authentication is still missing, report it explicitly as:
+
+DEFERRED ARCHITECTURAL DEPENDENCY
+
+Do NOT classify it as fixed.
+
+Determine whether this is a blocker for:
+- Phase 8 security approval
+- Phase 9 development
+- production release
+
+Do not make assumptions. Explain based on the actual current architecture.
+
+==================================================
+5. BATCH 2 FINDINGS
+==================================================
+
+Verify each original finding directly in source:
+
+M-01 rate limiter
+M-04 analytics abuse
+M-05 analytics retention
+M-06 decode-uri-component
+M-07 RPC response limits
+L-01 analytics DB boundary
+L-02 provider response bounds
+L-04 request body maximum
+L-05 metadata row bounds
+L-06 uuid
+L-07 static server traversal
+L-08 SecureStore terminology
+L-09 PIN threat model
+L-10 supply-chain governance
+
+For each:
+
+FIXED
+PARTIALLY FIXED
+NOT FIXED
+or
+DOCUMENTED / THREAT-MODEL LIMITATION
+
+Do not rely solely on the Batch 2 report.
+
+==================================================
+6. ANALYTICS PRIVACY REVIEW
+==================================================
+
+Verify:
+
+- event allowlist
+- property allowlist
+- prohibited-field rejection
+- anonymous identity model
+- identity admission limits
+- payload limits
+- batch limits
+- retention
+- cleanup invocation
+- database constraints
+- no wallet/account/blockchain joins
+- no wallet addresses
+- no transaction hashes
+- no exact amounts
+- no calldata
+- no push tokens
+- no credentials/API keys
+- no arbitrary text
+
+Confirm analytics failure cannot affect wallet operations.
+
+==================================================
+7. NOTIFICATION SECURITY REVIEW
+==================================================
+
+Verify:
+
+- push token ownership boundary
+- push token response exclusion
+- log exclusion
+- error exclusion
+- analytics exclusion
+- device registration authorization
+- deletion authorization
+- preference authorization
+- event source authorization
+- concurrent quotas
+- retry bounds
+- delivery deduplication
+
+Determine whether plaintext push-token storage is an actual release blocker or a deployment-level security requirement.
+
+Do not invent encryption-at-rest architecture.
+
+==================================================
+8. INDEXING / RPC SECURITY
+==================================================
+
+Verify:
+
+- RPC method allowlist
+- no eth_sendRawTransaction
+- RPC URL configuration boundary
+- no caller-controlled RPC URLs
+- chain verification
+- block/log bounds
+- response byte limit BEFORE JSON parsing
+- malformed response handling
+- sanitized errors
+- reorg handling
+- cursor safety
+- transactional persistence
+
+Explicitly inspect SSRF possibilities.
+
+==================================================
+9. API SECURITY
+==================================================
+
+Review every Phase 8 endpoint.
+
+For each determine:
+
+- authentication
+- authorization
+- input validation
+- output validation
+- rate limiting
+- pagination
+- resource bounds
+- account isolation
+- error sanitization
+- abuse potential
+
+Identify any endpoint that should not be public.
+
+==================================================
+10. DATABASE SECURITY
+==================================================
+
+Review every Phase 8 table and migration.
+
+Verify:
+
+- no wallet secrets
+- no signing material
+- account/network isolation
+- appropriate uniqueness
+- bounded fields
+- retention indexes
+- migration consistency
+- no dangerous destructive migrations
+- no accidental public exposure
+
+==================================================
+11. DEPENDENCY / SUPPLY CHAIN
+==================================================
+
+Review current dependency state.
+
+Verify:
+
+- no known unresolved high/critical vulnerability relevant to production
+- decode-uri-component remediation
+- uuid remediation/scope
+- SBOM capability
+- dependency audit tooling
+- lockfile discipline
+- no commercial analytics/tracking SDK
+- no suspicious new packages
+
+Do not upgrade anything.
+
+==================================================
+12. RESOURCE EXHAUSTION
+==================================================
+
+Verify current bounds for:
+
+- request bodies
+- analytics events
+- analytics identities
+- database reads
+- metadata reads
+- provider arrays
+- RPC responses
+- block ranges
+- log ranges
+- notification queues
+- notification registrations
+- rate-limit state
+
+Identify any remaining unbounded externally influenced resource.
+
+==================================================
+13. CROSS-PHASE REVIEW
+==================================================
+
+Verify Phase 8 cannot bypass:
+
+Phase 1 wallet security
+Phase 2 transaction security
+Phase 3 asset security
+Phase 4 transaction review/authentication
+Phase 5 Activity integrity
+Phase 6 swap execution
+Phase 7 DApp security
+
+Specifically confirm backend cannot:
+
+- sign
+- authorize signing
+- broadcast
+- unlock wallet
+- access SecureStore
+- access mnemonic/private key
+- approve DApps
+- execute swaps
+- silently change network
+- create false local Activity
+
+==================================================
+14. TEST QUALITY
+==================================================
+
+Do not merely count tests.
+
+Review whether important security properties actually have negative tests.
+
+Identify any meaningful remaining test gaps.
+
+Do not request tests merely for theoretical scenarios that cannot affect the current architecture.
+
+==================================================
+15. PRODUCTION-READINESS REVIEW
+==================================================
+
+Determine whether Phase 8 is:
+
+A. SECURITY APPROVED
+
+B. SECURITY APPROVED WITH DOCUMENTED NON-BLOCKING LIMITATIONS
+
+C. APPROVED WITH REQUIRED FIXES
+
+D. NOT APPROVED
+
+Use the evidence from the current repository.
+
+Do not give an overall score.
+
+Do not rank individual findings.
+
+==================================================
+16. REQUIRED FINAL REPORT
+==================================================
+
+Return exactly:
+
+# PHASE 8 FINAL SECURITY RE-REVIEW
+
+## 1. Executive Decision
+
+Choose exactly one:
+
+PHASE 8 SECURITY APPROVED
+
+PHASE 8 SECURITY APPROVED WITH DOCUMENTED NON-BLOCKING LIMITATIONS
+
+PHASE 8 SECURITY APPROVED WITH REQUIRED FIXES
+
+PHASE 8 SECURITY NOT APPROVED
+
+## 2. Critical Findings
+
+If none:
+
+None identified.
+
+## 3. High Findings
+
+If none:
+
+None identified.
+
+## 4. Medium Findings
+
+If none:
+
+None identified.
+
+## 5. Low / Informational Findings
+
+List remaining observations.
+
+## 6. Non-Custodial Verification
+
+Explicitly answer:
+
+Seed phrase:
+Private key:
+PIN:
+Vault key:
+Signing capability:
+Raw signed transaction:
+
+For each state whether the backend can receive/store/log/reconstruct/authorize/sign/broadcast using it.
+
+## 7. Batch 1 Verification
+
+H-01:
+H-02:
+M-03:
+L-03:
+
+State whether each remains fixed.
+
+## 8. Batch 2 Verification
+
+M-01:
+M-04:
+M-05:
+M-06:
+M-07:
+L-01:
+L-02:
+L-04:
+L-05:
+L-06:
+L-07:
+L-08:
+L-09:
+L-10:
+
+State current status for every item.
+
+## 9. Wallet-Ownership Authentication
+
+Clearly state:
+
+- what exists today
+- what remains deferred
+- whether it blocks Phase 8 security approval
+- whether it blocks Phase 9
+- whether it blocks production release
+
+Do not invent an authentication protocol.
+
+## 10. API Security
+
+Provide a concise endpoint matrix showing:
+
+Endpoint | Public/Auth | Authorization | Bounds | Finding
+
+## 11. Database Security
+
+Provide:
+
+Table | Sensitive Data | Isolation | Constraints | Finding
+
+## 12. Cross-Phase Security
+
+State whether Phase 8 creates any bypass around Phases 1–7.
+
+## 13. Test Coverage
+
+Report exact current validation results and meaningful remaining security test gaps.
+
+## 14. Production Dependencies
+
+List only genuine external/deployment dependencies such as:
+
+- wallet ownership authentication protocol
+- push-provider configuration
+- production RPC configuration
+- production database controls
+- Apple/Google store requirements
+
+Do not label ordinary future features as security blockers.
+
+## 15. Required Remediation
+
+If none:
+
+None.
+
+If there are required fixes, list only actual blockers.
+
+DO NOT implement them.
+
+## 16. Final Gate
+
+Use the exact decision selected above.
+
+Then end with:
+
+PHASE 8 FINAL SECURITY RE-REVIEW COMPLETE — AWAITING APPROVAL
+
+==================================================
+17. ABSOLUTE STOP
+==================================================
+
+This is audit-only.
+
+Do not change code.
+Do not change dependencies.
+Do not change migrations.
+Do not start Phase 9.
+Do not implement wallet ownership authentication.
+
+Stop after the report.
