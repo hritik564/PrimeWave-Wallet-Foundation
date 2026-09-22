@@ -13,6 +13,7 @@ import {
 import {
   isPreviewTestModeAvailable,
   PreviewTestMode,
+  createPreviewPortfolioReadModelService,
 } from '@/src/core/development';
 import {
   createAppPortfolioReadModelService,
@@ -657,8 +658,11 @@ export default function FoundationScreen() {
   );
   const previewTestMode = useMemo(() => new PreviewTestMode(), []);
   const portfolioReadModelService = useMemo(
-    () => createAppPortfolioReadModelService(),
-    [],
+    () =>
+      previewMode
+        ? createPreviewPortfolioReadModelService()
+        : createAppPortfolioReadModelService(),
+    [previewMode],
   );
   const swapQuoteService = useMemo(() => {
     try {
@@ -824,7 +828,19 @@ export default function FoundationScreen() {
     [previewMode],
   );
   const [selectedNetwork, setSelectedNetwork] = useState<EvmNetwork>(
-    () => defaultNetworkRegistry.getPrimaryNetwork(),
+    () => {
+      const primary = defaultNetworkRegistry.getPrimaryNetwork();
+      if (previewMode && primary.configurationStatus !== 'configured') {
+        const configured = defaultNetworkRegistry
+          .listEnabledNetworks()
+          .find((network) => network.configurationStatus === 'configured');
+        if (configured) {
+          defaultNetworkRegistry.selectActiveNetwork(configured.id);
+          return configured;
+        }
+      }
+      return primary;
+    },
   );
   const [view, setView] = useState<ViewName>('loading');
   const [draft, setDraft] = useState<WalletSetupResult | null>(null);

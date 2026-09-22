@@ -2,7 +2,8 @@ import type { Wallet } from '@/src/core/wallet/models';
 
 const PREVIEW_STATE_KEY = 'wavex.development.preview-test-mode.v1';
 const PREVIEW_STATE_VERSION = 1 as const;
-const PREVIEW_TEST_ADDRESS = '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
+export const PREVIEW_TEST_ADDRESS =
+  '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266';
 const PREVIEW_WALLET_ID = 'development-preview-test-wallet';
 
 export type PreviewTestPhase =

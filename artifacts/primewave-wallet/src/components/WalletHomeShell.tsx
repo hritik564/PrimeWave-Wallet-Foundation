@@ -1,7 +1,7 @@
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -1023,7 +1023,7 @@ export function WalletHomeShell({
   previewMode: boolean;
   network: EvmNetwork;
   networkRegistry: NetworkRegistry;
-  readModelService: PortfolioReadModelService;
+  readModelService: Pick<PortfolioReadModelService, 'getPortfolio'>;
   createConstructionEngine: (
     wallet: Wallet,
     networkId: string,
@@ -1058,6 +1058,7 @@ export function WalletHomeShell({
   const [swapApproval, setSwapApproval] = useState<SwapReviewApproval | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sendAssetKey, setSendAssetKey] = useState<string | null>(null);
+  const portfolioRequestRef = useRef(0);
   const account = wallet.accounts[0];
 
   const accountQuery = useMemo(
@@ -1072,6 +1073,7 @@ export function WalletHomeShell({
 
   const loadPortfolio = useCallback(
     async (isRefresh = false) => {
+      const requestId = ++portfolioRequestRef.current;
       if (!account) {
         setPortfolioState('error');
         setPortfolioError('The active public account is unavailable.');
@@ -1085,9 +1087,11 @@ export function WalletHomeShell({
       setPortfolioError(null);
       try {
         const next = await readModelService.getPortfolio(accountQuery);
+        if (requestId !== portfolioRequestRef.current) return;
         setPortfolio(next);
         setPortfolioState(getPortfolioState(next.assets.length));
       } catch (error) {
+        if (requestId !== portfolioRequestRef.current) return;
         const message = safePortfolioMessage(error);
         setPortfolioError(message);
         if (isRefresh && portfolio) {
@@ -1105,7 +1109,11 @@ export function WalletHomeShell({
   );
 
   useEffect(() => {
+    portfolioRequestRef.current += 1;
     void loadPortfolio();
+    return () => {
+      portfolioRequestRef.current += 1;
+    };
   }, [loadPortfolio]);
 
   useEffect(() => {
