@@ -1,0 +1,695 @@
+PHASE 8.5 — WAVEX MARKET & PRICE DATA INFRASTRUCTURE
+
+Build ONLY Phase 8.5.
+
+Do not begin Phase 8.6 or any later Phase 8 work automatically.
+
+The existing WaveX architecture is authoritative:
+
+- Phase 8.1 Backend Foundation & Security Boundary
+- Phase 8.2 Public Metadata
+- Phase 8.3 Read-only Blockchain Indexing
+- Phase 8.4 Transaction Synchronization & Reconciliation
+- Existing Phase 3 Portfolio/Asset architecture
+- Existing Phase 5 Activity presentation architecture
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Build a provider-neutral market and price data infrastructure.
+
+The service will provide public market valuation data for:
+
+- native EVM assets
+- supported ERC-20 tokens
+
+The system must explicitly distinguish:
+
+BLOCKCHAIN DATA
+- balances
+- transactions
+- transfers
+- blocks
+- receipts
+
+from:
+
+MARKET DATA
+- price
+- price source
+- quote currency
+- timestamp
+- freshness
+- availability
+
+Market data must NEVER become a source of truth for blockchain state.
+
+==================================================
+2. CORE INVARIANTS
+==================================================
+
+A price is an external valuation.
+
+It is NOT:
+
+- token verification
+- token trust
+- token legitimacy
+- blockchain balance
+- transaction confirmation
+- token identity
+- ownership
+- approval state
+
+Do not infer any of those properties from a price.
+
+A token having a price does not mean it is verified or trusted.
+
+A token having no price does not mean it is worthless.
+
+==================================================
+3. INSPECT EXISTING ARCHITECTURE
+==================================================
+
+Before modifying anything, inspect:
+
+- Phase 8.1 backend
+- Phase 8.2 metadata
+- Phase 8.3 indexing
+- Phase 8.4 synchronization
+- Phase 3 asset/token identity
+- PortfolioReadModel
+- ActivityPresentationModel
+
+Reuse existing token identity and network abstractions.
+
+Do not create a competing token identity system.
+
+==================================================
+4. PRICE IDENTITY
+==================================================
+
+A price observation must have a deterministic asset identity.
+
+For native assets:
+
+networkId + native asset identity
+
+For ERC-20:
+
+networkId + canonical contract address
+
+Do NOT identify prices solely by:
+
+- symbol
+- name
+- ticker
+- provider-specific asset ID
+
+Provider asset IDs may be mapping metadata, but they are not WaveX asset identity.
+
+==================================================
+5. QUOTE CURRENCY
+==================================================
+
+Define an explicit quote currency model.
+
+At minimum support a configurable fiat quote such as:
+
+- USD
+
+The architecture must allow future currencies.
+
+Do not assume all prices are USD internally.
+
+Represent:
+
+- quoteCurrency
+- price
+- observedAt
+- source
+- freshness
+
+Use exact/appropriate decimal representation.
+
+Do NOT use JavaScript floating-point arithmetic for monetary values where precision could be lost.
+
+==================================================
+6. PRICE MODEL
+==================================================
+
+Create a provider-neutral price observation model containing concepts such as:
+
+- networkId
+- asset identity
+- quote currency
+- price
+- source/provider
+- observedAt
+- receivedAt
+- freshness state
+- availability state
+- provider asset identifier where applicable
+- provenance
+
+Possible availability states:
+
+- available
+- unavailable
+- invalid
+
+Possible freshness states:
+
+- fresh
+- stale
+- unknown
+
+Do not silently turn unavailable prices into zero.
+
+Do not silently turn stale prices into fresh prices.
+
+==================================================
+7. PROVIDER ABSTRACTION
+==================================================
+
+Create a provider-neutral interface.
+
+Conceptually:
+
+PriceProvider
+  - provider identity
+  - supported assets
+  - quote currencies
+  - fetch prices
+  - normalize response
+  - provider error normalization
+
+Do NOT tightly couple the rest of WaveX to a single provider.
+
+Provider-specific response formats must remain inside the provider adapter.
+
+==================================================
+8. EXTERNAL PROVIDER
+==================================================
+
+For this sprint, implement ONLY the provider integration necessary to prove the architecture.
+
+If an existing approved market-data provider is not already configured, choose a provider only after inspecting current project dependencies and configuration.
+
+Do NOT hardcode API keys.
+
+Provider credentials must come from backend environment configuration.
+
+Never expose provider credentials to the mobile application.
+
+Do not place provider API keys in:
+
+- Expo public configuration
+- mobile source
+- database records
+- logs
+- API responses
+
+If no provider credentials are available, the system must still compile and test with deterministic mocked provider responses.
+
+Do not fabricate live price data.
+
+==================================================
+9. PROVIDER RATE LIMITS
+==================================================
+
+Respect provider limits.
+
+The backend must:
+
+- bound requested asset count
+- bound request frequency
+- avoid request-per-token explosions
+- normalize provider rate-limit errors
+- avoid infinite retry loops
+- avoid aggressive automatic retries
+
+If batching is supported, use bounded batches.
+
+Do not let a public API request directly control arbitrary provider requests.
+
+==================================================
+10. TOKEN MAPPING
+==================================================
+
+Create a safe provider-asset mapping boundary.
+
+For example:
+
+WaveX Asset Identity
+        ↓
+Provider Asset Mapping
+        ↓
+Provider-specific ID
+
+The mapping must be network-aware.
+
+Never assume:
+
+USDC on Ethereum == USDC on every network.
+
+Do not map tokens globally by symbol.
+
+Do not silently map unknown tokens.
+
+If mapping is unavailable:
+
+return unavailable price.
+
+Do not guess.
+
+==================================================
+11. NATIVE ASSET PRICES
+==================================================
+
+Native asset identity must come from the existing NetworkRegistry.
+
+Do not create duplicate native asset definitions.
+
+A network's native asset may have a provider mapping.
+
+If a native asset mapping does not exist:
+
+return unavailable.
+
+Do not infer price from another network's native asset.
+
+==================================================
+12. PRICE NORMALIZATION
+==================================================
+
+Provider responses must be normalized and validated.
+
+Reject:
+
+- negative prices
+- NaN
+- Infinity
+- malformed decimals
+- unsupported quote currencies
+- impossible timestamps
+- missing provider identity
+- malformed asset identity
+
+Bound:
+
+- decimal precision
+- string lengths
+- provider response size
+- asset counts
+
+Never allow malformed provider data to become a valid WaveX price.
+
+==================================================
+13. TIMESTAMP / FRESHNESS
+==================================================
+
+Distinguish:
+
+observedAt
+receivedAt
+
+Freshness must be deterministic.
+
+Define a configurable freshness policy.
+
+For example, the architecture may distinguish:
+
+fresh
+stale
+unknown
+
+Do not invent a universal freshness threshold without documenting it.
+
+The threshold should be configuration-driven where appropriate.
+
+If a provider does not supply a trustworthy observation timestamp:
+
+do not pretend the price is freshly observed.
+
+==================================================
+14. PRICE CACHE
+==================================================
+
+If caching is implemented, it must be:
+
+- bounded
+- explicitly scoped
+- provider-aware
+- quote-currency-aware
+- network/asset-aware
+- freshness-aware
+
+Do not create an unbounded in-memory cache.
+
+Do not cache a price indefinitely.
+
+Do not return stale values as fresh.
+
+If stale data is intentionally returned, label it stale.
+
+==================================================
+15. DATABASE
+==================================================
+
+If persistence is required, use existing PostgreSQL/Drizzle infrastructure.
+
+Create only tables required for market data.
+
+Potential conceptual model:
+
+price_observations
+provider_asset_mappings
+
+Do not duplicate:
+
+- token metadata
+- blockchain transactions
+- indexed transfers
+- account activity
+
+Use appropriate uniqueness/identity constraints.
+
+Do not store provider API credentials.
+
+Do not store wallet secrets.
+
+==================================================
+16. API DESIGN
+==================================================
+
+Create bounded read-only market-data endpoints under:
+
+/api/v1/...
+
+For example:
+
+GET /api/v1/prices
+
+The endpoint should support:
+
+- bounded asset list
+- explicit quote currency
+- bounded response size
+
+Do not create an endpoint that accepts arbitrary provider URLs.
+
+Do not proxy arbitrary external HTTP requests.
+
+Do not expose provider credentials.
+
+Do not create write endpoints for arbitrary users.
+
+==================================================
+17. RESPONSE CONTRACT
+==================================================
+
+A price response should make availability and freshness explicit.
+
+Conceptually:
+
+{
+  asset,
+  quoteCurrency,
+  price,
+  source,
+  observedAt,
+  receivedAt,
+  availability,
+  freshness
+}
+
+Do not return:
+
+price: 0
+
+when the price is actually unavailable.
+
+Do not omit freshness.
+
+Do not imply that provider data is blockchain truth.
+
+==================================================
+18. PORTFOLIO INTEGRATION BOUNDARY
+==================================================
+
+Do NOT modify PortfolioReadModel to depend on prices in this sprint.
+
+Do NOT change existing portfolio balance calculations.
+
+Do NOT introduce fiat values into the core blockchain balance layer.
+
+The future portfolio presentation layer may consume market data separately.
+
+This separation is important:
+
+Blockchain balance
++
+Market price
+=
+Future fiat valuation
+
+Keep these independently available.
+
+==================================================
+19. ACTIVITY INTEGRATION BOUNDARY
+==================================================
+
+Do NOT modify ActivityPresentationModel in this sprint.
+
+Do NOT retroactively calculate fiat values for historical transactions.
+
+Do not fabricate historical prices.
+
+Future historical valuation requires explicit historical-price architecture.
+
+That is NOT part of this sprint.
+
+==================================================
+20. SECURITY
+==================================================
+
+Audit all new code for:
+
+- API key leakage
+- provider credential leakage
+- arbitrary URL fetching
+- SSRF
+- unbounded provider requests
+- unbounded asset lists
+- unbounded database queries
+- SQL injection
+- log leakage
+- malformed provider data
+- cross-network token confusion
+
+Provider API credentials must never reach:
+
+- mobile
+- client responses
+- logs
+- database records
+
+==================================================
+21. FAILURE HANDLING
+==================================================
+
+Normalize provider failures into safe WaveX states.
+
+Distinguish:
+
+- unavailable
+- provider timeout
+- provider rate limit
+- malformed provider response
+- invalid asset mapping
+- stale data
+- configuration missing
+
+Do not expose raw provider errors to clients.
+
+Do not convert provider failure into:
+
+- zero price
+- fake price
+- previous price marked fresh
+
+==================================================
+22. TESTING
+==================================================
+
+Add focused tests for:
+
+- native asset identity
+- ERC-20 asset identity
+- network isolation
+- provider mapping
+- symbol collision prevention
+- quote currency validation
+- negative price rejection
+- malformed decimal rejection
+- NaN/Infinity rejection
+- timestamp validation
+- freshness classification
+- unavailable price
+- stale price
+- provider timeout
+- provider rate limit
+- malformed provider response
+- bounded asset lists
+- bounded provider batches
+- API key redaction
+- provider credential isolation
+- deterministic mocked provider responses
+
+Use mock provider responses.
+
+Do NOT require live credentials for the test suite.
+
+==================================================
+23. LIVE SMOKE TEST
+==================================================
+
+If a legitimate development market-data provider credential is already configured:
+
+Perform one small bounded read-only smoke test.
+
+Use a well-known public asset mapping.
+
+Verify:
+
+- provider authentication
+- normalized price
+- quote currency
+- source
+- timestamp
+- freshness classification
+
+Do NOT make large requests.
+
+Do NOT perform repeated polling.
+
+If no provider credential is configured:
+
+report that honestly and validate the provider through deterministic mocks.
+
+Do not fabricate a live success.
+
+==================================================
+24. DATABASE MIGRATION
+==================================================
+
+If database persistence is introduced:
+
+- generate Drizzle migrations
+- validate migration consistency
+- verify schema constraints
+- do not apply destructive migrations to production
+
+If a clean development database is available, test migration application.
+
+If not, report the limitation.
+
+Do not claim successful persistence without actually verifying it.
+
+==================================================
+25. DOCUMENTATION
+==================================================
+
+Update:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- backend README
+- market-data README if created
+
+Document:
+
+- price identity
+- provider abstraction
+- provider mapping
+- quote currencies
+- freshness
+- availability
+- caching
+- failure handling
+- credential boundaries
+- portfolio integration boundary
+- activity integration boundary
+- historical pricing explicitly deferred
+
+==================================================
+26. STRICTLY DO NOT IMPLEMENT
+==================================================
+
+Do NOT implement:
+
+- historical price feeds
+- portfolio fiat integration
+- Activity fiat integration
+- notifications
+- analytics
+- swap backend
+- DApp backend
+- server-side signing
+- transaction broadcasting
+- custody
+- private-key storage
+- seed-phrase storage
+- cloud wallet recovery
+- arbitrary external URL proxying
+- unrestricted provider requests
+- production deployment
+
+==================================================
+27. VALIDATION
+==================================================
+
+Before reporting completion:
+
+1. Run Phase 8.5 focused tests.
+2. Run complete existing test suite.
+3. Run TypeScript validation.
+4. Run backend build.
+5. Run Expo validation/static build.
+6. Run Drizzle migration consistency checks if schema changed.
+7. Run git diff --check.
+8. Inspect dependencies.
+9. Perform source security audit.
+10. Confirm provider credentials are never exposed.
+11. Confirm no Phase 8.6 work was started.
+
+Final report must include:
+
+- files created/changed
+- provider architecture
+- provider selected, if any
+- environment variables
+- price model
+- token mapping
+- freshness policy
+- availability states
+- database schema
+- API endpoints
+- security audit
+- test results
+- build results
+- live smoke result if performed
+- migration status
+- warnings
+- deferred work
+
+If everything passes, finish exactly with:
+
+PHASE 8.5 DEVELOPMENT COMPLETE — PENDING SECURITY REVIEW
+
+STOP.
+
+Do not begin Phase 8.6.
