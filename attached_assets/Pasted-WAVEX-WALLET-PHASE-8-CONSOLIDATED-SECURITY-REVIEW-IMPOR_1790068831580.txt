@@ -1,0 +1,781 @@
+WAVEX WALLET — PHASE 8 CONSOLIDATED SECURITY REVIEW
+
+IMPORTANT:
+This task is SECURITY REVIEW ONLY.
+
+Do NOT implement fixes.
+Do NOT refactor code.
+Do NOT upgrade dependencies.
+Do NOT modify database schemas or migrations.
+Do NOT start Phase 9.
+Do NOT add new features.
+
+Your job is to perform a comprehensive security audit of the completed Phase 8 backend/infrastructure work and report findings precisely.
+
+When finished, STOP and provide the audit report.
+
+==================================================
+1. REVIEW SCOPE
+==================================================
+
+Audit all Phase 8 work:
+
+8.1 Backend Foundation & Security Boundary
+8.2 Public Metadata
+8.3 Read-only Blockchain Indexing
+8.4 Transaction History Synchronization & Reconciliation
+8.5 Market & Price Data Infrastructure
+8.6 Notification Infrastructure
+8.7 Privacy-Safe Analytics
+
+Also inspect how these backend components interact with the existing WaveX mobile architecture.
+
+Review relevant:
+- source code
+- tests
+- database schemas
+- migrations
+- API routes
+- configuration
+- repositories/services
+- validation
+- logging
+- error handling
+- authentication/security boundaries
+- environment/secrets handling
+- documentation
+- package/dependency configuration
+
+==================================================
+2. CORE NON-CUSTODIAL SECURITY INVARIANT
+==================================================
+
+The following invariant is absolute:
+
+"WaveX Wallet must be strictly non-custodial. Private keys and recovery phrases must never leave the user's device and must never be transmitted to, stored by, logged by, or recoverable through PrimeWave/WaveX backend infrastructure."
+
+Verify that this remains true across ALL Phase 8 components.
+
+Specifically search for any path by which backend infrastructure could receive, persist, log, infer, reconstruct, or return:
+
+- seed phrases
+- private keys
+- raw private key material
+- wallet PINs
+- SecureStore contents
+- vault keys
+- encryption keys
+- signing capabilities
+- raw signed transactions
+- sensitive authentication material
+
+Also verify that backend endpoints cannot accidentally become a custody/signing/broadcasting mechanism.
+
+If any possible path exists, classify it as a security finding.
+
+==================================================
+3. MOBILE ↔ BACKEND TRUST BOUNDARY
+==================================================
+
+Audit the boundary between:
+
+WaveX Mobile
+        ↓
+Backend API
+        ↓
+Database
+        ↓
+External providers/RPCs
+
+Verify:
+
+- mobile never sends secrets
+- backend never requests secrets
+- backend never requires private signing
+- backend never performs wallet signing
+- backend never broadcasts user transactions on behalf of the wallet
+- backend cannot silently switch a user's wallet network
+- backend cannot modify local wallet state
+- backend cannot authorize a transaction
+- backend cannot bypass the mobile authentication/signing flow
+
+Pay particular attention to whether any newly added API could accidentally weaken an existing Phase 1–7 security boundary.
+
+==================================================
+4. PHASE 8.1 BACKEND FOUNDATION
+==================================================
+
+Audit:
+
+- configuration
+- environment variables
+- CORS
+- request validation
+- authentication boundary
+- rate limiting
+- error handling
+- logging
+- security headers
+- secret-shaped field rejection
+- production configuration requirements
+- health/readiness/version endpoints
+
+Verify:
+
+- secrets are never logged
+- database URLs/credentials are never logged
+- API keys are never logged
+- authorization headers/tokens are not logged
+- wallet material is rejected
+- malformed requests fail safely
+- production wildcard CORS is rejected where required
+- errors do not leak internal implementation details
+- health endpoints do not expose secrets or infrastructure credentials
+
+Check nested objects and arrays as well as top-level request fields.
+
+==================================================
+5. PHASE 8.2 PUBLIC METADATA
+==================================================
+
+Audit:
+
+- network metadata
+- token metadata
+- batch token lookup
+- address normalization
+- verification/provenance/trust separation
+- logo metadata
+- metadata freshness
+- database constraints
+
+Verify:
+
+- token identity is network + canonical contract address
+- no metadata field is treated as proof of token safety
+- unverified tokens are not automatically trusted
+- arbitrary remote URL fetching is not introduced
+- no remote image proxy can become SSRF
+- user-controlled URLs cannot cause server-side requests
+- batch limits are enforced
+- arbitrary database access is impossible
+- metadata cannot contain wallet secrets
+
+==================================================
+6. PHASE 8.3 BLOCKCHAIN INDEXING
+==================================================
+
+This is a HIGH-IMPORTANCE review area.
+
+Verify:
+
+- server-side RPC is read-only
+- only approved read methods are callable
+- eth_sendRawTransaction is impossible through indexing infrastructure
+- RPC URLs come only from controlled configuration
+- RPC credentials cannot leak
+- arbitrary RPC proxying is impossible
+- chain ID is verified
+- network configuration is validated
+- block ranges are bounded
+- log ranges are bounded
+- pagination is bounded
+- database writes are transactional where required
+- reorg handling does not silently corrupt state
+- cursor advancement is safe
+- malformed RPC responses fail safely
+- provider errors are sanitized
+- no arbitrary RPC method injection exists
+
+Check specifically for SSRF possibilities through RPC configuration or request parameters.
+
+==================================================
+7. PHASE 8.4 SYNCHRONIZATION / RECONCILIATION
+==================================================
+
+Audit:
+
+- account synchronization state
+- reconciliation records
+- indexed transaction consumption
+- local activity association
+- conflict handling
+- checkpoint endpoint
+- activity endpoint
+- pagination
+
+Verify:
+
+- a caller cannot use the API to scan arbitrary wallets without appropriate bounds
+- account/network scope is enforced
+- arbitrary account enumeration is limited appropriately
+- local activity IDs remain private
+- reconciliation cannot mutate local wallet Activity
+- indexed blockchain data cannot authorize transactions
+- synchronization cannot trigger signing/broadcasting
+- duplicate/conflicting mappings are handled safely
+- checkpoint manipulation cannot corrupt indexing state
+
+Pay particular attention to whether a public API can be abused as a blockchain intelligence/enumeration service.
+
+==================================================
+8. PHASE 8.5 MARKET / PRICE DATA
+==================================================
+
+Audit:
+
+- provider abstraction
+- asset identity
+- provider mapping
+- price validation
+- freshness/staleness
+- batching
+- provider failures
+- endpoint validation
+
+Verify:
+
+- exact decimal prices are handled safely
+- floating-point precision cannot corrupt financial values
+- arbitrary provider URLs cannot be supplied by callers
+- SSRF is impossible
+- provider credentials cannot leak
+- price data cannot be confused with wallet balances
+- price data cannot be treated as transaction authorization
+- unconfigured providers fail closed
+- untrusted provider responses cannot inject arbitrary data
+
+==================================================
+9. PHASE 8.6 NOTIFICATIONS
+==================================================
+
+Audit:
+
+- device registration
+- notification preferences
+- push-token handling
+- queue/retry behavior
+- deduplication
+- provider abstraction
+- database persistence
+- cleanup/failure states
+
+Verify:
+
+- push tokens are never returned through public APIs
+- push tokens are never logged
+- push tokens cannot be used as wallet identity
+- notification registration cannot expose wallet secrets
+- notification events cannot trigger signing/broadcast
+- notification retries are bounded
+- duplicate notifications are controlled
+- arbitrary provider endpoints are impossible
+- notification preferences cannot be abused to access another account
+- device registration IDs cannot expose sensitive data
+
+==================================================
+10. PHASE 8.7 ANALYTICS / PRIVACY
+==================================================
+
+This is another HIGH-IMPORTANCE review area.
+
+Audit every analytics event and property.
+
+Verify:
+
+- event allowlist is enforced
+- unknown events are rejected
+- unknown properties are rejected
+- payload size is bounded
+- batch size is bounded
+- session IDs are random
+- installation IDs are random
+- IDs are not derived from wallet addresses
+- IDs are not derived from device hardware
+- wallet addresses are rejected
+- transaction hashes are rejected
+- exact transaction amounts are rejected
+- raw calldata is rejected
+- typed-data/signature information is rejected
+- push tokens are rejected
+- API keys/credentials are rejected
+- arbitrary text is rejected
+- IP addresses are not intentionally persisted
+- analytics cannot be joined with wallet/blockchain/indexing/notification identity
+
+Also verify that error telemetry does not accidentally capture:
+
+- stack traces
+- request bodies
+- authorization headers
+- RPC responses
+- provider responses
+- wallet information
+- signed transaction data
+- secrets
+
+Verify retention/expiry cleanup is bounded and safe.
+
+==================================================
+11. DATABASE SECURITY
+==================================================
+
+Review every Phase 8 database table and migration.
+
+Tables include, where applicable:
+
+- public_network_metadata
+- public_token_metadata
+- indexer_state
+- indexed_blocks
+- indexed_transactions
+- indexed_logs
+- indexed_token_transfers
+- account_sync_state
+- reconciliation_records
+- analytics_events
+- analytics_errors
+- analytics_performance
+- notification-related tables
+
+Check:
+
+- primary keys
+- unique constraints
+- foreign keys
+- indexes
+- account/network scoping
+- retention/expiry fields
+- nullable fields
+- unbounded text/blob fields
+- sensitive columns
+- accidental secret storage
+- migration correctness
+- destructive behavior
+- race conditions
+- duplicate handling
+
+Explicitly confirm that no database table contains fields intended for:
+
+private keys
+seed phrases
+PINs
+wallet encryption keys
+signing capabilities
+raw signed transactions
+push tokens exposed through public responses
+
+Push tokens may exist only where required for private notification infrastructure and must remain protected from public API responses/logging.
+
+==================================================
+12. API SECURITY
+==================================================
+
+Review every Phase 8 API endpoint.
+
+For each endpoint determine:
+
+- authentication requirement
+- authorization requirement
+- input validation
+- output validation
+- rate limiting
+- pagination/bounds
+- account/network isolation
+- secret rejection
+- error sanitization
+- abuse potential
+
+Check especially:
+
+GET /api/v1/metadata/networks
+GET /api/v1/metadata/tokens/:networkId/:contractAddress
+GET /api/v1/metadata/tokens
+GET /api/v1/indexing/status
+GET /api/v1/synchronization/status
+GET /api/v1/synchronization/activity
+GET /api/v1/synchronization/reconciliation
+POST /api/v1/synchronization/checkpoint
+GET/POST notification endpoints
+GET/PUT notification preference endpoints
+POST /api/v1/analytics/events
+POST /api/v1/analytics/events/batch
+GET /api/v1/prices
+health/readiness/version endpoints
+
+Do not assume an endpoint is safe merely because its current tests pass.
+
+Inspect the implementation.
+
+==================================================
+13. SSRF REVIEW
+==================================================
+
+Perform an explicit SSRF audit.
+
+Search the entire Phase 8 backend for:
+
+- fetch()
+- axios
+- HTTP clients
+- URL constructors
+- provider URLs
+- RPC URLs
+- image URLs
+- webhook URLs
+- callback URLs
+- redirect handling
+
+Determine whether user-controlled input can influence outbound server-side network requests.
+
+If yes, identify the exact path and severity.
+
+==================================================
+14. INJECTION REVIEW
+==================================================
+
+Audit for:
+
+- SQL injection
+- command injection
+- shell execution
+- path traversal
+- arbitrary file access
+- prototype pollution
+- unsafe JSON handling
+- unsafe URL handling
+- regex denial of service
+- object/property injection
+- unsafe dynamic imports
+
+Pay particular attention to:
+
+- database queries
+- metadata
+- RPC
+- analytics properties
+- notification provider configuration
+- provider mappings
+
+==================================================
+15. RESOURCE EXHAUSTION / DOS
+==================================================
+
+Check every externally reachable endpoint for:
+
+- unbounded arrays
+- unbounded pagination
+- huge request bodies
+- huge batch sizes
+- huge block ranges
+- huge log ranges
+- expensive database queries
+- repeated external provider requests
+- retry storms
+- memory growth
+- regex DoS
+- cleanup loops
+- concurrency issues
+
+Confirm explicit bounds exist where appropriate.
+
+==================================================
+16. CROSS-PHASE SECURITY REVIEW
+==================================================
+
+This is critical.
+
+Do not review Phase 8 in isolation.
+
+Check whether Phase 8 introduces a path that bypasses protections from:
+
+Phase 1:
+Wallet Core / Secure Vault / Authentication
+
+Phase 2:
+Transaction Construction / Signing / Broadcasting
+
+Phase 3:
+Asset / Token / Portfolio
+
+Phase 4:
+Wallet UI / Send / Review / Authorization
+
+Phase 5:
+Activity / Reconciliation
+
+Phase 6:
+Swap / Approval / Execution
+
+Phase 7:
+WalletConnect / DApp sessions / DApp signing / DApp transactions
+
+Specifically verify:
+
+Backend cannot:
+- sign
+- approve
+- broadcast
+- authorize
+- unlock
+- access wallet secrets
+- create fake transaction history
+- silently switch networks
+- approve DApps
+- execute swaps
+- modify local wallet state
+
+==================================================
+17. DEPENDENCY / SUPPLY-CHAIN REVIEW
+==================================================
+
+Review newly introduced Phase 8 dependencies.
+
+Check for:
+
+- known critical/high vulnerabilities
+- suspicious packages
+- unnecessary packages
+- commercial tracking SDKs
+- advertising SDKs
+- packages capable of unexpected network collection
+- packages that violate the non-custodial architecture
+
+Do not automatically upgrade anything.
+
+Report findings only.
+
+==================================================
+18. TEST QUALITY REVIEW
+==================================================
+
+Do not only count tests.
+
+Inspect whether tests actually enforce security boundaries.
+
+Identify important security properties that are:
+
+- tested
+- partially tested
+- not tested
+
+Pay particular attention to negative tests.
+
+Examples:
+
+- secret-shaped request rejection
+- nested secret rejection
+- arbitrary URL rejection
+- RPC method restrictions
+- account isolation
+- network isolation
+- oversized payload rejection
+- oversized batch rejection
+- analytics property rejection
+- push-token protection
+- rate limits
+- provider failure isolation
+- malformed provider response handling
+- reorg handling
+- synchronization conflicts
+- notification authorization
+- database uniqueness
+- retention cleanup
+
+==================================================
+19. SOURCE AUDIT
+==================================================
+
+Search source code for dangerous patterns and report occurrences:
+
+- privateKey
+- mnemonic
+- seed
+- secret
+- password
+- PIN
+- SecureStore
+- signing capability
+- raw transaction
+- eth_sendRawTransaction
+- fetch(
+- axios
+- http://
+- https://
+- process.env
+- DATABASE_URL
+- API_KEY
+- token
+- push token
+- authorization
+- bearer
+- wallet address
+- transaction hash
+- calldata
+
+Do NOT flag legitimate security-controlled uses automatically.
+
+For each meaningful finding explain why it is safe or unsafe.
+
+==================================================
+20. SEVERITY MODEL
+==================================================
+
+Classify findings:
+
+CRITICAL
+Direct possibility of:
+- custody
+- private-key/seed compromise
+- unauthorized signing
+- unauthorized broadcasting
+- authentication bypass
+- severe database compromise
+
+HIGH
+Serious security/privacy issue that could materially affect users or infrastructure.
+
+MEDIUM
+Meaningful weakness requiring remediation before production.
+
+LOW
+Hardening/documentation/test-quality issue.
+
+INFO
+Observation with no required remediation.
+
+Do not inflate severity.
+
+==================================================
+21. REQUIRED FINAL REPORT FORMAT
+==================================================
+
+Return exactly these sections:
+
+# PHASE 8 CONSOLIDATED SECURITY REVIEW
+
+## 1. Executive Summary
+
+State whether Phase 8 is:
+
+- SECURITY APPROVED
+- APPROVED WITH REQUIRED FIXES
+- NOT APPROVED
+
+Do not use vague language.
+
+## 2. Critical Findings
+
+List all CRITICAL findings.
+
+If none:
+"None identified."
+
+## 3. High Findings
+
+List all HIGH findings.
+
+If none:
+"None identified."
+
+## 4. Medium Findings
+
+List all MEDIUM findings.
+
+If none:
+"None identified."
+
+## 5. Low / Informational Findings
+
+List relevant LOW and INFO findings.
+
+## 6. Non-Custodial Verification
+
+Explicitly answer:
+
+Can any Phase 8 backend component receive, store, log, reconstruct, authorize, sign, or broadcast using:
+
+- seed phrase?
+- private key?
+- PIN?
+- vault key?
+- signing capability?
+- raw signed transaction?
+
+Answer each individually.
+
+## 7. API Security Matrix
+
+Create a concise table:
+
+Endpoint | Auth | Validation | Rate Limit | Isolation | Finding
+
+## 8. Database Security Matrix
+
+Create:
+
+Table | Sensitive Data Risk | Isolation | Constraints | Finding
+
+## 9. Phase-by-Phase Findings
+
+8.1
+8.2
+8.3
+8.4
+8.5
+8.6
+8.7
+
+For each state:
+PASS / PASS WITH NOTE / FINDING
+
+## 10. Cross-Phase Security
+
+Explain whether Phase 8 creates any bypass around Phases 1–7.
+
+## 11. Test Coverage Gaps
+
+List meaningful security properties that still lack adequate automated coverage.
+
+## 12. Required Remediation
+
+Only list actual required fixes.
+
+DO NOT implement them.
+
+## 13. Security Gate Decision
+
+Use exactly one:
+
+PHASE 8 SECURITY APPROVED
+
+or
+
+PHASE 8 SECURITY APPROVED WITH REQUIRED FIXES
+
+or
+
+PHASE 8 SECURITY NOT APPROVED
+
+==================================================
+22. ABSOLUTE STOP CONDITION
+==================================================
+
+This is an AUDIT ONLY.
+
+Do not:
+
+- modify source code
+- modify migrations
+- modify dependencies
+- change configuration
+- start Phase 9
+- create new features
+- create production deployments
+- apply production migrations
+
+If you discover vulnerabilities, report them precisely and STOP.
+
+At the very end include:
+
+PHASE 8 SECURITY REVIEW COMPLETE — AWAITING APPROVAL
