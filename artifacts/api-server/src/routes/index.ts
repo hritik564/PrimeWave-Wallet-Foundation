@@ -9,12 +9,16 @@ import { createSynchronizationRouter } from "../synchronization/router";
 import { createMarketPriceRouter } from "../market/router";
 import { createNotificationRouter } from "../notifications/router";
 import type { NotificationRepository } from "../notifications/types";
+import { createAnalyticsRouter } from "../analytics/router";
+import type { AnalyticsProvider, AnalyticsRepository } from "../analytics/types";
 
 export function createRouter(
   config: ServerConfig,
   repository?: MetadataRepository,
   indexer?: IndexerService,
   notificationRepository?: NotificationRepository,
+  analyticsRepository?: AnalyticsRepository,
+  analyticsProvider?: AnalyticsProvider,
 ): IRouter {
   const router: IRouter = Router();
   router.use(createHealthRouter(config));
@@ -23,5 +27,12 @@ export function createRouter(
   router.use(createSynchronizationRouter(config));
   router.use(createMarketPriceRouter(config));
   router.use(createNotificationRouter(config, notificationRepository));
+  router.use(
+    createAnalyticsRouter(
+      config,
+      analyticsRepository,
+      analyticsProvider,
+    ),
+  );
   return router;
 }

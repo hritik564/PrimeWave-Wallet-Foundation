@@ -265,4 +265,32 @@ approved provider is configured. The deterministic mock provider is test-only;
 Firebase, APNs, Expo Push, native permissions, mobile notification UI,
 analytics, campaigns, price alerts, arbitrary messaging, and production
 workers are intentionally deferred. Phase 8.5 market data is not used to
-generate notifications and no fiat values are fabricated.
+ generate notifications and no fiat values are fabricated.
+
+## Phase 8.7 privacy-safe analytics
+
+The analytics boundary measures product behavior and service reliability, not
+people or wallets. The only ingestion routes are:
+
+- `POST /api/v1/analytics/events` — one strictly allowlisted event.
+- `POST /api/v1/analytics/events/batch` — a bounded batch of strictly
+  allowlisted events.
+
+Events require a version, app version, platform, environment, timestamp, and
+random installation/session-scoped identity. Event properties are selected
+from centralized schemas; arbitrary JSON is rejected. Transaction, swap, and
+DApp events use only coarse categories and duration buckets. Wallet addresses,
+transaction hashes, calldata, exact amounts, push tokens, credentials,
+authorization data, IP addresses, and arbitrary text are rejected.
+
+Analytics persistence is separate from wallet/account, indexing,
+synchronization, notification, metadata, and price tables. The schema stores
+only validated event properties and safe error/performance categories. It has
+no foreign keys to wallet or blockchain tables. Records have explicit expiry
+timestamps and bounded cleanup; no indefinite archive is created by default.
+
+No commercial analytics SDK or production analytics provider is configured.
+The runtime reports analytics as unconfigured when no provider is available,
+and deterministic providers are test-only. Provider failures are isolated and
+cannot block wallet creation, recovery, authentication, signing, broadcasting,
+swaps, or DApp behavior.

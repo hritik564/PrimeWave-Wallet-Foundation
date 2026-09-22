@@ -1490,6 +1490,39 @@ automatically connected to all indexed or synchronized records in this phase.
 
 Push tokens remain server-side sensitive infrastructure identifiers. They are
 not returned by ordinary APIs, logged, copied into notification payloads, or
-exposed across account scopes. No production push provider, native permission,
-mobile notification UI, worker, analytics, marketing, price alert, arbitrary
-messaging, or fiat valuation integration is included.
+ exposed across account scopes. No production push provider, native permission,
+ mobile notification UI, worker, marketing, price alert, arbitrary messaging,
+ or fiat valuation integration is included.
+
+## Phase 8.7 — privacy-safe analytics
+
+Phase 8.7 adds an isolated, provider-neutral telemetry boundary. It measures
+coarse product usage, reliability, and performance without identifying,
+profiling, or tracking wallets or people.
+
+```text
+explicit allowlisted event
+  -> centralized validation and redaction
+  -> bounded analytics repository
+  -> optional provider adapter
+```
+
+The event allowlist covers app and onboarding milestones, screen categories,
+asset search, receive/send review, transaction flow categories, swap flow
+categories, coarse DApp categories, and settings. Properties are strict
+schemas containing only categorical values and duration buckets. Anonymous
+identity is random and session-scoped by default; it is never derived from a
+wallet address, transaction hash, hardware identifier, or personal data.
+
+The mobile client is an isolated fail-safe adapter under
+`src/core/analytics`. It is not wired into wallet creation, recovery, PIN,
+biometrics, SecureStore, signing, broadcasting, swap execution, or DApp
+signing. Disabled, unavailable, rejected, or provider-failed analytics returns
+safe results and cannot block core wallet operations.
+
+Analytics tables are separate from account, wallet, blockchain index,
+synchronization, notification, metadata, and price data. Event, error, and
+performance rows have bounded expiry timestamps and bounded cleanup. Security
+logs remain a separate access and retention boundary. No commercial analytics
+SDK, advertising tracker, behavioral profile, or production provider is
+configured.

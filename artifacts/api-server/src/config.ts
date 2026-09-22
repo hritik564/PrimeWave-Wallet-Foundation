@@ -3,6 +3,7 @@ import { createPublicNetworkCatalog } from "./metadata/catalog";
 import type { IndexerConfig } from "./indexing/types";
 import type { MarketPriceConfig } from "./market/types";
 import type { NotificationConfig } from "./notifications/types";
+import type { AnalyticsConfig } from "./analytics/types";
 
 export type ServerEnvironment = "development" | "test" | "production";
 
@@ -17,6 +18,7 @@ export interface ServerConfig {
   readonly indexer: IndexerConfig;
   readonly market: MarketPriceConfig;
   readonly notifications: NotificationConfig;
+  readonly analytics: AnalyticsConfig;
   readonly requestBodyLimit: string;
   readonly rateLimitWindowMs: number;
   readonly rateLimitMaxRequests: number;
@@ -158,6 +160,42 @@ function createNotificationConfig(
       environment.NOTIFICATIONS_DELIVERY_RETENTION_MS,
       30 * 24 * 60 * 60 * 1_000,
       "NOTIFICATIONS_DELIVERY_RETENTION_MS",
+    ),
+  };
+}
+
+function createAnalyticsConfig(environment: NodeJS.ProcessEnv): AnalyticsConfig {
+  return {
+    enabled: parseBoolean(environment.ANALYTICS_ENABLED, true),
+    maxBatchEvents: parsePositiveInteger(
+      environment.ANALYTICS_MAX_BATCH_EVENTS,
+      20,
+      "ANALYTICS_MAX_BATCH_EVENTS",
+    ),
+    maxEventPayloadBytes: parsePositiveInteger(
+      environment.ANALYTICS_MAX_EVENT_PAYLOAD_BYTES,
+      16_384,
+      "ANALYTICS_MAX_EVENT_PAYLOAD_BYTES",
+    ),
+    eventRetentionMs: parsePositiveInteger(
+      environment.ANALYTICS_EVENT_RETENTION_MS,
+      90 * 24 * 60 * 60 * 1_000,
+      "ANALYTICS_EVENT_RETENTION_MS",
+    ),
+    errorRetentionMs: parsePositiveInteger(
+      environment.ANALYTICS_ERROR_RETENTION_MS,
+      30 * 24 * 60 * 60 * 1_000,
+      "ANALYTICS_ERROR_RETENTION_MS",
+    ),
+    performanceRetentionMs: parsePositiveInteger(
+      environment.ANALYTICS_PERFORMANCE_RETENTION_MS,
+      30 * 24 * 60 * 60 * 1_000,
+      "ANALYTICS_PERFORMANCE_RETENTION_MS",
+    ),
+    cleanupBatchSize: parsePositiveInteger(
+      environment.ANALYTICS_CLEANUP_BATCH_SIZE,
+      1_000,
+      "ANALYTICS_CLEANUP_BATCH_SIZE",
     ),
   };
 }
@@ -335,6 +373,7 @@ export function loadConfig(
     ),
     market: createMarketPriceConfig(environment),
     notifications: createNotificationConfig(environment),
+    analytics: createAnalyticsConfig(environment),
     requestBodyLimit: environment.REQUEST_BODY_LIMIT ?? "64kb",
     rateLimitWindowMs,
     rateLimitMaxRequests,

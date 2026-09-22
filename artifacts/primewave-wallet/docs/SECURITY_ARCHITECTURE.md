@@ -1686,3 +1686,30 @@ providers fail explicitly, while deterministic mock delivery is test-only.
 No production push SDK, native notification permission, mobile notification
 surface, arbitrary messaging endpoint, worker deployment, analytics, campaign,
 price-alert, or speculative security-alert behavior is included in Phase 8.6.
+
+## Phase 8.7 privacy-safe analytics boundary
+
+Analytics is optional product telemetry, never a wallet-security dependency.
+The mobile adapter accepts only a centralized TypeScript event union and sends
+random session-scoped identifiers. A random installation identifier may be
+stored in ordinary app storage for lifecycle continuity, but it is not derived
+from a wallet, device hardware, transaction, or personal information. Session
+reset creates a new random session identifier.
+
+The analytics boundary must never receive or persist seed phrases, mnemonics,
+private keys, PINs or PIN hashes, SecureStore/vault contents, encryption keys,
+signing capabilities, raw signed transactions, raw calldata, push tokens,
+authentication credentials, provider keys, wallet addresses, transaction
+hashes, exact amounts, precise location, full IP addresses, or arbitrary user
+text. Centralized validation rejects secret-shaped fields and unknown event
+properties before persistence or provider delivery.
+
+Analytics is separate from operational and security logs. It does not join
+with accounts, indexed blockchain activity, reconciliation, notification
+devices, token metadata, or price data. Error telemetry stores only bounded
+categories and stable codes; performance telemetry stores only metric and
+value buckets. Event, error, and performance records expire under independent
+bounded retention settings. Provider failures, missing configuration,
+unavailable servers, and malformed telemetry are isolated and cannot block
+wallet unlock, creation, recovery, signing, broadcast, swaps, or DApp
+operations.

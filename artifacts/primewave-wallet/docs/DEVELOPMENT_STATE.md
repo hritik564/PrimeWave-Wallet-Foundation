@@ -2,7 +2,7 @@
 
 ## Current phase
 
-**Phase 8.5 — WaveX market and price data infrastructure (implemented;
+**Phase 8.7 — WaveX privacy-safe analytics infrastructure (implemented;
 pending security review)**
 
 The native wallet/security path remains the production-controlled path. A
@@ -764,3 +764,24 @@ increment.
   and token redaction.
 - Database migration generation/application status must remain explicit in the
   final Phase 8.6 validation report; no production migration is applied.
+
+## Phase 8.7 completion
+
+- Added separate analytics event, safe-error, and performance tables with
+  explicit expiry timestamps and no wallet/account/blockchain foreign keys.
+- Added centralized event allowlisting, strict event-specific properties,
+  random anonymous identity validation, prohibited-field rejection, bounded
+  timestamps, and retention normalization.
+- Added bounded provider-neutral ingestion at
+  `/api/v1/analytics/events` and `/api/v1/analytics/events/batch`.
+- Added explicit unconfigured and deterministic mock providers, in-memory and
+  PostgreSQL repositories, provider failure isolation, and bounded cleanup.
+- Added an isolated fail-safe mobile analytics client with session reset and
+  bounded batch/payload behavior; it is not wired into wallet security,
+  signing, broadcasting, swaps, or DApp operations.
+- Added focused API, validation, failure-isolation, retention, schema privacy,
+  and mobile boundary tests. No commercial analytics SDK or production
+  provider was added.
+- Generated Drizzle migration `0005_gifted_nick_fury.sql`; it is not applied
+  to a production database.
+- Phase 9 and later work remain intentionally deferred.
