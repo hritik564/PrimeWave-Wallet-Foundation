@@ -1,0 +1,217 @@
+WaveX Fix — Real Blockchain Balance in Preview Test Mode
+
+We need to fix one specific issue in the current WaveX Preview Test Mode.
+
+CURRENT BEHAVIOR:
+
+The Home screen currently shows:
+
+"Blockchain data unavailable"
+
+even though the Preview Test Mode has a public wallet address and I have transferred real BNB to that address.
+
+OBJECTIVE:
+
+For Preview Test Mode ONLY, allow the app to read the REAL native balance of the Preview Mode public address from the blockchain using a READ-ONLY RPC call.
+
+Do NOT create fake/demo balances.
+
+Do NOT create a fake portfolio.
+
+Do NOT hardcode a balance.
+
+The balance displayed in Preview Test Mode must come from the actual blockchain.
+
+SECURITY REQUIREMENTS:
+
+Preview Test Mode must remain strictly development-only.
+
+It may use:
+- the existing Preview Test Mode public address
+- read-only RPC
+- eth_getBalance
+- existing public blockchain/network infrastructure where appropriate
+
+It MUST NOT use:
+- private keys
+- mnemonic/recovery phrase
+- SecureStore
+- LocalWalletEngine secret material
+- signing
+- transaction construction for spending
+- broadcasting
+- backend wallet custody
+- fake transaction results
+- fake blockchain responses
+
+The RPC request must contain ONLY the public address and the required public network/RPC information.
+
+IMPORTANT:
+
+Do NOT change the existing real wallet security architecture.
+
+Do NOT introduce a private key into Preview Test Mode.
+
+Do NOT make Preview Test Mode capable of signing or sending transactions.
+
+PREVIEW BALANCE:
+
+When Preview Test Mode is active:
+
+1. Identify the existing Preview Test Mode public address from the current implementation.
+2. Identify the currently selected configured network.
+3. Use the existing EVM RPC infrastructure where appropriate.
+4. Read the native balance using eth_getBalance.
+5. Convert the returned bigint/exact value using the existing native asset/balance formatting architecture.
+6. Display the REAL balance in the Home screen.
+7. The Assets screen should display the same REAL native balance.
+8. Refresh should perform another read-only balance request.
+9. Do not cache a fake value.
+
+For example, if the blockchain currently reports:
+
+0.150000000000000000 BNB
+
+the UI should display the appropriate formatted value such as:
+
+0.15 BNB
+
+Do not hardcode 0.15 BNB or any other amount.
+
+NETWORK:
+
+The balance must correspond to the currently selected Preview network.
+
+Do not assume BNB Smart Chain is always selected.
+
+If the selected network is:
+- configured
+- enabled
+- has a valid RPC endpoint
+
+then the preview balance may be read from that network.
+
+If the selected network is unconfigured or unavailable, show the existing controlled unavailable state.
+
+Do NOT invent a balance.
+
+ERROR STATES:
+
+If RPC fails:
+show a clear blockchain-data-unavailable state.
+
+If the RPC returns zero:
+show:
+
+0 BNB
+
+Do NOT interpret zero as unavailable.
+
+If the RPC returns a real positive balance:
+show the real balance.
+
+If the network changes:
+invalidate the previous balance and read the balance for the newly selected network.
+
+If the address/network context changes:
+do not display stale data from the previous context.
+
+ARCHITECTURE:
+
+Prefer existing WaveX services:
+
+NetworkRegistry
+EvmRpcProvider
+EvmAccountStateService
+NativeAssetBalanceService
+PortfolioAggregationService
+PortfolioReadModelService
+
+Do not duplicate blockchain/RPC logic inside the React UI.
+
+If the existing Preview Test Mode architecture intentionally bypasses production blockchain services, add the smallest development-only adapter necessary to obtain the real public balance.
+
+Keep Preview-specific logic isolated under the existing development/preview-test-mode area.
+
+IMPORTANT PRODUCTION BEHAVIOR:
+
+This task must NOT change how the normal production wallet obtains balances.
+
+The eventual standalone/public WaveX APK must work like this:
+
+User creates/imports wallet
+→ real local wallet/account
+→ public address
+→ configured network RPC
+→ real blockchain balance
+
+No fake balance source must exist in the production portfolio path.
+
+Preview Test Mode must never be included/enabled in production builds.
+
+SECURITY INVARIANT:
+
+The backend must never receive:
+- mnemonic
+- private key
+- PIN
+- vault key
+- signing capability
+
+The RPC request must never contain secret material.
+
+TESTS:
+
+Add focused tests for:
+
+1. Preview balance is obtained from read-only blockchain data.
+2. eth_getBalance is called with the public Preview address only.
+3. Returned balance is represented as bigint/exact numeric data.
+4. A real positive balance is displayed correctly.
+5. Zero balance is displayed as zero, not unavailable.
+6. RPC failure produces the controlled unavailable state.
+7. Network changes invalidate the previous balance.
+8. No fake/hardcoded balance exists.
+9. Preview mode does not access SecureStore.
+10. Preview mode does not access mnemonic/private-key APIs.
+11. Preview mode cannot sign.
+12. Preview mode cannot broadcast.
+13. Production/non-preview portfolio behavior remains unchanged.
+
+RUN:
+
+- focused tests
+- full test suite
+- TypeScript
+- Expo checks
+- iOS/Android bundle checks where currently available
+- security/diff inspection
+
+DO NOT redesign the UI in this task.
+
+DO NOT modify wallet security architecture.
+
+DO NOT modify transaction signing.
+
+DO NOT modify broadcasting.
+
+DO NOT modify swap execution.
+
+DO NOT modify DApp signing.
+
+DO NOT modify backend architecture.
+
+REPORT:
+
+At the end provide:
+
+1. Exact files changed.
+2. Exact source used for the Preview balance.
+3. Confirmation that the displayed balance is read from real blockchain RPC.
+4. Confirmation that no balance is hardcoded/faked.
+5. Exact Preview public address being queried.
+6. Exact network being queried.
+7. Confirmation that no secrets are used.
+8. Tests passed.
+9. TypeScript/build status.
+10. Any warnings or limitations.
