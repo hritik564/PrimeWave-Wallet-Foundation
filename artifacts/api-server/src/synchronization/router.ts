@@ -3,6 +3,12 @@ import { z } from "zod";
 import type { ServerConfig } from "../config";
 import { HttpError } from "../lib/errors";
 import { validateBody, validateQuery } from "../lib/request-validation";
+import {
+  authorizedAccountScope,
+  createFailClosedAccountAuthorizationBoundary,
+  requireAccountAuthorization,
+  type AccountAuthorizationBoundary,
+} from "../lib/auth-boundary";
 import { createSynchronizationRepository } from "./repository";
 import { SynchronizationError } from "./errors";
 import { SynchronizationService } from "./service";
@@ -86,17 +92,24 @@ export function createSynchronizationRouter(
     },
     createSynchronizationRepository(config),
   ),
+  accountAuthorization: AccountAuthorizationBoundary =
+    createFailClosedAccountAuthorizationBoundary(),
 ): IRouter {
   const router: IRouter = Router();
 
   router.get(
     "/synchronization/status",
     validateQuery(scopeQuerySchema),
+    requireAccountAuthorization(accountAuthorization, (request) =>
+      scopeFromInput(
+        request.validatedQuery as z.infer<typeof scopeQuerySchema>,
+      ),
+    ),
     async (request, response, next) => {
       try {
-        const query = request.validatedQuery as z.infer<typeof scopeQuerySchema>;
+        const scope = authorizedAccountScope(request);
         response.json({
-          data: await service.getStatus(scopeFromInput(query)),
+          data: await service.getStatus(scope),
         });
       } catch (error) {
         next(error instanceof SynchronizationError ? toHttpError(error) : error);
@@ -107,6 +120,11 @@ export function createSynchronizationRouter(
   router.get(
     "/synchronization/activity",
     validateQuery(activityQuerySchema),
+    requireAccountAuthorization(accountAuthorization, (request) =>
+      scopeFromInput(
+        request.validatedQuery as z.infer<typeof activityQuerySchema>,
+      ),
+    ),
     async (request, response, next) => {
       try {
         const query = request.validatedQuery as z.infer<
@@ -125,7 +143,7 @@ export function createSynchronizationRouter(
           0,
         );
         const page = await service.getActivity(
-          scopeFromInput(query),
+          authorizedAccountScope(request),
           parseDecimalBlock(query.startBlock, "The start block"),
           parseDecimalBlock(query.endBlock, "The end block"),
           limit,
@@ -149,6 +167,11 @@ export function createSynchronizationRouter(
   router.get(
     "/synchronization/reconciliation",
     validateQuery(activityQuerySchema),
+    requireAccountAuthorization(accountAuthorization, (request) =>
+      scopeFromInput(
+        request.validatedQuery as z.infer<typeof activityQuerySchema>,
+      ),
+    ),
     async (request, response, next) => {
       try {
         const query = request.validatedQuery as z.infer<
@@ -167,7 +190,7 @@ export function createSynchronizationRouter(
           0,
         );
         const page = await service.getActivity(
-          scopeFromInput(query),
+          authorizedAccountScope(request),
           parseDecimalBlock(query.startBlock, "The start block"),
           parseDecimalBlock(query.endBlock, "The end block"),
           limit,
@@ -202,6 +225,11 @@ export function createSynchronizationRouter(
   router.post(
     "/synchronization/checkpoint",
     validateBody(checkpointBodySchema),
+    requireAccountAuthorization(accountAuthorization, (request) =>
+      scopeFromInput(
+        request.validatedBody as z.infer<typeof checkpointBodySchema>,
+      ),
+    ),
     async (request, response, next) => {
       try {
         const body = request.validatedBody as z.infer<
@@ -209,7 +237,7 @@ export function createSynchronizationRouter(
         >;
         response.json({
           data: await service.synchronizeRange(
-            scopeFromInput(body),
+            authorizedAccountScope(request),
             parseDecimalBlock(body.startBlock, "The start block"),
             parseDecimalBlock(body.endBlock, "The end block"),
           ),

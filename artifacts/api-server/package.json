@@ -7,7 +7,7 @@
     "dev": "export NODE_ENV=development && pnpm run build && pnpm run start",
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
-    "test": "NODE_ENV=test node --import tsx --test src/**/*.test.ts src/notifications.test.ts src/analytics.test.ts",
+    "test": "NODE_ENV=test node --import tsx --test src/**/*.test.ts src/authorization.test.ts src/foundation.test.ts src/notifications.test.ts src/analytics.test.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {

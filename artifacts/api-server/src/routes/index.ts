@@ -11,6 +11,7 @@ import { createNotificationRouter } from "../notifications/router";
 import type { NotificationRepository } from "../notifications/types";
 import { createAnalyticsRouter } from "../analytics/router";
 import type { AnalyticsProvider, AnalyticsRepository } from "../analytics/types";
+import type { AccountAuthorizationBoundary } from "../lib/auth-boundary";
 
 export function createRouter(
   config: ServerConfig,
@@ -19,14 +20,22 @@ export function createRouter(
   notificationRepository?: NotificationRepository,
   analyticsRepository?: AnalyticsRepository,
   analyticsProvider?: AnalyticsProvider,
+  accountAuthorization?: AccountAuthorizationBoundary,
 ): IRouter {
   const router: IRouter = Router();
   router.use(createHealthRouter(config));
   router.use(createMetadataRouter(config, repository));
   if (indexer) router.use(createIndexerRouter(indexer));
-  router.use(createSynchronizationRouter(config));
+  router.use(createSynchronizationRouter(config, undefined, accountAuthorization));
   router.use(createMarketPriceRouter(config));
-  router.use(createNotificationRouter(config, notificationRepository));
+  router.use(
+    createNotificationRouter(
+      config,
+      notificationRepository,
+      undefined,
+      accountAuthorization,
+    ),
+  );
   router.use(
     createAnalyticsRouter(
       config,

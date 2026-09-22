@@ -1,0 +1,684 @@
+WAVEX WALLET — PHASE 8 REMEDIATION BATCH 1
+AUTHORIZATION + NOTIFICATION SECURITY
+
+IMPORTANT:
+This task is remediation of findings from the completed Phase 8 Consolidated Security Review.
+
+Implement ONLY the findings explicitly listed in this prompt.
+
+Do NOT:
+- start Phase 9
+- redesign unrelated backend architecture
+- modify mobile wallet cryptography
+- modify wallet signing/broadcasting
+- modify Swap
+- modify DApp execution
+- modify blockchain indexing architecture except where strictly required for authorization
+- add commercial authentication/analytics SDKs
+- introduce custody
+- store private keys, seed phrases, PINs, vault keys, or signing capabilities
+- send wallet secrets to the backend
+- use seed phrases/private keys as authentication credentials
+- silently change unrelated behavior
+- upgrade unrelated dependencies
+
+If an architectural decision is genuinely required but cannot be implemented safely without inventing a new security model, STOP and report it instead of guessing.
+
+==================================================
+1. SOURCE OF TRUTH
+==================================================
+
+The Phase 8 security review identified:
+
+HIGH:
+H-01 — Account authentication and wallet-ownership enforcement are absent.
+
+H-02 — Notification registration can bind an attacker-controlled push token to an arbitrary wallet scope.
+
+MEDIUM:
+M-03 — Notification quotas are vulnerable to concurrent overrun.
+
+LOW/INFO:
+L-03 — Notification event source authorization is implicit.
+
+The review specifically states that the existing authentication boundary is deferred and currently returns null.
+
+The objective of this remediation is to establish a proper authorization boundary WITHOUT compromising WaveX's strictly non-custodial architecture.
+
+==================================================
+2. NON-CUSTODIAL SECURITY INVARIANT
+==================================================
+
+This invariant must remain absolute:
+
+"WaveX Wallet must be strictly non-custodial. Private keys and recovery phrases must never leave the user's device and must never be transmitted to, stored by, logged by, or recoverable through WaveX/PrimeWave backend infrastructure."
+
+Therefore:
+
+NEVER send:
+- seed phrase
+- mnemonic
+- private key
+- raw wallet secret
+- wallet PIN
+- SecureStore contents
+- vault key
+- signing capability
+- raw signed transaction
+
+to the backend for authentication.
+
+Authentication MUST NOT depend on backend custody of wallet secrets.
+
+==================================================
+3. AUTHENTICATION ARCHITECTURE — DO NOT INVENT UNSAFELY
+==================================================
+
+First inspect the existing:
+
+- auth-boundary.ts
+- route architecture
+- mobile wallet/account architecture
+- existing cryptographic primitives already available
+- existing public account/address models
+- existing signing/authentication boundaries
+
+Determine the smallest secure architecture that can prove wallet/account ownership without transmitting wallet secrets.
+
+The backend authorization model must distinguish:
+
+1. Public wallet address
+2. Authenticated principal
+3. Authorized wallet/account scope
+
+A caller-provided:
+
+accountAddress
+networkId
+chainId
+
+MUST NOT by itself constitute ownership proof.
+
+Do not simply add a boolean such as:
+
+isAuthenticated: true
+
+Do not trust a client-supplied userId.
+
+Do not trust a client-supplied accountAddress.
+
+Do not use wallet address as an authentication credential.
+
+Do not use a private key or seed phrase on the server.
+
+If the existing architecture already contains a suitable cryptographic proof mechanism, use it.
+
+If a secure wallet-ownership proof mechanism is NOT already present and implementing one would require a new protocol decision, DO NOT invent a production authentication protocol.
+
+Instead:
+
+- preserve the existing deferred auth interface
+- create the correct authorization interfaces/boundaries
+- add explicit fail-closed behavior for account-scoped routes
+- document the exact remaining authentication dependency
+- add tests proving unauthenticated access is rejected
+
+In that case report the remaining architectural dependency clearly.
+
+Security is more important than completing a fake authentication implementation.
+
+==================================================
+4. ACCOUNT-SCOPED ROUTES
+==================================================
+
+The following routes must become authorization-protected:
+
+GET
+/api/v1/synchronization/status
+
+GET
+/api/v1/synchronization/activity
+
+GET
+/api/v1/synchronization/reconciliation
+
+POST
+/api/v1/synchronization/checkpoint
+
+POST
+/api/v1/notifications/devices
+
+DELETE
+/api/v1/notifications/devices/:registrationId
+
+GET
+/api/v1/notifications/preferences
+
+PUT
+/api/v1/notifications/preferences
+
+The compatibility `/api` mount must receive the same protections.
+
+Do not protect public metadata endpoints unnecessarily.
+
+Public endpoints such as:
+
+- metadata
+- public prices
+- health
+- readiness
+- version
+
+may remain public where their current architecture intentionally allows it.
+
+==================================================
+5. AUTHORIZATION RULE
+==================================================
+
+For every account-scoped request:
+
+The authenticated principal must be explicitly authorized for the requested wallet account scope.
+
+Requested:
+
+networkId
+chainId
+accountAddress
+
+must be checked against the authenticated principal.
+
+Reject:
+
+- missing authentication
+- invalid authentication
+- expired authentication
+- malformed authentication
+- mismatched account
+- mismatched network
+- mismatched chain
+- unauthorized registration ID
+- unauthorized notification scope
+
+Use fail-closed behavior.
+
+Never silently fall back to public access.
+
+Never infer authorization from the public nature of a blockchain address.
+
+==================================================
+6. ACCOUNT ADDRESS NORMALIZATION
+==================================================
+
+Continue using the existing canonical EVM address normalization.
+
+Authorization comparisons must operate on the canonical representation.
+
+Do not create a second incompatible address normalization system.
+
+Verify:
+
+- checksum/canonical normalization
+- case-insensitive equivalence where appropriate
+- chain/network scope
+- account identity
+
+Tests must include equivalent EVM address casing.
+
+==================================================
+7. SYNCHRONIZATION SECURITY
+==================================================
+
+For:
+
+- status
+- activity
+- reconciliation
+- checkpoint
+
+verify authorization BEFORE account-scoped database work.
+
+An unauthorized caller must not be able to:
+
+- enumerate arbitrary account activity
+- read synchronization state
+- read reconciliation records
+- create or alter checkpoints
+- cause account-scoped persistence work
+
+Do not remove the existing:
+
+- pagination bounds
+- block-range bounds
+- chain validation
+- account normalization
+- reconciliation protections
+
+Authorization is an additional boundary.
+
+==================================================
+8. NOTIFICATION DEVICE REGISTRATION
+==================================================
+
+This is HIGH priority.
+
+A caller must not be able to register:
+
+their push token
+
+against:
+
+another user's wallet address.
+
+The authenticated principal must authorize the complete:
+
+network
+chain
+account
+
+scope before device registration.
+
+The registration must not accept arbitrary ownership claims from the request body.
+
+Push token handling must remain private.
+
+Push tokens must:
+
+- never appear in public response models
+- never appear in logs
+- never appear in analytics
+- never appear in error messages
+- never be used as wallet identity
+- never be returned by GET endpoints
+
+==================================================
+9. NOTIFICATION DEVICE DELETION
+==================================================
+
+Deletion must be ownership-scoped.
+
+A caller must not be able to delete another user's device registration merely by knowing:
+
+registrationId
+
+or:
+
+accountAddress.
+
+Verify that the authenticated principal owns the registration scope before deletion.
+
+Prefer deriving authorization from the stored registration record rather than trusting a caller-supplied account scope.
+
+Reject cross-account deletion.
+
+==================================================
+10. NOTIFICATION PREFERENCES
+==================================================
+
+GET and PUT notification preferences must be principal-scoped.
+
+A caller must not be able to:
+
+- read another account's preferences
+- modify another account's preferences
+
+The account scope must come from the authenticated authorization context.
+
+If the request also supplies an account address, it must match the authorized scope.
+
+Never allow request data to override authenticated identity.
+
+==================================================
+11. NOTIFICATION EVENT SOURCE AUTHORIZATION
+==================================================
+
+Address finding L-03.
+
+Inspect:
+
+NotificationService.createEvent
+
+and its callers.
+
+The event creation boundary must only be callable by approved internal notification-producing components.
+
+Do not expose a public endpoint for arbitrary notification event creation.
+
+Use the smallest safe internal authorization mechanism.
+
+At minimum:
+
+- separate public request DTOs from internal event commands
+- ensure arbitrary external requests cannot directly invoke internal notification-event creation
+- validate that the event source is an approved internal component
+- preserve existing account/network/chain validation
+- preserve deduplication
+- preserve bounded event fields
+
+Do not create a client-controlled `source` string and treat that as proof.
+
+==================================================
+12. NOTIFICATION QUOTA CONCURRENCY
+==================================================
+
+Fix M-03.
+
+Current vulnerable patterns:
+
+- device quota check → write
+- pending-delivery quota check → write
+
+These must become concurrency-safe.
+
+Do NOT merely increase limits.
+
+Do NOT rely only on application-level check-then-write.
+
+Use the existing PostgreSQL/Drizzle architecture where appropriate.
+
+The resulting implementation must guarantee configured bounds under concurrent requests.
+
+At minimum test concurrent attempts that exceed:
+
+maxDevicesPerScope
+
+and:
+
+maxPendingDeliveries
+
+Expected result:
+
+The configured quota must not be exceeded because of race conditions.
+
+Preserve existing uniqueness constraints and deduplication.
+
+==================================================
+13. PUSH TOKEN STORAGE
+==================================================
+
+Address the security concern identified in M-02 without inventing unnecessary cryptography.
+
+Inspect current notification token storage.
+
+The backend may need to retain push tokens for actual future delivery, but they must remain protected.
+
+Implement/document the smallest appropriate deployment-level protection.
+
+At minimum verify:
+
+- token column is never returned by public APIs
+- token never appears in logs
+- token never appears in analytics
+- token never appears in error responses
+- token is only accessible to the notification delivery boundary
+- notification delivery code does not expose token values through provider errors
+
+If database-level encryption or application-level encryption requires a key-management architecture that does not currently exist, DO NOT invent one.
+
+Instead:
+- preserve the current storage requirement
+- add explicit security-boundary documentation
+- ensure access is limited to the notification subsystem
+- clearly document encryption-at-rest as a deployment/security requirement
+- report it as a remaining operational security dependency
+
+Do not store a second plaintext copy.
+
+==================================================
+14. RATE LIMITER
+==================================================
+
+Do NOT fix M-01 in this batch unless the authorization changes require touching the same code.
+
+Do not redesign the global rate limiter yet.
+
+The next remediation batch will handle:
+
+- unbounded rate-limit key growth
+- multi-instance limitations
+- proxy-aware client identity
+
+Avoid scope creep.
+
+==================================================
+15. TESTING REQUIREMENTS
+==================================================
+
+Add focused regression tests for:
+
+AUTHENTICATION
+
+1. Missing authentication → rejected.
+2. Invalid authentication → rejected.
+3. Expired authentication → rejected if applicable.
+4. Valid authentication + matching account → allowed.
+5. Valid authentication + different account → rejected.
+6. Valid authentication + different network scope → rejected.
+7. Valid authentication + different chain scope → rejected.
+8. Equivalent EVM address casing → correctly normalized.
+
+SYNCHRONIZATION
+
+9. Unauthorized status → rejected.
+10. Unauthorized activity → rejected.
+11. Unauthorized reconciliation → rejected.
+12. Unauthorized checkpoint → rejected.
+13. Authorized synchronization access → succeeds.
+
+NOTIFICATIONS
+
+14. Unauthorized device registration → rejected.
+15. Registration against another account → rejected.
+16. Authorized registration → succeeds.
+17. Unauthorized device deletion → rejected.
+18. Cross-account deletion → rejected.
+19. Authorized deletion → succeeds.
+20. Unauthorized preference read → rejected.
+21. Unauthorized preference update → rejected.
+22. Cross-account preference access → rejected.
+23. Authorized preference access → succeeds.
+
+PUSH TOKEN
+
+24. Push token never appears in response.
+25. Push token never appears in logs.
+26. Push token never appears in error output.
+27. Push token never appears in analytics.
+
+CONCURRENCY
+
+28. Concurrent device registrations cannot exceed configured quota.
+29. Concurrent pending deliveries cannot exceed configured quota.
+
+INTERNAL EVENTS
+
+30. External/public request cannot directly create internal notification events.
+31. Approved internal source can create a notification event.
+32. Invalid/unapproved event source is rejected.
+
+COMPATIBILITY ROUTES
+
+33. `/api` compatibility routes enforce exactly the same authorization rules as `/api/v1`.
+
+SECURITY REGRESSION
+
+34. Seed phrase rejected.
+35. Private key rejected.
+36. PIN rejected.
+37. Vault-key-shaped data rejected.
+38. Raw signed transaction rejected.
+39. Existing non-custodial tests remain passing.
+
+Add additional tests if required by the implementation.
+
+==================================================
+16. SECURITY SOURCE AUDIT
+==================================================
+
+After implementation search for:
+
+- accountAddress
+- auth
+- authorization
+- bearer
+- pushToken
+- registrationId
+- createEvent
+- notification
+- checkpoint
+
+Verify no route accidentally bypasses the authorization middleware/service.
+
+Also inspect both:
+
+/api/v1
+
+and:
+
+/api
+
+mounts.
+
+==================================================
+17. VALIDATION
+==================================================
+
+Run:
+
+- Phase 8 backend tests
+- wallet/mobile tests
+- TypeScript validation
+- API build
+- Expo static iOS build
+- Expo static Android build
+- migration consistency checks
+- git diff --check
+- relevant security/source audits
+
+Do not apply production migrations.
+
+If a development migration must be generated for schema changes, generate it and consistency-check it, but do not deploy it to production.
+
+==================================================
+18. CHANGE DISCIPLINE
+==================================================
+
+Keep the implementation minimal.
+
+Do not modify unrelated Phase 8 systems.
+
+Do not modify:
+
+- Swap
+- DApp
+- wallet signing
+- wallet broadcasting
+- wallet cryptography
+- token engine
+- portfolio
+- Activity architecture
+
+unless a direct compilation/security dependency makes a minimal change unavoidable.
+
+Document any such dependency.
+
+==================================================
+19. REQUIRED FINAL REPORT
+==================================================
+
+Return:
+
+# PHASE 8 REMEDIATION BATCH 1
+
+## 1. Implemented Changes
+
+List exact files/components changed.
+
+## 2. Authentication Architecture
+
+Explain exactly how account ownership is established.
+
+If production authentication is still deferred, say so explicitly and explain what remains.
+
+Do NOT claim authentication is implemented if it is not.
+
+## 3. Synchronization Authorization
+
+Show which endpoints are protected and how account scope is enforced.
+
+## 4. Notification Authorization
+
+Show registration, deletion, and preference authorization.
+
+## 5. Notification Event Boundary
+
+Explain how internal event creation is protected.
+
+## 6. Concurrent Quota Protection
+
+Explain the mechanism used and the concurrency tests.
+
+## 7. Push Token Protection
+
+Explain exactly how tokens are protected and what deployment-level requirements remain.
+
+## 8. Tests
+
+Report focused tests and full test totals.
+
+## 9. Validation
+
+Report:
+
+- TypeScript
+- API build
+- Expo builds
+- migrations
+- git diff
+- security audit
+
+## 10. Remaining Phase 8 Security Findings
+
+Do NOT hide unresolved findings.
+
+List the remaining findings from the original audit that are NOT addressed by this batch.
+
+In particular, do not silently claim these are fixed:
+
+- M-01 rate limiter
+- M-04 analytics abuse
+- M-05 retention scheduler
+- M-06 decode-uri-component
+- M-07 RPC response byte limit
+- L-01 analytics DB constraints
+- L-02 provider response bounds
+- L-04 request body maximum
+- L-05 metadata row limit
+- L-06 uuid advisory
+- L-07 static server traversal hardening
+- L-08 SecureStore terminology
+- L-09 PIN threat model
+- L-10 SBOM/provenance
+
+## 11. Security Status
+
+Use exactly one:
+
+PHASE 8 BATCH 1 COMPLETE — PENDING SECURITY RE-REVIEW
+
+or
+
+PHASE 8 BATCH 1 BLOCKED — ARCHITECTURAL DECISION REQUIRED
+
+==================================================
+20. ABSOLUTE STOP
+==================================================
+
+After completing this batch:
+
+STOP.
+
+Do not start Batch 2.
+Do not start Phase 9.
+Do not perform unrelated cleanup.
+
+Wait for security re-review.

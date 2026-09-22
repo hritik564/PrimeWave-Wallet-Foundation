@@ -3,6 +3,12 @@ import { z } from "zod";
 import type { ServerConfig } from "../config";
 import { HttpError } from "../lib/errors";
 import { validateBody, validateParams, validateQuery } from "../lib/request-validation";
+import {
+  authorizedAccountScope,
+  createFailClosedAccountAuthorizationBoundary,
+  requireAccountAuthorization,
+  type AccountAuthorizationBoundary,
+} from "../lib/auth-boundary";
 import { NotificationError } from "./errors";
 import { createNotificationRepository } from "./repository";
 import { NotificationService } from "./service";
@@ -42,18 +48,34 @@ export function createNotificationRouter(
   config: ServerConfig,
   repository: NotificationRepository = createNotificationRepository(config),
   service = new NotificationService(config.notifications, repository),
+  accountAuthorization: AccountAuthorizationBoundary =
+    createFailClosedAccountAuthorizationBoundary(),
 ): IRouter {
   const router: IRouter = Router();
 
   router.post(
     "/notifications/devices",
     validateBody(notificationDeviceBodySchema),
+    requireAccountAuthorization(accountAuthorization, (request) => {
+      const body = request.validatedBody as z.infer<
+        typeof notificationDeviceBodySchema
+      >;
+      return {
+        networkId: body.networkId,
+        chainId: body.chainId,
+        accountAddress: body.accountAddress,
+      };
+    }),
     async (request, response, next) => {
       try {
+        const body = request.validatedBody as z.infer<
+          typeof notificationDeviceBodySchema
+        >;
         response.status(201).json({
-          data: await service.registerDevice(request.validatedBody as z.infer<
-            typeof notificationDeviceBodySchema
-          >),
+          data: await service.registerDevice({
+            ...body,
+            ...authorizedAccountScope(request),
+          }),
         });
       } catch (error) {
         next(error instanceof NotificationError ? toHttpError(error) : error);
@@ -65,15 +87,21 @@ export function createNotificationRouter(
     "/notifications/devices/:registrationId",
     validateParams(notificationRegistrationParamsSchema),
     validateQuery(notificationScopeQuerySchema),
+    requireAccountAuthorization(accountAuthorization, (request) => {
+      const scope = request.validatedQuery as z.infer<
+        typeof notificationScopeQuerySchema
+      >;
+      return scope;
+    }),
     async (request, response, next) => {
       try {
         const params = request.validatedParams as z.infer<
           typeof notificationRegistrationParamsSchema
         >;
-        const scope = request.validatedQuery as z.infer<
-          typeof notificationScopeQuerySchema
-        >;
-        await service.unregisterDevice(scope, params.registrationId);
+        await service.unregisterDevice(
+          authorizedAccountScope(request),
+          params.registrationId,
+        );
         response.json({
           data: { registrationId: params.registrationId, disabled: true },
         });
@@ -86,14 +114,14 @@ export function createNotificationRouter(
   router.get(
     "/notifications/preferences",
     validateQuery(notificationScopeQuerySchema),
+    requireAccountAuthorization(accountAuthorization, (request) =>
+      request.validatedQuery as z.infer<typeof notificationScopeQuerySchema>,
+    ),
     async (request, response, next) => {
       try {
-        const scope = request.validatedQuery as z.infer<
-          typeof notificationScopeQuerySchema
-        >;
         response.json({
           data: NotificationService.publicPreferences(
-            await service.getPreferences(scope),
+            await service.getPreferences(authorizedAccountScope(request)),
           ),
         });
       } catch (error) {
@@ -105,16 +133,26 @@ export function createNotificationRouter(
   router.put(
     "/notifications/preferences",
     validateBody(preferencesBodySchema),
+    requireAccountAuthorization(accountAuthorization, (request) => {
+      const body = request.validatedBody as z.infer<
+        typeof preferencesBodySchema
+      >;
+      return {
+        networkId: body.networkId,
+        chainId: body.chainId,
+        accountAddress: body.accountAddress,
+      };
+    }),
     async (request, response, next) => {
       try {
         const body = request.validatedBody as z.infer<
           typeof preferencesBodySchema
         >;
-        const { networkId, chainId, accountAddress, ...preferences } = body;
+        const { networkId: _networkId, chainId: _chainId, accountAddress: _accountAddress, ...preferences } = body;
         response.json({
           data: NotificationService.publicPreferences(
             await service.updatePreferences(
-              { networkId, chainId, accountAddress },
+              authorizedAccountScope(request),
               preferences,
             ),
           ),

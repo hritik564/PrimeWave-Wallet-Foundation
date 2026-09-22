@@ -14,6 +14,10 @@ import { createIndexerRepository } from "./indexing/repository";
 import { IndexerService } from "./indexing/service";
 import type { NotificationRepository } from "./notifications/types";
 import type { AnalyticsProvider, AnalyticsRepository } from "./analytics/types";
+import {
+  createFailClosedAccountAuthorizationBoundary,
+  type AccountAuthorizationBoundary,
+} from "./lib/auth-boundary";
 
 export function createApp(
   config: ServerConfig = loadConfig(),
@@ -21,6 +25,8 @@ export function createApp(
   notificationRepository?: NotificationRepository,
   analyticsRepository?: AnalyticsRepository,
   analyticsProvider?: AnalyticsProvider,
+  accountAuthorization: AccountAuthorizationBoundary =
+    createFailClosedAccountAuthorizationBoundary(),
 ): Express {
   const app: Express = express();
   const metadataRepository = repository ?? createMetadataRepository(config);
@@ -82,6 +88,7 @@ export function createApp(
       notificationRepository,
       analyticsRepository,
       analyticsProvider,
+      accountAuthorization,
     ),
   );
   app.use(
@@ -93,6 +100,7 @@ export function createApp(
       notificationRepository,
       analyticsRepository,
       analyticsProvider,
+      accountAuthorization,
     ),
   );
   app.use((_request, _response, next) => {

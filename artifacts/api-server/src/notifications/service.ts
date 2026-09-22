@@ -20,7 +20,6 @@ import {
   type NotificationEventInput,
   type NotificationPreferencesInput,
 } from "./validation";
-import { publicDevice } from "./repository";
 
 const providerFailureMessages: Record<string, string> = {
   CONFIGURATION_MISSING: "No notification provider is configured.",
@@ -181,26 +180,15 @@ export class NotificationService {
       );
     }
     const scope = normalizeNotificationScope(input);
-    const devices = await this.repository.listDevices(scope);
-    const existing = devices.find(
-      (device) => device.deviceIdentifier === input.deviceIdentifier,
-    );
-    if (!existing && devices.length >= this.config.maxDevicesPerScope) {
-      throw new NotificationError(
-        "DEVICE_LIMIT",
-        "The maximum number of notification devices has been reached.",
-      );
-    }
-    const device = await this.repository.upsertDevice({
-      registrationId: existing?.registrationId ?? randomUUID(),
+    return this.repository.upsertDevice({
+      registrationId: randomUUID(),
       scope,
       deviceIdentifier: input.deviceIdentifier,
       platform: input.platform,
       pushToken: input.pushToken,
       appVersion: input.appVersion,
       environment: input.environment,
-    });
-    return publicDevice(device);
+    }, this.config.maxDevicesPerScope);
   }
 
   async unregisterDevice(
@@ -208,7 +196,14 @@ export class NotificationService {
     registrationId: string,
   ): Promise<void> {
     const scope = normalizeNotificationScope(scopeInput);
-    if (!(await this.repository.disableDevice(scope, registrationId))) {
+    const stored = await this.repository.getDeviceByRegistrationId(registrationId);
+    if (
+      !stored ||
+      stored.networkId !== scope.networkId ||
+      stored.chainId !== scope.chainId ||
+      stored.accountAddress !== scope.accountAddress ||
+      !(await this.repository.disableDevice(stored, registrationId))
+    ) {
       throw new NotificationError("DEVICE_NOT_FOUND", "The device registration was not found.");
     }
   }
@@ -241,18 +236,10 @@ export class NotificationService {
     const devices = preferenceEnabled(preferences, event)
       ? (await this.repository.listDevices(event)).filter((device) => device.enabled)
       : [];
-    const pending = await this.repository.countPendingDeliveries();
-    if (
-      pending + devices.length > this.config.maxPendingDeliveries
-    ) {
-      throw new NotificationError(
-        "QUEUE_LIMIT",
-        "The notification delivery queue is full.",
-      );
-    }
     const result = await this.repository.createEvent(
       event,
       devices.map((device) => device.registrationId),
+      this.config.maxPendingDeliveries,
     );
     return { ...result, duplicate: false };
   }

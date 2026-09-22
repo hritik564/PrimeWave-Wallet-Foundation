@@ -19,8 +19,10 @@ Supported event types:
 - `security_event`
 
 Event generation is not automatically wired to every indexer or
-synchronization record in this phase. Synthetic deterministic events are used
-in tests.
+synchronization record in this phase. Only the approved internal sources
+`indexer` and `synchronization` are accepted by the event command schema;
+there is no public event-creation endpoint. Synthetic deterministic events in
+tests use the `indexer` source.
 
 ## Device and preference boundary
 
@@ -60,11 +62,14 @@ bounded backoff and maximum attempts; invalid tokens, disabled registrations,
 malformed requests, and missing provider configuration are permanent for that
 delivery.
 
-The repository has PostgreSQL/Drizzle and in-memory implementations. There is
-no continuously running worker in Phase 8.6. Delivery processing is an
-explicit service operation and can use `DeterministicMockNotificationProvider`
-in tests. `UnconfiguredNotificationProvider` reports configuration absence
-instead of fabricating success.
+The repository has PostgreSQL/Drizzle and in-memory implementations. Device
+quota reservations and pending-delivery reservations are serialized with
+transaction-scoped PostgreSQL advisory locks; in-memory tests perform the
+same quota decision inside the repository write. There is no continuously
+running worker in Phase 8.6. Delivery processing is an explicit service
+operation and can use `DeterministicMockNotificationProvider` in tests.
+`UnconfiguredNotificationProvider` reports configuration absence instead of
+fabricating success.
 
 ## Security and privacy
 
@@ -77,7 +82,12 @@ blockchain transaction objects and raw calldata are outside this boundary.
 The existing request pipeline provides request IDs, validation, body limits,
 rate limiting, secret-material rejection, security headers, and sanitized
 errors. Notification API responses are account-scoped and omit internal
-provider and queue details. No public arbitrary-send endpoint exists.
+provider and queue details. Push tokens are kept in the private device record,
+are omitted from public summaries and event fan-out, and are only carried into
+the delivery work item. Production deployment must provide database
+encryption at rest and restrict database access to the notification subsystem;
+this batch does not invent application-level key management. No public
+arbitrary-send endpoint exists.
 
 Mobile push permissions, Expo/APNs/FCM integrations, notification UI,
 analytics, price alerts, arbitrary messaging, production workers, and

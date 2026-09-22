@@ -76,7 +76,7 @@ export const notificationEventSchema = notificationScopeSchema.extend({
     .nullable()
     .optional(),
   eventTimestamp: z.string().datetime({ offset: true }),
-  source: z.string().trim().min(1).max(64),
+  source: z.enum(["indexer", "synchronization"]),
   deduplicationKey: z.string().trim().min(1).max(256).optional(),
 }).strict();
 

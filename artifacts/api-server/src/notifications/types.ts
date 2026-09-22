@@ -74,6 +74,11 @@ export interface PublicNotificationDevice extends NotificationScope {
   readonly lastDeliveryAt: string | null;
 }
 
+export interface NotificationDeviceSummary extends NotificationScope {
+  readonly registrationId: string;
+  readonly enabled: boolean;
+}
+
 export interface NotificationPreferences extends NotificationScope {
   readonly transactionConfirmations: boolean;
   readonly incomingTransactions: boolean;
@@ -154,14 +159,13 @@ export interface NotificationRepository {
     readonly pushToken: string;
     readonly appVersion: string;
     readonly environment: NotificationEnvironment;
-  }): Promise<NotificationDeviceRegistration>;
-  getDevice(
-    scope: NotificationScope,
+  }, maxDevicesPerScope: number): Promise<PublicNotificationDevice>;
+  getDeviceByRegistrationId(
     registrationId: string,
-  ): Promise<NotificationDeviceRegistration | null>;
+  ): Promise<NotificationDeviceSummary | null>;
   disableDevice(scope: NotificationScope, registrationId: string): Promise<boolean>;
   listDevices(scope: NotificationScope): Promise<
-    readonly NotificationDeviceRegistration[]
+    readonly NotificationDeviceSummary[]
   >;
   getPreferences(scope: NotificationScope): Promise<NotificationPreferences>;
   updatePreferences(
@@ -178,6 +182,7 @@ export interface NotificationRepository {
   createEvent(
     event: NotificationEventRecord,
     registrationIds: readonly string[],
+    maxPendingDeliveries: number,
   ): Promise<{
     readonly event: NotificationEventRecord;
     readonly deliveries: readonly NotificationDeliveryRecord[];

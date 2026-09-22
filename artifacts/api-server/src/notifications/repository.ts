@@ -18,11 +18,13 @@ import type {
   NotificationDeliveryRecord,
   NotificationDeliveryWorkItem,
   NotificationDeviceRegistration,
+  NotificationDeviceSummary,
   NotificationEnvironment,
   NotificationEventRecord,
   NotificationFailureKind,
   NotificationPlatform,
   NotificationPreferences,
+  PublicNotificationDevice,
   NotificationProviderResult,
   NotificationRepository,
   NotificationScope,
@@ -85,6 +87,18 @@ function deviceFromRow(
   };
 }
 
+function deviceSummary(
+  device: NotificationDeviceRegistration,
+): NotificationDeviceSummary {
+  return {
+    registrationId: device.registrationId,
+    networkId: device.networkId,
+    chainId: device.chainId,
+    accountAddress: device.accountAddress,
+    enabled: device.enabled,
+  };
+}
+
 function preferencesFromRow(
   row: typeof notificationPreferencesTable.$inferSelect,
 ): NotificationPreferences {
@@ -136,7 +150,7 @@ const defaultPreferences = (
 });
 
 export class EmptyNotificationRepository implements NotificationRepository {
-  async upsertDevice(): Promise<NotificationDeviceRegistration> {
+  async upsertDevice(): Promise<PublicNotificationDevice> {
     throw new NotificationError(
       "PERSISTENCE_FAILURE",
       "Notification persistence is not configured.",
@@ -147,6 +161,10 @@ export class EmptyNotificationRepository implements NotificationRepository {
     return null;
   }
 
+  async getDeviceByRegistrationId(): Promise<NotificationDeviceSummary | null> {
+    return null;
+  }
+
   async disableDevice(): Promise<boolean> {
     throw new NotificationError(
       "PERSISTENCE_FAILURE",
@@ -154,7 +172,7 @@ export class EmptyNotificationRepository implements NotificationRepository {
     );
   }
 
-  async listDevices(): Promise<readonly NotificationDeviceRegistration[]> {
+  async listDevices(): Promise<readonly NotificationDeviceSummary[]> {
     return [];
   }
 
@@ -229,13 +247,24 @@ export class InMemoryNotificationRepository implements NotificationRepository {
     readonly pushToken: string;
     readonly appVersion: string;
     readonly environment: NotificationEnvironment;
-  }): Promise<NotificationDeviceRegistration> {
+  }, maxDevicesPerScope: number): Promise<PublicNotificationDevice> {
     const now = new Date();
     const existing = [...this.devices.values()].find(
       (device) =>
         scopeKey(device) === scopeKey(input.scope) &&
         device.deviceIdentifier === input.deviceIdentifier,
     );
+    if (
+      !existing &&
+      [...this.devices.values()].filter(
+        (device) => scopeKey(device) === scopeKey(input.scope),
+      ).length >= maxDevicesPerScope
+    ) {
+      throw new NotificationError(
+        "DEVICE_LIMIT",
+        "The maximum number of notification devices has been reached.",
+      );
+    }
     const record: NotificationDeviceRegistration = {
       ...input.scope,
       registrationId: existing?.registrationId ?? input.registrationId,
@@ -250,7 +279,7 @@ export class InMemoryNotificationRepository implements NotificationRepository {
       lastDeliveryAt: existing?.lastDeliveryAt ?? null,
     };
     this.devices.set(record.registrationId, record);
-    return record;
+    return publicDevice(record);
   }
 
   async getDevice(
@@ -259,6 +288,13 @@ export class InMemoryNotificationRepository implements NotificationRepository {
   ): Promise<NotificationDeviceRegistration | null> {
     const device = this.devices.get(registrationId);
     return device && scopeKey(device) === scopeKey(scope) ? device : null;
+  }
+
+  async getDeviceByRegistrationId(
+    registrationId: string,
+  ): Promise<NotificationDeviceSummary | null> {
+    const device = this.devices.get(registrationId);
+    return device ? deviceSummary(device) : null;
   }
 
   async disableDevice(
@@ -285,10 +321,10 @@ export class InMemoryNotificationRepository implements NotificationRepository {
 
   async listDevices(
     scope: NotificationScope,
-  ): Promise<readonly NotificationDeviceRegistration[]> {
+  ): Promise<readonly NotificationDeviceSummary[]> {
     return [...this.devices.values()].filter(
       (device) => scopeKey(device) === scopeKey(scope),
-    );
+    ).map(deviceSummary);
   }
 
   async getPreferences(scope: NotificationScope): Promise<NotificationPreferences> {
@@ -314,6 +350,7 @@ export class InMemoryNotificationRepository implements NotificationRepository {
   async createEvent(
     event: NotificationEventRecord,
     registrationIds: readonly string[],
+    maxPendingDeliveries: number,
   ): Promise<{
     readonly event: NotificationEventRecord;
     readonly deliveries: readonly NotificationDeliveryRecord[];
@@ -327,6 +364,15 @@ export class InMemoryNotificationRepository implements NotificationRepository {
           (delivery) => delivery.notificationEventId === existing.notificationEventId,
         ),
       };
+    }
+    const pending = [...this.deliveries.values()].filter(
+      (delivery) => delivery.state === "pending" || delivery.state === "sending",
+    ).length;
+    if (pending + registrationIds.length > maxPendingDeliveries) {
+      throw new NotificationError(
+        "QUEUE_LIMIT",
+        "The notification delivery queue is full.",
+      );
     }
     this.events.set(key, event);
     const deliveries: NotificationDeliveryRecord[] = [];
@@ -467,43 +513,78 @@ export class PostgresNotificationRepository
     readonly pushToken: string;
     readonly appVersion: string;
     readonly environment: NotificationEnvironment;
-  }): Promise<NotificationDeviceRegistration> {
+  }, maxDevicesPerScope: number): Promise<PublicNotificationDevice> {
     const db = await this.database();
     const now = new Date();
-    const rows = await db
-      .insert(notificationDevicesTable)
-      .values({
-        registrationId: input.registrationId,
-        networkId: input.scope.networkId,
-        chainId: input.scope.chainId,
-        accountAddress: input.scope.accountAddress,
-        deviceIdentifier: input.deviceIdentifier,
-        platform: input.platform,
-        pushToken: input.pushToken,
-        appVersion: input.appVersion,
-        environment: input.environment,
-        enabled: true,
-        createdAt: now,
-        updatedAt: now,
-      })
-      .onConflictDoUpdate({
-        target: [
-          notificationDevicesTable.networkId,
-          notificationDevicesTable.chainId,
-          notificationDevicesTable.accountAddress,
-          notificationDevicesTable.deviceIdentifier,
-        ],
-        set: {
-          pushToken: input.pushToken,
+    return db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended(${scopeKey(input.scope)}, 0))`,
+      );
+      const existing = await tx
+        .select({ registrationId: notificationDevicesTable.registrationId })
+        .from(notificationDevicesTable)
+        .where(
+          and(
+            eq(notificationDevicesTable.networkId, input.scope.networkId),
+            eq(notificationDevicesTable.chainId, input.scope.chainId),
+            eq(notificationDevicesTable.accountAddress, input.scope.accountAddress),
+            eq(notificationDevicesTable.deviceIdentifier, input.deviceIdentifier),
+          ),
+        )
+        .limit(1);
+      if (existing.length === 0) {
+        const count = await tx
+          .select({ count: sql<number>`count(*)` })
+          .from(notificationDevicesTable)
+          .where(
+            and(
+              eq(notificationDevicesTable.networkId, input.scope.networkId),
+              eq(notificationDevicesTable.chainId, input.scope.chainId),
+              eq(notificationDevicesTable.accountAddress, input.scope.accountAddress),
+            ),
+          );
+        if (Number(count[0]?.count ?? 0) >= maxDevicesPerScope) {
+          throw new NotificationError(
+            "DEVICE_LIMIT",
+            "The maximum number of notification devices has been reached.",
+          );
+        }
+      }
+      const rows = await tx
+        .insert(notificationDevicesTable)
+        .values({
+          registrationId: input.registrationId,
+          networkId: input.scope.networkId,
+          chainId: input.scope.chainId,
+          accountAddress: input.scope.accountAddress,
+          deviceIdentifier: input.deviceIdentifier,
           platform: input.platform,
+          pushToken: input.pushToken,
           appVersion: input.appVersion,
           environment: input.environment,
           enabled: true,
+          createdAt: now,
           updatedAt: now,
-        },
-      })
-      .returning();
-    return deviceFromRow(rows[0]!);
+        })
+        .onConflictDoUpdate({
+          target: [
+            notificationDevicesTable.networkId,
+            notificationDevicesTable.chainId,
+            notificationDevicesTable.accountAddress,
+            notificationDevicesTable.deviceIdentifier,
+          ],
+          set: {
+            pushToken: input.pushToken,
+            platform: input.platform,
+            appVersion: input.appVersion,
+            environment: input.environment,
+            enabled: true,
+            updatedAt: now,
+          },
+        })
+        .returning();
+      return publicDevice(deviceFromRow(rows[0]!));
+    });
   }
 
   async getDevice(
@@ -524,6 +605,18 @@ export class PostgresNotificationRepository
       )
       .limit(1);
     return rows[0] ? deviceFromRow(rows[0]) : null;
+  }
+
+  async getDeviceByRegistrationId(
+    registrationId: string,
+  ): Promise<NotificationDeviceSummary | null> {
+    const db = await this.database();
+    const rows = await db
+      .select()
+      .from(notificationDevicesTable)
+      .where(eq(notificationDevicesTable.registrationId, registrationId))
+      .limit(1);
+    return rows[0] ? deviceSummary(deviceFromRow(rows[0])) : null;
   }
 
   async disableDevice(
@@ -564,7 +657,7 @@ export class PostgresNotificationRepository
 
   async listDevices(
     scope: NotificationScope,
-  ): Promise<readonly NotificationDeviceRegistration[]> {
+  ): Promise<readonly NotificationDeviceSummary[]> {
     const db = await this.database();
     const rows = await db
       .select()
@@ -576,7 +669,7 @@ export class PostgresNotificationRepository
           eq(notificationDevicesTable.accountAddress, scope.accountAddress),
         ),
       );
-    return rows.map(deviceFromRow);
+    return rows.map(deviceFromRow).map(deviceSummary);
   }
 
   async getPreferences(scope: NotificationScope): Promise<NotificationPreferences> {
@@ -638,12 +731,16 @@ export class PostgresNotificationRepository
   async createEvent(
     event: NotificationEventRecord,
     registrationIds: readonly string[],
+    maxPendingDeliveries: number,
   ): Promise<{
     readonly event: NotificationEventRecord;
     readonly deliveries: readonly NotificationDeliveryRecord[];
   }> {
     const db = await this.database();
     const result = await db.transaction(async (tx) => {
+      await tx.execute(
+        sql`select pg_advisory_xact_lock(hashtextextended('notifications:pending-deliveries', 0))`,
+      );
       const inserted = await tx
         .insert(notificationEventsTable)
         .values({
@@ -692,6 +789,26 @@ export class PostgresNotificationRepository
           "PERSISTENCE_FAILURE",
           "The notification event could not be stored.",
         );
+      }
+      if (inserted.length > 0 && registrationIds.length > 0) {
+        const pending = await tx
+          .select({ count: sql<number>`count(*)` })
+          .from(notificationDeliveriesTable)
+          .where(
+            or(
+              eq(notificationDeliveriesTable.state, "pending"),
+              eq(notificationDeliveriesTable.state, "sending"),
+            ),
+          );
+        if (
+          Number(pending[0]?.count ?? 0) + registrationIds.length >
+          maxPendingDeliveries
+        ) {
+          throw new NotificationError(
+            "QUEUE_LIMIT",
+            "The notification delivery queue is full.",
+          );
+        }
       }
       if (inserted.length > 0 && registrationIds.length > 0) {
         await tx

@@ -2,6 +2,7 @@ import type { NextFunction, Request, Response } from "express";
 import type { ZodType } from "zod";
 import { HttpError } from "./errors";
 import { randomUUID } from "node:crypto";
+import type { AccountAuthorization } from "./auth-boundary";
 
 declare global {
   namespace Express {
@@ -9,6 +10,7 @@ declare global {
       validatedBody?: unknown;
       validatedQuery?: unknown;
       validatedParams?: unknown;
+      accountAuthorization?: AccountAuthorization;
     }
   }
 }
