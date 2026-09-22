@@ -8,8 +8,12 @@ import { MemoryRateLimiter, rateLimitMiddleware } from "./lib/rate-limit";
 import { requireJsonContentType, requestIdMiddleware } from "./lib/request-validation";
 import { secretMaterialGuard, securityHeaders } from "./lib/security";
 import { createRouter } from "./routes";
+import type { MetadataRepository } from "./metadata/types";
 
-export function createApp(config: ServerConfig = loadConfig()): Express {
+export function createApp(
+  config: ServerConfig = loadConfig(),
+  repository?: MetadataRepository,
+): Express {
   const app: Express = express();
   const rateLimiter = new MemoryRateLimiter(
     config.rateLimitWindowMs,
@@ -56,8 +60,8 @@ export function createApp(config: ServerConfig = loadConfig()): Express {
 
   // Keep the existing workflow startup probe working while the versioned
   // namespace becomes the only new API boundary.
-  app.use(`${config.apiPrefix}`, createRouter(config));
-  app.use("/api", createRouter(config));
+   app.use(`${config.apiPrefix}`, createRouter(config, repository));
+   app.use("/api", createRouter(config, repository));
   app.use((_request, _response, next) => {
     next(new HttpError(404, "NOT_FOUND", "The requested API resource was not found."));
   });

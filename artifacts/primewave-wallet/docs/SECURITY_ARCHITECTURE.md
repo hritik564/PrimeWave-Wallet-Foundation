@@ -1459,4 +1459,63 @@ signing authorization remain distinct boundaries.
 Configuration is environment-only. Database credentials and other server
 secrets are not exposed to Expo public configuration or health responses.
 CORS production origins must be explicit; wildcard credentialed traffic is not
-allowed. Production deployment and all later Phase 8 services remain deferred.
+allowed. Production deployment and later non-metadata Phase 8 services remain
+deferred.
+
+## Phase 8.2 public metadata boundary
+
+Phase 8.2 adds only read-only public metadata. The backend does not become a
+wallet, signer, custody layer, broadcaster, blockchain indexer, price service,
+transaction service, swap service, or DApp execution service.
+
+### Public metadata identity and state
+
+ERC-20 token identity is always:
+
+```text
+networkId + lowercase canonical EVM contractAddress
+```
+
+The API validates both components and bounds batch reads to 50 addresses.
+Database uniqueness is enforced on the same composite identity. Token names,
+symbols, decimals, logos, balances, popularity, and activity are not identity.
+
+The token model keeps these independent:
+
+- metadata status
+- provenance
+- verification status
+- discovery status
+- visibility
+- trust status
+- freshness status
+
+Metadata availability, registry provenance, or a logo never implies
+verification or trust. Missing metadata is represented as `unavailable`, and
+partial metadata remains `partial`; the service does not invent display values.
+
+### Network and logo safety
+
+Network metadata is derived from the existing public registry concepts. The
+PrimeWave entry remains a placeholder with null chain and endpoint values.
+Metadata responses omit RPC URLs entirely, including server-only Sepolia
+configuration. Explorer references are restricted to bounded HTTP(S) values
+without credentials, query strings, or fragments.
+
+Logo metadata is a bounded reference plus independent provenance. The server
+does not accept a client URL for server-side fetching, does not implement a
+remote image proxy, and does not download arbitrary remote images.
+
+### Database and failure boundary
+
+The only Phase 8.2 tables are `public_network_metadata` and
+`public_token_metadata`. Their columns contain public metadata only; there are
+no secret-bearing columns, account secrets, PINs, vault material, signing
+capabilities, or recovery material. Text fields and numeric ranges are bounded
+in the schema, and token identity has a composite unique index.
+
+Metadata reads are rate-limited and validated. Database failures do not make
+the mobile wallet dependent on the backend: network reads use the safe public
+catalog and token reads return explicit `unavailable` records. No unrestricted
+pagination, arbitrary SQL, dynamic SQL, or client-controlled remote fetch path
+was added.

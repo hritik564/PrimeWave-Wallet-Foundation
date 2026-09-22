@@ -1,0 +1,391 @@
+{
+  "id": "bc03fd3a-d26a-43cc-ab2f-9b4410e1b621",
+  "prevId": "00000000-0000-0000-0000-000000000000",
+  "version": "7",
+  "dialect": "postgresql",
+  "tables": {
+    "public.public_network_metadata": {
+      "name": "public_network_metadata",
+      "schema": "",
+      "columns": {
+        "network_id": {
+          "name": "network_id",
+          "type": "varchar(64)",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "chain_id": {
+          "name": "chain_id",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "display_name": {
+          "name": "display_name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "native_currency_name": {
+          "name": "native_currency_name",
+          "type": "varchar(80)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "native_currency_symbol": {
+          "name": "native_currency_symbol",
+          "type": "varchar(24)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "native_currency_decimals": {
+          "name": "native_currency_decimals",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "explorer_name": {
+          "name": "explorer_name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "explorer_base_url": {
+          "name": "explorer_base_url",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "explorer_address_url_template": {
+          "name": "explorer_address_url_template",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "explorer_transaction_url_template": {
+          "name": "explorer_transaction_url_template",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "environment": {
+          "name": "environment",
+          "type": "network_environment",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "is_primary": {
+          "name": "is_primary",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "enabled": {
+          "name": "enabled",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": true
+        },
+        "configuration_status": {
+          "name": "configuration_status",
+          "type": "network_configuration_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "configuration_note": {
+          "name": "configuration_note",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "public_network_metadata_native_decimals_range": {
+          "name": "public_network_metadata_native_decimals_range",
+          "value": "\"public_network_metadata\".\"native_currency_decimals\" between 0 and 36"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.public_token_metadata": {
+      "name": "public_token_metadata",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "serial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "network_id": {
+          "name": "network_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "contract_address": {
+          "name": "contract_address",
+          "type": "varchar(42)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "varchar(120)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "symbol": {
+          "name": "symbol",
+          "type": "varchar(32)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "decimals": {
+          "name": "decimals",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "description": {
+          "name": "description",
+          "type": "varchar(2000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "logo_reference": {
+          "name": "logo_reference",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "logo_provenance": {
+          "name": "logo_provenance",
+          "type": "metadata_provenance",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "metadata_status": {
+          "name": "metadata_status",
+          "type": "metadata_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provenance": {
+          "name": "provenance",
+          "type": "metadata_provenance",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "provenance_reference": {
+          "name": "provenance_reference",
+          "type": "varchar(512)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "verification_status": {
+          "name": "verification_status",
+          "type": "verification_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "discovery_status": {
+          "name": "discovery_status",
+          "type": "discovery_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "visibility": {
+          "name": "visibility",
+          "type": "visibility_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "trust_status": {
+          "name": "trust_status",
+          "type": "trust_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "freshness_status": {
+          "name": "freshness_status",
+          "type": "freshness_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "public_token_metadata_identity_idx": {
+          "name": "public_token_metadata_identity_idx",
+          "columns": [
+            {
+              "expression": "network_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "contract_address",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": true,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {},
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {},
+      "policies": {},
+      "checkConstraints": {
+        "public_token_metadata_contract_address_format": {
+          "name": "public_token_metadata_contract_address_format",
+          "value": "\"public_token_metadata\".\"contract_address\" ~ '^0x[0-9a-f]{40}$'"
+        },
+        "public_token_metadata_decimals_range": {
+          "name": "public_token_metadata_decimals_range",
+          "value": "\"public_token_metadata\".\"decimals\" is null or \"public_token_metadata\".\"decimals\" between 0 and 255"
+        }
+      },
+      "isRLSEnabled": false
+    }
+  },
+  "enums": {
+    "public.discovery_status": {
+      "name": "discovery_status",
+      "schema": "public",
+      "values": [
+        "not_discovered",
+        "user_declared",
+        "observed"
+      ]
+    },
+    "public.freshness_status": {
+      "name": "freshness_status",
+      "schema": "public",
+      "values": [
+        "fresh",
+        "cached",
+        "stale",
+        "unavailable"
+      ]
+    },
+    "public.metadata_provenance": {
+      "name": "metadata_provenance",
+      "schema": "public",
+      "values": [
+        "verified_provider",
+        "user_provided",
+        "registry",
+        "unavailable"
+      ]
+    },
+    "public.metadata_status": {
+      "name": "metadata_status",
+      "schema": "public",
+      "values": [
+        "available",
+        "partial",
+        "invalid",
+        "unavailable"
+      ]
+    },
+    "public.network_configuration_status": {
+      "name": "network_configuration_status",
+      "schema": "public",
+      "values": [
+        "configured",
+        "unavailable",
+        "placeholder"
+      ]
+    },
+    "public.network_environment": {
+      "name": "network_environment",
+      "schema": "public",
+      "values": [
+        "development",
+        "testnet",
+        "mainnet"
+      ]
+    },
+    "public.trust_status": {
+      "name": "trust_status",
+      "schema": "public",
+      "values": [
+        "unassessed",
+        "review_required",
+        "not_trusted"
+      ]
+    },
+    "public.verification_status": {
+      "name": "verification_status",
+      "schema": "public",
+      "values": [
+        "unverified",
+        "pending",
+        "verified",
+        "rejected"
+      ]
+    },
+    "public.visibility_status": {
+      "name": "visibility_status",
+      "schema": "public",
+      "values": [
+        "public",
+        "hidden"
+      ]
+    }
+  },
+  "schemas": {},
+  "sequences": {},
+  "roles": {},
+  "policies": {},
+  "views": {},
+  "_meta": {
+    "columns": {},
+    "schemas": {},
+    "tables": {}
+  }
+}

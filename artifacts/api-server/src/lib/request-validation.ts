@@ -3,6 +3,16 @@ import type { ZodType } from "zod";
 import { HttpError } from "./errors";
 import { randomUUID } from "node:crypto";
 
+declare global {
+  namespace Express {
+    interface Request {
+      validatedBody?: unknown;
+      validatedQuery?: unknown;
+      validatedParams?: unknown;
+    }
+  }
+}
+
 export function requestIdMiddleware(
   request: Request,
   response: Response,
@@ -25,6 +35,7 @@ export function validateBody<T>(schema: ZodType<T>) {
       next(new HttpError(400, "INVALID_REQUEST", "The request body is invalid."));
       return;
     }
+    request.validatedBody = parsed.data;
     request.body = parsed.data;
     next();
   };
@@ -37,7 +48,7 @@ export function validateQuery<T>(schema: ZodType<T>) {
       next(new HttpError(400, "INVALID_QUERY", "The query parameters are invalid."));
       return;
     }
-    request.query = parsed.data as Request["query"];
+    request.validatedQuery = parsed.data;
     next();
   };
 }
@@ -49,6 +60,7 @@ export function validateParams<T>(schema: ZodType<T>) {
       next(new HttpError(400, "INVALID_PATH", "The path parameters are invalid."));
       return;
     }
+    request.validatedParams = parsed.data;
     request.params = parsed.data as Request["params"];
     next();
   };

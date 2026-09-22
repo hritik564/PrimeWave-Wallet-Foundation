@@ -9,6 +9,7 @@ export interface ServerConfig {
   readonly apiVersion: string;
   readonly corsAllowedOrigins: readonly string[];
   readonly databaseUrl: string | null;
+  readonly sepoliaRpcConfigured: boolean;
   readonly requestBodyLimit: string;
   readonly rateLimitWindowMs: number;
   readonly rateLimitMaxRequests: number;
@@ -128,6 +129,7 @@ export function loadConfig(
       currentEnvironment,
     ),
     databaseUrl,
+    sepoliaRpcConfigured: Boolean(environment.SEPOLIA_RPC_URL?.trim()),
     requestBodyLimit: environment.REQUEST_BODY_LIMIT ?? "64kb",
     rateLimitWindowMs,
     rateLimitMaxRequests,

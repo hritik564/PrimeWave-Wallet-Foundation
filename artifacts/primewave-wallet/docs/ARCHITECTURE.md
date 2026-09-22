@@ -1269,3 +1269,43 @@ invalidates pending requests. Account, wallet-address, network, and foreground
 context checks never silently rebind an open DApp request. Preview remains
 unavailable for native provider behavior and creates no fake sessions or
 requests. Physical-device validation is still deferred.
+
+## Phase 8.2 — public metadata services
+
+Phase 8.2 extends the existing WaveX API foundation with read-only public
+metadata. The backend remains supplementary information infrastructure; the
+mobile wallet remains local-first and non-custodial.
+
+The enabled metadata endpoints are:
+
+- `GET /api/v1/metadata/networks`
+- `GET /api/v1/metadata/tokens/:networkId/:contractAddress`
+- `GET /api/v1/metadata/tokens?networkId=<id>&addresses=<csv>`
+
+Token identity is the deterministic pair of network ID and lowercase canonical
+EVM contract address. Names, symbols, decimals, logos, balances, popularity,
+and transaction counts are metadata attributes and never identity.
+
+The provider-neutral token model separates metadata status, provenance,
+verification status, discovery status, visibility, trust status, and freshness.
+An available metadata record is not necessarily verified or trusted. A logo has
+its own provenance and is not evidence of verification or trust. Missing or
+partial records remain explicit; the service does not invent token values.
+
+Network metadata reuses the existing registry values without importing the
+mobile runtime. Ethereum, the configured network entries, and the exact
+PrimeWave placeholder are represented as public metadata. PrimeWave has no
+invented chain ID, RPC URL, or explorer URL. The API does not return RPC URLs
+or server credentials.
+
+Persistence is limited to `public_network_metadata` and
+`public_token_metadata`. The token table enforces uniqueness on
+`network_id + contract_address`, bounded field lengths, lowercase EVM address
+format, and decimal ranges. There are no public metadata write endpoints.
+
+The metadata layer does not fetch arbitrary URLs, proxy images, index
+blockchains, read balances, provide prices, sync transactions, sign,
+broadcast, or execute transactions. When persistence is unavailable, network
+metadata falls back to the safe catalog and token responses explicitly report
+`unavailable`; the mobile wallet does not depend on the backend for local
+wallet operation.

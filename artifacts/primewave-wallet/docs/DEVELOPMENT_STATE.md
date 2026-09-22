@@ -2,8 +2,8 @@
 
 ## Current phase
 
-**Phase 8.1 — WaveX backend foundation and security boundary (implemented;
-pending security review)**
+**Phase 8.2 — WaveX public metadata services (implemented; pending security
+review)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -640,3 +640,28 @@ increment.
 - Deferred token/blockchain indexing, prices, notifications, analytics,
   transaction synchronization, swaps, DApp backend services, custody,
   signing, broadcasting, production deployment, and cloud migration.
+
+## Phase 8.2 completion
+
+- Added read-only public network metadata and bounded ERC-20 metadata
+  endpoints under `/api/v1/metadata/`.
+- Preserved token identity as `networkId + canonical contractAddress`, with
+  deterministic lowercase normalization and a maximum batch size of 50.
+- Added explicit metadata, provenance, verification, discovery, visibility,
+  trust, logo, and freshness states. Metadata and logos never imply trust or
+  verification.
+- Added safe registry-derived network metadata while preserving PrimeWave as a
+  placeholder with no invented production values. RPC URLs and credentials are
+  not returned.
+- Added PostgreSQL/Drizzle `public_network_metadata` and
+  `public_token_metadata` tables, bounded columns, decimal/address checks, and
+  a composite token identity uniqueness constraint.
+- Added explicit unavailable metadata behavior for missing records and
+  database failures. The mobile wallet remains functional without the backend.
+- Added tests for token normalization, duplicate identity, valid/invalid
+  networks and addresses, bounded batches, partial/unavailable metadata,
+  provenance, verification separation, logo handling, and PrimeWave safety.
+- Deferred account metadata writes, arbitrary URL fetching, image proxying,
+  indexing, prices, notifications, analytics, transaction synchronization,
+  swaps, DApp backend services, custody, signing, broadcasting, deployment,
+  and Phase 8.3.
