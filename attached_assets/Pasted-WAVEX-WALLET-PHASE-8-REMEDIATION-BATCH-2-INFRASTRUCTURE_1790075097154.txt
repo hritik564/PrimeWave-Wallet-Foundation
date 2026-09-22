@@ -1,0 +1,690 @@
+WAVEX WALLET — PHASE 8 REMEDIATION BATCH 2
+INFRASTRUCTURE + RESOURCE + DEPENDENCY HARDENING
+
+IMPORTANT:
+This is ONLY Phase 8 Remediation Batch 2.
+
+Implement only the findings explicitly listed below.
+
+DO NOT:
+- start Phase 9
+- design or implement wallet-ownership authentication
+- invent a server-verifiable wallet authentication protocol
+- modify wallet cryptography
+- modify SecureStore
+- modify PIN behavior
+- modify transaction signing
+- modify transaction broadcasting
+- modify Swap execution
+- modify DApp execution
+- modify token architecture
+- modify portfolio architecture
+- redesign Batch 1 authorization
+- add commercial analytics/monitoring SDKs
+- deploy production migrations
+- upgrade unrelated dependencies
+
+The deferred production wallet-ownership authentication protocol remains intentionally OUT OF SCOPE.
+
+Batch 1 authorization must remain intact.
+
+If a finding cannot be fixed safely without a new architectural decision, STOP that item and report it rather than inventing behavior.
+
+==================================================
+1. SOURCE OF TRUTH
+==================================================
+
+Use the previous Phase 8 security review and Batch 1 remediation as the source of truth.
+
+Batch 1 already addressed:
+
+- H-01 account authorization boundary
+- H-02 notification ownership
+- L-03 notification event-source boundary
+- M-03 notification quota concurrency
+
+Do not regress those controls.
+
+This batch addresses:
+
+M-01 — Rate limiter memory growth / process-local behavior
+M-04 — Analytics identity-level abuse resistance
+M-05 — Analytics retention cleanup
+M-06 — decode-uri-component advisory
+M-07 — RPC response byte limit
+
+L-01 — Analytics database constraints
+L-02 — Market provider response bounds
+L-04 — Request body maximum
+L-05 — Metadata network row bounds
+L-06 — uuid advisory
+L-07 — Static server path traversal hardening
+L-08 — SecureStore terminology/threat-model documentation
+L-09 — PIN threat-model documentation
+L-10 — SBOM/provenance/dependency-integrity governance
+
+==================================================
+2. M-01 — RATE LIMITER HARDENING
+==================================================
+
+Current issue:
+
+MemoryRateLimiter has unbounded key growth and is process-local.
+
+Implement a bounded in-memory limiter suitable for the current single-process development/runtime architecture.
+
+Requirements:
+
+- bound the number of retained rate-limit keys
+- remove expired buckets
+- prevent attacker-controlled unique keys from causing unbounded memory growth
+- preserve existing rate-limit behavior
+- fail safely if capacity is exhausted
+- do not weaken limits to solve the issue
+- do not trust arbitrary forwarded IP headers unless there is an explicit trusted-proxy configuration
+- document that the in-memory limiter is process-local
+- document that production multi-instance deployments require a shared limiter
+
+Do NOT build a Redis dependency or external rate-limit service in this batch.
+
+If an eviction policy is needed, make it deterministic and bounded.
+
+Add tests for:
+
+1. normal rate limiting
+2. expired bucket cleanup
+3. maximum key capacity
+4. unique-key flooding
+5. concurrent access
+6. no unbounded map growth
+7. fail-safe behavior at capacity
+
+Preserve Batch 1 authorization behavior.
+
+==================================================
+3. M-04 — ANALYTICS ABUSE RESISTANCE
+==================================================
+
+Analytics endpoints intentionally remain anonymous/public.
+
+Do NOT add wallet authentication.
+
+Instead add bounded abuse controls.
+
+Requirements:
+
+- bound unique anonymous session/installation identities accepted within a defined window
+- bound event admission per anonymous identity
+- bound total analytics ingestion
+- prevent attackers from generating unlimited unique event IDs/anonymous IDs to grow storage
+- preserve legitimate mobile analytics behavior
+- preserve existing event/property allowlists
+- preserve payload and batch limits
+- provider/persistence failure isolation must remain
+
+Do not use wallet addresses or device hardware identifiers as analytics identity.
+
+Do not create fingerprinting.
+
+Use bounded rate/admission controls compatible with the existing privacy model.
+
+Add tests for:
+
+- valid analytics ingestion
+- per-identity event limit
+- unique-ID flooding
+- batch abuse
+- global ingestion limits
+- expired identity admission state
+- provider failure isolation
+- persistence failure isolation
+- existing prohibited-field rejection
+
+==================================================
+4. M-05 — ANALYTICS RETENTION CLEANUP
+==================================================
+
+Current issue:
+
+Analytics records have expiry timestamps, but no operationally guaranteed cleanup invocation exists.
+
+Implement the smallest safe solution.
+
+Requirements:
+
+- expired analytics records must be cleaned up through a bounded operation
+- cleanup must not block wallet operations
+- cleanup must not create an unbounded database scan
+- cleanup must be safe under concurrent execution
+- cleanup should be idempotent
+- cleanup should operate separately for events/errors/performance where appropriate
+- preserve configured retention values
+
+If a production scheduler is not part of the existing architecture, DO NOT introduce an external scheduler/service in this batch.
+
+Instead implement:
+
+- a bounded cleanup entry point
+- safe invocation integration where appropriate (for example controlled startup/maintenance invocation)
+- clear operational documentation explaining how production should schedule it
+
+Do not claim "guaranteed automatic cleanup" unless there is actually a reliable production invocation mechanism.
+
+Add tests proving:
+
+- expired rows are removed
+- non-expired rows remain
+- cleanup is bounded
+- repeated cleanup is safe
+- concurrent cleanup is safe
+
+==================================================
+5. M-06 — decode-uri-component
+==================================================
+
+Address:
+
+decode-uri-component@0.2.2
+GHSA-vcc3-ghjq-m6fr
+
+Use the safest compatible fixed version/path.
+
+Requirements:
+
+- do not blindly upgrade the entire dependency tree
+- determine whether the dependency is direct or transitive
+- use the smallest compatible remediation
+- preserve the existing Expo/mobile architecture
+- run dependency installation and lockfile validation
+- run tests and TypeScript after remediation
+
+Do not introduce a second URI parser unnecessarily.
+
+Report exactly:
+
+- old version
+- new version
+- why the dependency changed
+- whether it remains transitive
+- whether lockfile changed
+
+==================================================
+6. M-07 — RPC RESPONSE BYTE LIMIT
+==================================================
+
+Current issue:
+
+The server indexing RPC client reads the complete response body before JSON parsing.
+
+Add a hard response-body byte limit BEFORE full JSON parsing.
+
+Requirements:
+
+- enforce the limit while reading the response
+- do not call response.text() without a bound
+- abort/reject when the byte limit is exceeded
+- use a deterministic configured maximum
+- keep the limit appropriate for the existing bounded indexing operations
+- preserve normal block/log/transaction responses
+- sanitize the resulting error
+- do not expose provider credentials or full RPC URLs
+
+Add tests for:
+
+1. response below limit succeeds
+2. response exactly at/near limit behaves deterministically
+3. oversized response is rejected before JSON parsing
+4. malformed response remains safely rejected
+5. provider/network failure remains sanitized
+6. existing indexing behavior remains intact
+
+Do not allow request parameters to influence the maximum response size.
+
+==================================================
+7. L-01 — ANALYTICS DATABASE CONSTRAINTS
+==================================================
+
+Current issue:
+
+analytics_events.properties is unrestricted jsonb at database level.
+
+Do not attempt to reproduce the entire application validator in PostgreSQL.
+
+Instead strengthen the database boundary where practical.
+
+Requirements:
+
+- preserve application-level allowlisting as the authoritative validation layer
+- prevent obviously unbounded property payloads at database level where practical
+- add appropriate maximum serialized property size if compatible with current schema
+- preserve retention/expiry indexes
+- preserve existing application validation
+- document that direct database writers bypass application policy unless database constraints prevent it
+
+Do not add complex database functions unless clearly necessary.
+
+Add migration only if actually required.
+
+Do not apply production migration.
+
+==================================================
+8. L-02 — MARKET PROVIDER RESPONSE BOUNDS
+==================================================
+
+Current issue:
+
+applyProviderResponses validates an array but does not reject an array larger than the requested batch.
+
+Implement explicit bounds.
+
+Requirements:
+
+- provider response count must not exceed requested asset batch
+- reject oversized provider responses
+- preserve exact asset identity validation
+- preserve duplicate handling
+- preserve unavailable/invalid provider behavior
+- prevent oversized response iteration
+
+Add focused tests for:
+
+- exact expected count
+- fewer responses
+- oversized response
+- duplicate assets
+- unknown assets
+- malformed responses
+
+==================================================
+9. L-04 — REQUEST BODY MAXIMUM
+==================================================
+
+Current issue:
+
+request body limit is configurable but has no application-level upper bound.
+
+Implement a safe hard maximum.
+
+Requirements:
+
+- define an explicit maximum request body size
+- configured values above the maximum must fail validation/configuration
+- preserve smaller deployment-specific values
+- prevent an operator from accidentally configuring an excessive body limit
+- document the chosen maximum and rationale
+
+Do not simply silently clamp unsafe configuration unless that is already the established configuration convention.
+
+Prefer fail-fast configuration validation.
+
+Add configuration tests.
+
+==================================================
+10. L-05 — METADATA ROW BOUNDS
+==================================================
+
+Current issue:
+
+listNetworks() reads all rows.
+
+The public catalog currently constrains output, but harden the repository boundary.
+
+Implement a safe bounded read.
+
+Requirements:
+
+- bounded maximum network metadata rows
+- no unbounded database result
+- preserve fixed public catalog projection
+- preserve current API behavior
+- fail safely if the configured/database result exceeds the bound
+
+Add a focused test.
+
+==================================================
+11. L-06 — uuid ADVISORY
+==================================================
+
+Review:
+
+uuid@7.0.3
+GHSA-w5hq-g745-h8pq
+
+Determine whether it is:
+
+- runtime production dependency
+- build-only dependency
+- Expo/Xcode tooling dependency
+- transitive development dependency
+
+Do not blindly upgrade Expo or React Native.
+
+If a safe compatible remediation exists without destabilizing the mobile toolchain, apply it.
+
+Otherwise:
+
+- document why it remains
+- confirm the affected APIs are not used by WaveX production runtime
+- isolate the finding clearly
+- record the dependency path
+
+Run dependency checks after the decision.
+
+==================================================
+12. L-07 — STATIC SERVER PATH TRAVERSAL HARDENING
+==================================================
+
+Review:
+
+artifacts/primewave-wallet/server/serve.js
+
+Strengthen the existing static path boundary without changing intended behavior.
+
+Requirements:
+
+- resolve the final path
+- verify it remains within STATIC_ROOT using a separator-aware comparison
+- reject traversal attempts
+- handle platform path separators correctly
+- consider symlink escape behavior
+- preserve legitimate static asset serving
+
+Add tests for:
+
+- normal file
+- nested file
+- ../ traversal
+- encoded traversal
+- absolute path
+- sibling-prefix collision
+- symlink escape if test environment supports it
+
+Do not expose arbitrary filesystem access.
+
+==================================================
+13. L-08 — SECURESTORE TERMINOLOGY
+==================================================
+
+This is documentation/threat-model work only.
+
+Do NOT modify wallet cryptography in this batch.
+
+The review observed that the vault payload contains mnemonic material in plaintext JSON before SecureStore persistence.
+
+Document accurately:
+
+- SecureStore is the native protected storage boundary
+- the application is not implementing an independent encryption layer
+- terminology such as "encrypted wallet state" must not imply application-level cryptographic encryption if it is not actually present
+- device compromise/keychain compromise remains part of the threat model
+
+Do not claim zeroization or encryption guarantees that JavaScript/Expo does not provide.
+
+Run no cryptographic refactor.
+
+==================================================
+14. L-09 — PIN THREAT MODEL
+==================================================
+
+Documentation/security architecture only.
+
+Do NOT change PIN behavior.
+
+Document:
+
+- six-digit PIN policy
+- retry delay
+- maximum retry delay
+- absence/presence of permanent lockout
+- absence/presence of wallet wipe
+- device-compromise threat model
+- native biometric fallback relationship
+- limitations of client-side PIN protection
+
+Do not invent a stronger security claim.
+
+Do not change authentication code.
+
+==================================================
+15. L-10 — SBOM / DEPENDENCY INTEGRITY GOVERNANCE
+==================================================
+
+Add lightweight repository-level supply-chain governance.
+
+Do not add a paid security product.
+
+Prefer existing package-manager/tooling capabilities.
+
+At minimum:
+
+- document dependency audit expectations
+- document lockfile requirements
+- document production dependency review
+- document vulnerability review before production release
+- document SBOM/provenance as a production-readiness requirement
+- if practical, add a deterministic SBOM generation/check command without making it a runtime dependency
+- if practical, add a vulnerability audit script that does not modify dependencies automatically
+
+Do not automatically upgrade packages.
+
+Do not fail normal development because an external vulnerability database is temporarily unavailable.
+
+==================================================
+16. CROSS-CUTTING SECURITY REGRESSION
+==================================================
+
+Batch 1 protections MUST remain intact.
+
+Verify:
+
+- unauthenticated account-scoped routes remain 401
+- authorized scope remains enforced
+- cross-account requests remain rejected
+- notification ownership remains enforced
+- internal notification event source restrictions remain enforced
+- notification quota concurrency protection remains enforced
+
+Also verify:
+
+- no private keys
+- no seed phrases
+- no PINs
+- no vault keys
+- no signing capabilities
+- no raw signed transactions
+
+enter backend telemetry, analytics, logs, or database tables.
+
+==================================================
+17. SOURCE AUDIT
+==================================================
+
+Inspect relevant code for:
+
+- unbounded Map/Set growth
+- response.text()
+- JSON.parse()
+- fetch(
+- request body parsers
+- analytics ingestion
+- cleanup loops
+- database SELECT without bounds
+- provider response arrays
+- path.join/path.resolve
+- symlink handling
+- dependency imports
+
+Do not flag safe bounded uses as vulnerabilities.
+
+==================================================
+18. REQUIRED TESTING
+==================================================
+
+Run:
+
+- backend tests
+- mobile tests
+- TypeScript
+- API build
+- Expo static iOS build
+- Expo static Android build
+- migration consistency
+- git diff --check
+- dependency audit
+- relevant security/source audit
+
+Do not apply production migrations.
+
+Do not start Phase 9.
+
+==================================================
+19. REQUIRED FINAL REPORT
+==================================================
+
+Return exactly:
+
+# PHASE 8 REMEDIATION BATCH 2
+
+## 1. Implemented Changes
+
+List exact files/components changed.
+
+## 2. M-01 Rate Limiter
+
+State:
+FIXED / PARTIALLY FIXED / NOT FIXED
+
+Explain bounds and eviction.
+
+## 3. M-04 Analytics Abuse
+
+State:
+FIXED / PARTIALLY FIXED / NOT FIXED
+
+Explain identity/event admission controls.
+
+## 4. M-05 Analytics Retention
+
+State:
+FIXED / PARTIALLY FIXED / NOT FIXED
+
+Explain cleanup invocation and operational dependency.
+
+## 5. M-06 Dependency Advisory
+
+State:
+FIXED / PARTIALLY FIXED / NOT FIXED
+
+Give exact dependency path/version.
+
+## 6. M-07 RPC Response Bounds
+
+State:
+FIXED / PARTIALLY FIXED / NOT FIXED
+
+Explain pre-parse byte limiting.
+
+## 7. L-01 Analytics DB Boundary
+
+State:
+FIXED / PARTIALLY FIXED / NOT FIXED
+
+## 8. L-02 Provider Response Bounds
+
+State:
+FIXED / PARTIALLY FIXED / NOT FIXED
+
+## 9. L-04 Request Body Maximum
+
+State:
+FIXED / PARTIALLY FIXED / NOT FIXED
+
+## 10. L-05 Metadata Bounds
+
+State:
+FIXED / PARTIALLY FIXED / NOT FIXED
+
+## 11. L-06 uuid Advisory
+
+State:
+FIXED / PARTIALLY FIXED / NOT FIXED
+
+Explain dependency path and runtime relevance.
+
+## 12. L-07 Static Server Hardening
+
+State:
+FIXED / PARTIALLY FIXED / NOT FIXED
+
+## 13. L-08 SecureStore Documentation
+
+State:
+FIXED / PARTIALLY FIXED / NOT FIXED
+
+## 14. L-09 PIN Threat Model
+
+State:
+FIXED / PARTIALLY FIXED / NOT FIXED
+
+## 15. L-10 Supply-Chain Governance
+
+State:
+FIXED / PARTIALLY FIXED / NOT FIXED
+
+## 16. Batch 1 Regression
+
+Explicitly confirm:
+
+- H-01
+- H-02
+- M-03
+- L-03
+
+remain protected.
+
+## 17. Tests and Validation
+
+Report exact counts/results for:
+
+- backend tests
+- mobile tests
+- TypeScript
+- API build
+- Expo builds
+- migrations
+- dependency audit
+- security/source audit
+- git diff
+
+## 18. Remaining Security Findings
+
+List every unresolved finding from the original Phase 8 security review.
+
+Do not hide partial fixes.
+
+The deferred production wallet-ownership authentication protocol must remain explicitly listed as an architectural dependency if it is still unresolved.
+
+## 19. Security Status
+
+Use exactly one:
+
+PHASE 8 BATCH 2 COMPLETE — PENDING SECURITY RE-REVIEW
+
+or
+
+PHASE 8 BATCH 2 BLOCKED — ARCHITECTURAL DECISION REQUIRED
+
+==================================================
+20. ABSOLUTE STOP
+==================================================
+
+After this batch:
+
+STOP.
+
+Do not start Batch 3.
+Do not start Phase 9.
+Do not implement the deferred wallet-ownership authentication protocol.
+Do not perform unrelated cleanup.
+
+Wait for security re-review.
