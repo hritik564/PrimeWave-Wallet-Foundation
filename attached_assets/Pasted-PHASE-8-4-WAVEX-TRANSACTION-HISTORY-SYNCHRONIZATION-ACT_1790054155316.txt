@@ -1,0 +1,699 @@
+PHASE 8.4 — WAVEX TRANSACTION HISTORY SYNCHRONIZATION & ACTIVITY RECONCILIATION
+
+Build ONLY Phase 8.4.
+
+Do not begin Phase 8.5 or any later Phase 8 work automatically.
+
+The existing WaveX mobile wallet is strictly non-custodial.
+
+Phase 8.1 backend security boundary, Phase 8.2 metadata architecture, Phase 8.3 indexing foundation, and the existing Phase 5 Activity architecture are authoritative.
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Build the backend-to-wallet transaction history synchronization and reconciliation foundation.
+
+The purpose is to combine:
+
+1. Local wallet activity
+2. Public blockchain observations from Phase 8.3
+
+into a consistent activity model that can later power synchronized transaction history.
+
+The backend must remain an INFORMATION / INDEXING SERVICE.
+
+It must NOT become:
+
+- a signing service
+- a custody service
+- a transaction execution service
+- a transaction broadcasting service
+
+==================================================
+2. CRITICAL ARCHITECTURAL RULE
+==================================================
+
+DO NOT REPLACE THE EXISTING LOCAL ACTIVITY ARCHITECTURE.
+
+WaveX already has:
+
+- Activity models
+- Activity repository
+- Activity service
+- Activity read model
+- Activity presentation model
+- transaction lifecycle handling
+- local broadcast/confirmation integration
+
+Those remain authoritative for local wallet execution.
+
+The backend provides public blockchain evidence.
+
+The new reconciliation layer must connect these systems without creating a second competing Activity architecture.
+
+==================================================
+3. TARGET ARCHITECTURE
+==================================================
+
+Use this conceptual architecture:
+
+LOCAL WALLET EVENTS
+        │
+        ▼
+Existing Activity System
+        │
+        │
+        ├───────────────┐
+        │               │
+        ▼               ▼
+Local Activity     Backend Sync Boundary
+                         │
+                         ▼
+                  Indexed Blockchain
+                    Observations
+                         │
+                         ▼
+                 Reconciliation Layer
+                         │
+                         ▼
+                 Reconciled Activity
+                         │
+                         ▼
+                  Existing Read Model
+                         │
+                         ▼
+                    WaveX UI
+
+Do not make the mobile app depend on the backend for basic local transaction execution.
+
+==================================================
+4. RECONCILIATION IDENTITY
+==================================================
+
+Create deterministic reconciliation identities.
+
+A blockchain transaction should be identified by:
+
+networkId + transactionHash
+
+An ERC-20 transfer should be identified by:
+
+networkId + transactionHash + logIndex
+
+Do not identify transactions using:
+
+- token name
+- symbol
+- timestamp
+- amount alone
+- counterparty alone
+- local generated ID alone
+
+A local Activity record may initially have only a local ID.
+
+When a blockchain hash becomes known, associate it with the corresponding activity.
+
+==================================================
+5. LOCAL → BLOCKCHAIN MATCHING
+==================================================
+
+Define a safe reconciliation strategy.
+
+Possible matching evidence:
+
+- networkId
+- account/public address
+- transaction hash
+- sender
+- recipient
+- asset identity
+- nonce where available
+- transaction value
+- transaction type
+- known local broadcast result
+
+Prefer transaction hash whenever available.
+
+Do NOT automatically merge records solely because:
+
+- amounts match
+- timestamps are close
+- recipient matches
+- asset matches
+
+Those are supporting signals, not authoritative identity.
+
+If there is insufficient evidence:
+
+- keep records separate
+- mark reconciliation as unresolved
+- do not fabricate a match.
+
+==================================================
+6. RECONCILIATION STATES
+==================================================
+
+Create explicit states such as:
+
+- local_only
+- indexed
+- matched
+- confirmed
+- reverted
+- unknown
+- conflict
+- unresolved
+
+Do not collapse unknown/conflict into failed.
+
+A local transaction can remain pending while the backend has not yet observed it.
+
+A blockchain observation can exist without a corresponding local Activity.
+
+==================================================
+7. AUTHORITATIVE BLOCKCHAIN STATUS
+==================================================
+
+When a transaction is confirmed on-chain:
+
+The indexed blockchain observation is authoritative for:
+
+- transaction hash
+- block number
+- block hash
+- transaction index
+- receipt status
+- confirmation metadata
+- blockchain timestamp where available
+
+The local wallet remains authoritative for:
+
+- local authorization
+- signing lifecycle
+- local user intent
+- local transaction initiation
+
+Do not overwrite local intent fields with backend data.
+
+==================================================
+8. CONFIRMATION HANDLING
+==================================================
+
+Use existing Phase 8.3 indexed transaction status.
+
+Do not create a second blockchain confirmation engine.
+
+The backend synchronization layer should consume indexed observations.
+
+Do not add continuous mobile polling in this phase.
+
+Do not create a new RPC polling loop.
+
+==================================================
+9. ERC-20 ACTIVITY RECONCILIATION
+==================================================
+
+Use Phase 8.3 indexed ERC-20 Transfer observations.
+
+A transfer must retain:
+
+- networkId
+- chainId
+- token contract address
+- from
+- to
+- raw amount
+- transaction hash
+- block number
+- block hash
+- log index
+- timestamp where available
+
+Token identity remains:
+
+networkId + canonical contract address.
+
+Use Phase 8.2 metadata only as supplementary metadata.
+
+Do not infer:
+
+- token trust
+- token legitimacy
+- fiat value
+- swap classification
+- approval classification
+
+from a Transfer event alone.
+
+==================================================
+10. ACCOUNT SCOPING
+==================================================
+
+Synchronization must be scoped by:
+
+- account/public address
+- networkId
+- chainId
+
+Never mix activity between:
+
+- accounts
+- networks
+- chains
+
+Address comparisons must be canonical and deterministic.
+
+Do not require private keys to identify account activity.
+
+==================================================
+11. PUBLIC ACCOUNT DATA
+==================================================
+
+The backend may use public blockchain addresses as synchronization identifiers.
+
+Do not introduce wallet authentication or private wallet recovery into this phase.
+
+Do not store:
+
+- seed phrases
+- private keys
+- PINs
+- wallet encryption keys
+- signing capabilities
+- SecureStore contents
+
+==================================================
+12. SYNC CURSOR
+==================================================
+
+Create a bounded synchronization cursor for account/network activity.
+
+The cursor should be able to represent:
+
+- networkId
+- account/public address
+- last synchronized block
+- last synchronization time
+- status
+- bounded error state
+
+Do not allow clients to request unlimited historical synchronization.
+
+Require bounded ranges.
+
+==================================================
+13. HISTORICAL SYNC
+==================================================
+
+Support bounded historical synchronization.
+
+For example:
+
+- initial sync from an explicit bounded starting block
+- incremental sync from the last synchronized block
+- bounded catch-up
+
+Do NOT automatically scan the entire blockchain history for an arbitrary address.
+
+Do not create an unlimited public history endpoint.
+
+==================================================
+14. SYNC IDEMPOTENCY
+==================================================
+
+Repeated synchronization must be safe.
+
+Use the deterministic identities established earlier.
+
+Do not create duplicate:
+
+- transactions
+- logs
+- token transfers
+- reconciliation records
+
+Use database constraints wherever appropriate.
+
+==================================================
+15. BACKEND DATA MODEL
+==================================================
+
+Create only the database structures necessary for synchronization/reconciliation.
+
+Possible conceptual structures:
+
+- account_sync_state
+- blockchain_activity_links
+- reconciliation_records
+
+Reuse Phase 8.3 indexed transaction and token-transfer tables.
+
+Do not duplicate entire blockchain transaction records unnecessarily.
+
+Do not create another complete token metadata table.
+
+Do not create a second independent Activity database that competes with the mobile ActivityRepository.
+
+==================================================
+16. LOCAL ACTIVITY SYNC CONTRACT
+==================================================
+
+Define a provider-neutral contract for the mobile application to provide public activity context where needed.
+
+The contract may contain:
+
+- account/public address
+- networkId
+- local activity ID
+- local transaction hash when available
+- local transaction lifecycle state
+- local transaction identity context
+
+It must NEVER contain:
+
+- private keys
+- seed phrases
+- PINs
+- signing capabilities
+- vault data
+- SecureStore contents
+
+The backend should never need the signed raw transaction.
+
+==================================================
+17. PRIVACY
+==================================================
+
+Treat wallet addresses as public blockchain identifiers, but do not collect more information than necessary.
+
+Do not create unnecessary cross-account profiling.
+
+Do not create global user behavior profiles.
+
+Do not introduce advertising identifiers.
+
+Do not introduce analytics in this phase.
+
+Do not expose one user's synchronization data to another account.
+
+==================================================
+18. API DESIGN
+==================================================
+
+Create only bounded synchronization/read endpoints required by this phase.
+
+Possible concepts:
+
+GET synchronized activity for a public account/network
+
+GET synchronization status
+
+POST/PUT synchronization checkpoint where appropriate
+
+GET reconciliation state
+
+Exact endpoint names may follow existing API conventions.
+
+Every endpoint must enforce:
+
+- bounded requests
+- network validation
+- address validation
+- pagination/range limits
+- account isolation
+- rate limiting
+- sanitized errors
+
+Do NOT expose:
+
+- arbitrary SQL
+- arbitrary RPC methods
+- arbitrary blockchain scan commands
+- raw database access
+- signing endpoints
+- broadcast endpoints
+
+==================================================
+19. MOBILE CLIENT BOUNDARY
+==================================================
+
+Do NOT fully integrate the mobile UI in this sprint.
+
+Do not rebuild Activity screens.
+
+Do not replace ActivityReadModelService.
+
+Do not replace ActivityRepository.
+
+Do not modify signing/broadcasting behavior.
+
+If a small shared TypeScript contract is required, keep it provider-neutral and public-data-only.
+
+The actual mobile synchronization integration should be introduced only after this backend reconciliation architecture has been reviewed.
+
+==================================================
+20. ACTIVITY PRESENTATION
+==================================================
+
+Preserve the existing Phase 5.1A presentation model.
+
+The backend must not dictate UI styling.
+
+Existing WaveX presentation concepts remain valid:
+
+- asset-first visual
+- network badge
+- sent/received/swapped/etc. classification
+- counterparty
+- exact amount
+- optional fiat
+- date grouping
+- status
+
+Do not infer a swap from transaction shape or Transfer events.
+
+Do not add fake fiat values.
+
+==================================================
+21. CONFLICT HANDLING
+==================================================
+
+If local and indexed information conflicts:
+
+Do NOT silently choose one.
+
+Create an explicit conflict/unresolved state.
+
+Examples:
+
+- local transaction hash conflicts with indexed hash
+- same local activity appears to map to multiple blockchain transactions
+- blockchain observation contradicts expected network
+- transaction receipt state differs unexpectedly
+- token transfer identity conflicts
+
+Preserve enough public evidence for later reconciliation.
+
+==================================================
+22. DELETION / PRIVACY
+==================================================
+
+If synchronization data is associated with a local account context, establish clear deletion behavior.
+
+Do not create irreversible global public-address profiles unnecessarily.
+
+Document what is:
+
+- local-only
+- backend-indexed
+- synchronization state
+- derived reconciliation state
+
+Do not delete public blockchain facts merely because local wallet state changes.
+
+But do allow application-owned synchronization metadata to be cleaned up safely.
+
+==================================================
+23. SECURITY
+==================================================
+
+Perform a full source audit for:
+
+- private keys
+- seed phrases
+- PINs
+- wallet vault data
+- signing capabilities
+- raw signed transactions
+- server-side signing
+- transaction broadcasting
+- arbitrary RPC proxy
+- SQL injection
+- cross-account data leakage
+- unbounded synchronization
+- unbounded pagination
+- log leakage
+- credential leakage
+
+The backend remains strictly read-only.
+
+==================================================
+24. TESTING
+==================================================
+
+Add focused tests for:
+
+- deterministic reconciliation identity
+- local-only activity
+- indexed-only activity
+- successful hash match
+- insufficient-evidence unresolved state
+- conflicting matches
+- confirmed transaction
+- reverted transaction
+- unknown transaction
+- ERC-20 transfer reconciliation
+- account isolation
+- network isolation
+- bounded sync ranges
+- cursor advancement
+- resume behavior
+- duplicate prevention
+- pagination/range bounds
+- sanitized errors
+- secret-material rejection
+- privacy/deletion behavior
+
+Use deterministic fixtures.
+
+Do NOT require private keys or real signing.
+
+==================================================
+25. LIVE SMOKE TEST
+==================================================
+
+If a development RPC/database is available:
+
+Perform only a bounded read-only synchronization test.
+
+For example:
+
+- use Ethereum Sepolia
+- use a known public test address
+- read a very small bounded block range
+- normalize observations
+- verify synchronization/reconciliation persistence
+
+Do NOT send transactions.
+
+Do NOT sign anything.
+
+Do NOT broadcast anything.
+
+If a development database has not yet been migrated/applied, report the limitation instead of pretending synchronization succeeded.
+
+==================================================
+26. DATABASE MIGRATIONS
+==================================================
+
+Generate migration files.
+
+Validate migration consistency.
+
+If safe development database access is available, verify applying the migration to a clean development database.
+
+Do NOT apply destructive migrations to production.
+
+Do NOT fabricate successful persistence if the database is unavailable.
+
+==================================================
+27. DOCUMENTATION
+==================================================
+
+Update:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- backend README
+- synchronization/reconciliation README if created
+
+Document:
+
+- local vs indexed activity
+- reconciliation identity
+- matching rules
+- unresolved/conflict handling
+- sync cursor
+- privacy boundaries
+- deletion behavior
+- backend/mobile contract
+- future UI integration boundary
+
+==================================================
+28. STRICTLY DO NOT IMPLEMENT
+==================================================
+
+Do NOT implement:
+
+- price feeds
+- notifications
+- analytics
+- swap backend
+- DApp backend
+- server-side signing
+- transaction broadcasting
+- custody
+- cloud wallet recovery
+- private-key storage
+- seed phrase storage
+- production worker deployment
+- production cloud migration
+- full mobile Activity synchronization UI
+- automatic unlimited historical scanning
+
+==================================================
+29. VALIDATION
+==================================================
+
+Before reporting completion:
+
+1. Run Phase 8.4 focused tests.
+2. Run the complete existing test suite.
+3. Run TypeScript validation.
+4. Run backend build.
+5. Run Expo validation/static build.
+6. Run Drizzle migration consistency checks.
+7. Run git diff --check.
+8. Inspect dependencies.
+9. Perform the security source audit.
+10. Verify account/network isolation.
+11. Verify no wallet security boundary was weakened.
+12. Verify no Phase 8.5 work was started.
+
+Final report must include:
+
+- files created/changed
+- database schema
+- sync architecture
+- reconciliation identity
+- matching rules
+- conflict handling
+- account/network isolation
+- API endpoints
+- security audit
+- migration status
+- tests
+- TypeScript/build results
+- live smoke test result if performed
+- warnings
+- deferred work
+
+If all requirements pass, finish exactly with:
+
+PHASE 8.4 DEVELOPMENT COMPLETE — PENDING SECURITY REVIEW
+
+STOP.
+
+Do not begin Phase 8.5.
