@@ -83,3 +83,11 @@ The provider-neutral `LocalActivityContext` contract contains only public
 account scope, a local activity ID, an optional public transaction hash, and a
 local lifecycle label. It never contains keys, seed phrases, PINs, vault
 contents, SecureStore values, signing capabilities, or raw signed bytes.
+
+## Phase 8.5 market-data separation
+
+The Phase 8.5 price endpoint is a separate public valuation boundary. It does
+not alter synchronization identity, state, cursor, or reconciliation behavior.
+Market prices never establish token verification, balance, ownership,
+confirmation, or trust. Synchronization does not consume prices, and market
+data does not become blockchain truth.

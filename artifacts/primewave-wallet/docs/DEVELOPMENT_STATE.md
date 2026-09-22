@@ -2,9 +2,8 @@
 
 ## Current phase
 
-**Phase 8.4 — WaveX transaction history synchronization and activity
-reconciliation (implemented; pending
-security review)**
+**Phase 8.5 — WaveX market and price data infrastructure (implemented;
+pending security review)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -440,9 +439,10 @@ UI testing; it is not a real wallet and does not alter the native boundary.
   build environment must be configured separately if it needs those values.
 - `ZEROEX_API_KEY` is configured for the existing provider boundary. Its
   presence was verified without reading or exposing its value.
-- External token lists, verification providers, NFTs, portfolio valuation, fiat
-  pricing, external indexing, backend asset/history APIs, notifications, and
-  full wallet UI remain outside this controlled increment.
+- External token lists, verification providers, NFTs, portfolio valuation,
+  historical fiat pricing, notifications, and full wallet UI remain outside
+  this controlled increment. Phase 8.5 provides a backend market-data
+  boundary only; it does not integrate prices into Portfolio or Activity.
 - Phase 6.4 intentionally stops at **Approved for Signing**. It does not include
   swap execution, signing, broadcasting, persistent quote state, Activity
   records, swap detection, approvals execution, Permit2, DApps,
@@ -470,8 +470,8 @@ UI testing; it is not a real wallet and does not alter the native boundary.
 ## Known limitations
 
 - No automatic network switching, aggressive RPC failover, health-check
-  scheduler, indexer, price service, database, notification service, or DApp
-  connection.
+  scheduler, background market polling, price persistence, notification
+  service, or DApp connection.
 - QR scanning, camera permissions, recipient parsing, and native device share
   validation remain deferred. Web Preview reports when native sharing is
   unavailable rather than claiming it was tested.
@@ -710,9 +710,36 @@ increment.
   hash-matched, confirmed, reverted, unknown, unresolved, and conflict states.
 - Preserved local wallet Activity architecture and did not integrate mobile UI,
   signing, broadcasting, custody, authentication, analytics, notifications,
-  prices, swaps, DApp backend services, or Phase 8.5 work.
+  prices into mobile surfaces, swaps, or DApp backend services.
 - Added deterministic tests for identity, local/indexed-only activity,
   matching, unresolved/conflict handling, account/network isolation, bounded
   ranges, cursor advancement, duplicate prevention, and pagination.
 - Migration files were generated and validated but not applied to a development
   or production database.
+
+## Phase 8.5 completion
+
+- Added a provider-neutral backend market-price boundary under
+  `artifacts/api-server/src/market`.
+- Reused network-aware native and ERC-20 identity. Native assets use
+  `networkId + native`; ERC-20 assets use
+  `networkId + canonical contractAddress`. Symbols and provider IDs are not
+  identity.
+- Added bounded `GET /api/v1/prices` support with explicit quote currency,
+  exact decimal prices, separate observation/receipt timestamps, availability,
+  freshness, provenance, and safe failure reasons.
+- Added provider and mapping interfaces, an explicit unconfigured runtime
+  provider, and deterministic mock provider responses for tests. No approved
+  live market provider or credential is configured.
+- Added validation for malformed identities, unsupported currencies, negative
+  or malformed decimals, `NaN`, `Infinity`, excess precision, impossible
+  timestamps, asset limits, and provider batch limits.
+- Kept market valuation separate from blockchain balances, metadata
+  verification, transaction confirmation, PortfolioReadModel,
+  ActivityPresentationModel, and historical activity valuation.
+- Added no price tables, cache, background polling, arbitrary URL proxy,
+  provider credential storage, wallet secret access, signing, broadcasting,
+  analytics, notifications, or Phase 8.6 behavior.
+- Focused market tests cover identity, network isolation, mapping, quote
+  validation, exact decimal handling, freshness, unavailable/stale/invalid
+  states, provider failures, bounded batches, and credential redaction.

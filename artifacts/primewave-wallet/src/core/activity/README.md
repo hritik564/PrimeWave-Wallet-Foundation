@@ -4,7 +4,7 @@ Phase 5.1 provides a UI-independent public transaction activity model,
 repository, lifecycle service, and read model. Phase 5.2 adds the
 presentation-only Activity destination and asset-first feed. The feed does not
 build a complete transaction detail page, backend indexing, external indexers,
-notifications, analytics, or cloud persistence.
+notifications, analytics, price integration, or cloud persistence.
 
 Records are scoped by `accountId`, `networkId`, and exact `chainId`. A local
 record uses a generated `localTransactionId` before a blockchain hash exists.
@@ -75,7 +75,7 @@ same-symbol assets on different networks are never merged.
 
 Phase 5.1A remains UI-independent and does not implement Activity UI,
 transaction detail UI, backend history, external indexing, notifications,
-analytics, price APIs, signing, authentication, SecureStore access,
+analytics, price APIs or price-derived fiat values, signing, authentication, SecureStore access,
 broadcasting, replacement, speed-up, or cancellation.
 
 ## Phase 5.2 Activity destination
@@ -111,6 +111,15 @@ refresh-error states. It does not add fake transactions, fiat prices, inferred
 swaps, direct receipt polling, background polling, analytics, backend history,
 notifications, or transaction mutation.
 
+## Phase 8.5 market-data boundary
+
+Phase 8.5 provides a separate backend market-price infrastructure but does not
+consume it here. `ActivityPresentationModel` continues to expose fiat display
+data as `null` unless a future approved presentation resolver supplies an
+observation with an explicit historical-price policy. Current activity rows do
+not fetch prices, infer historical values, or change lifecycle states from
+market data.
+
 ## Phase 5.3 Transaction Details and reconciliation
 
 `TransactionDetailScreen` receives only an activity identity and its public
@@ -141,5 +150,5 @@ configured URL. Copy actions write public addresses or hashes through the
 existing clipboard boundary and never read or persist clipboard contents.
 
 Phase 5.3 does not implement swap detection or execution, approval execution,
-backend history, external indexing, price APIs, notifications, replacement,
+backend history, external indexing, price integration, notifications, replacement,
 speed-up, cancellation, or fee bumping.

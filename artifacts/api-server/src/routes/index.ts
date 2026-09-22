@@ -6,6 +6,7 @@ import type { MetadataRepository } from "../metadata/types";
 import { createIndexerRouter } from "../indexing/router";
 import { IndexerService } from "../indexing/service";
 import { createSynchronizationRouter } from "../synchronization/router";
+import { createMarketPriceRouter } from "../market/router";
 
 export function createRouter(
   config: ServerConfig,
@@ -17,5 +18,6 @@ export function createRouter(
   router.use(createMetadataRouter(config, repository));
   if (indexer) router.use(createIndexerRouter(indexer));
   router.use(createSynchronizationRouter(config));
+  router.use(createMarketPriceRouter(config));
   return router;
 }

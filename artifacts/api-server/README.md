@@ -27,6 +27,13 @@ Indexer status:
   cursor, progress, and error status. There is no public start-indexing
   endpoint.
 
+Market data:
+
+- `GET /api/v1/prices?assets=<descriptors>&quoteCurrency=USD` — bounded,
+  provider-neutral public market observations. Asset descriptors are
+  `native:<networkId>` or
+  `erc20:<networkId>:<canonicalContractAddress>`.
+
 Token identity is always the normalized pair
 `networkId + contractAddress`. Missing records return explicit `unavailable`
 metadata rather than invented names, symbols, decimals, logos, or verification.
@@ -58,6 +65,12 @@ Configuration is loaded in `src/config.ts` and is environment-specific:
   variable is absent.
 - `INDEXER_RPC_TIMEOUT_MS` and the `INDEXER_MAX_*` variables — bounded
   provider-response and block-range limits. See `src/config.ts` for defaults.
+- `MARKET_PRICE_ENABLED` — enables the market-data boundary; it does not
+  fabricate prices when no provider is configured.
+- `MARKET_PRICE_MAX_ASSETS`, `MARKET_PRICE_MAX_BATCH_SIZE`,
+  `MARKET_PRICE_FRESHNESS_MAX_AGE_MS`, `MARKET_PRICE_MAX_FUTURE_SKEW_MS`, and
+  `MARKET_PRICE_MAX_DECIMAL_PLACES` — bounded market-data validation and
+  freshness policy values.
 
 No backend secret is placed in Expo public configuration. No credentials are
 invented in this repository.
@@ -79,8 +92,9 @@ The existing `@workspace/db` package remains the PostgreSQL/Drizzle
 foundation. Phase 8.2 adds only `public_network_metadata` and
 `public_token_metadata`, with bounded fields and a composite unique token
 identity constraint. Phase 8.3 adds `indexer_state`, `indexed_blocks`,
-`indexed_transactions`, `indexed_logs`, and `indexed_token_transfers`. The
-migrations are generated under `lib/db/migrations`.
+`indexed_transactions`, `indexed_logs`, and `indexed_token_transfers`. Phase
+8.4 adds `account_sync_state` and `reconciliation_records`. Phase 8.5 adds no
+database tables. The migrations are generated under `lib/db/migrations`.
 
 ## Metadata model
 
@@ -168,3 +182,26 @@ RPC, starts indexing, signs, broadcasts, or performs unlimited historical
 scanning. Pages, ranges, request bodies, and errors are bounded; the existing
 rate limiter and secret-material guard apply. No mobile Activity UI
 integration is included in Phase 8.4.
+
+## Phase 8.5 market and price data
+
+Phase 8.5 adds a separate public valuation boundary. It does not modify
+`PortfolioReadModel`, `ActivityPresentationModel`, balance calculations,
+historical transaction presentation, or token verification.
+
+Market identity is network-aware: native assets use `networkId + native`, and
+ERC-20 assets use `networkId + canonical contractAddress`. Provider asset IDs
+are mapping metadata only. The current runtime has no approved market-data
+provider credentials, so the configured provider is explicitly `unconfigured`
+and returns unavailable observations. Deterministic mock responses are used
+only in tests; no live price is fabricated.
+
+Price responses use exact decimal strings and explicitly report quote currency,
+source, observation/receipt timestamps, availability, freshness, provenance,
+and bounded failure reason. The endpoint does not proxy arbitrary URLs or
+return credentials. Requests are bounded by asset count and provider batch
+size, and the existing rate limiter and sanitized error pipeline apply.
+
+No price persistence, cache, background polling, historical prices, portfolio
+fiat valuation, Activity fiat valuation, or mobile market-data integration is
+included in Phase 8.5.

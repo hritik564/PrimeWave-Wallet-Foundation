@@ -120,16 +120,17 @@ transaction-execution endpoints.
 
 The server boundary is separated into configuration, HTTP middleware,
 validation, security guards, authentication interfaces, routes, errors,
-logging, and the existing PostgreSQL/Drizzle package. The database package is
-kept migration-ready but has no Phase 8 application tables yet.
+logging, and the existing PostgreSQL/Drizzle package. The database package
+contains the public metadata, indexing, synchronization, and reconciliation
+tables described by Phases 8.2–8.4; Phase 8.5 does not add price tables.
 
 The mobile wallet remains independently useful without this service. The
 backend may later receive minimized public wallet metadata, public network
-context, token metadata requests, public indexing queries, notification
-preferences, and privacy-safe telemetry. It must never receive recovery
+context, token metadata requests, public indexing queries, bounded market
+observations, notification preferences, and privacy-safe telemetry. It must never receive recovery
 phrases, private keys, PINs, secure-vault data, signing capabilities, or raw
-secret material. Production deployment and all later Phase 8 business services
-remain deferred.
+secret material. Production deployment and later business integrations remain
+deferred.
 
 ## Phase 7.1 — provider-neutral DApp architecture
 
@@ -1412,3 +1413,46 @@ analytics, notifications, price data, swap classification, or DApp services.
 Public blockchain facts are not removed when local wallet state changes;
 application-owned synchronization metadata is a separate future deletion
 boundary.
+
+## Phase 8.5 — market and price data infrastructure
+
+Phase 8.5 adds a separate backend-only, provider-neutral market valuation
+boundary. It does not modify the existing PortfolioReadModel,
+ActivityPresentationModel, balance calculations, transaction history, or token
+verification state.
+
+The data flow is:
+
+```text
+bounded public asset descriptors
+  ↓
+network-aware WaveX asset identity
+  ↓
+provider-specific mapping boundary
+  ↓
+bounded provider batches
+  ↓
+strict decimal/timestamp normalization
+  ↓
+explicit availability and freshness response
+```
+
+Native identity is `networkId + native`; ERC-20 identity is
+`networkId + canonical lowercase contractAddress`. Symbols, names, tickers, and
+provider asset IDs are never identity. A price is an external valuation only;
+it does not establish verification, trust, legitimacy, balance, ownership,
+approval state, or transaction confirmation.
+
+`GET /api/v1/prices` accepts a bounded asset list and explicit quote currency.
+Prices are exact decimal strings, with separate `observedAt` and
+`receivedAt` timestamps. `available`, `unavailable`, and `invalid` states are
+explicit, as are `fresh`, `stale`, and `unknown` freshness. Missing prices are
+never converted to zero.
+
+No approved market-data credentials or provider are configured in this
+repository. Runtime therefore uses an explicit unconfigured provider and
+returns unavailable observations. The deterministic mock provider is test-only
+and does not represent live data. Phase 8.5 adds no database tables, price
+cache, background polling, historical prices, portfolio fiat valuation, or
+Activity fiat valuation. It does not fetch arbitrary URLs, proxy providers,
+store credentials, sign, broadcast, or access wallet secrets.

@@ -1612,3 +1612,44 @@ authenticated deletion flow may remove application-owned cursor and
 reconciliation metadata; it must not pretend to delete public blockchain
 facts. This phase adds no wallet authentication or public-address ownership
 claim and no mobile Activity synchronization UI.
+
+## Phase 8.5 market-data security boundary
+
+Phase 8.5 is a separate public valuation service. It accepts only bounded
+asset descriptors and an explicit quote currency. It does not accept wallet
+addresses as ownership claims, wallet secrets, provider credentials, raw
+signed transactions, RPC methods, arbitrary URLs, or arbitrary SQL.
+
+Market identity remains network-aware:
+
+```text
+native: networkId + native
+ERC-20: networkId + canonical lowercase contractAddress
+```
+
+Provider asset IDs are mapping metadata and cannot replace WaveX identity.
+Symbols, names, tickers, prices, logos, and provider IDs cannot establish
+token verification, trust, legitimacy, balance, ownership, approval state, or
+transaction confirmation.
+
+Provider data is untrusted. The service rejects negative, malformed,
+over-precise, `NaN`, and `Infinity` prices, unsupported quote currencies,
+malformed asset identities, and impossible timestamps. Exact decimal strings
+are preserved without JavaScript floating-point arithmetic. Responses
+distinguish `available`, `unavailable`, and `invalid`, and separately
+distinguish `fresh`, `stale`, and `unknown`. Unavailable values remain `null`,
+never zero.
+
+Provider calls are bounded by asset count and batch size, inherit the existing
+rate limiter, and do not retry indefinitely or proxy arbitrary external URLs.
+Provider timeouts, rate limits, unavailable configuration, and malformed
+responses are normalized into safe response states. Raw provider payloads,
+credentials, URLs, and log fields never reach clients, mobile configuration,
+database rows, or logs. The current runtime has no approved market provider;
+the unconfigured provider returns explicit unavailable data, while the
+deterministic mock exists only for tests.
+
+Phase 8.5 adds no persistence, cache, background polling, historical pricing,
+portfolio fiat valuation, Activity fiat valuation, signing, broadcasting,
+custody, authentication, or mobile market-data integration. Market data never
+becomes blockchain truth.

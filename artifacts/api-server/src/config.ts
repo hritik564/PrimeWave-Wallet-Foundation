@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { createPublicNetworkCatalog } from "./metadata/catalog";
 import type { IndexerConfig } from "./indexing/types";
+import type { MarketPriceConfig } from "./market/types";
 
 export type ServerEnvironment = "development" | "test" | "production";
 
@@ -13,6 +14,7 @@ export interface ServerConfig {
   readonly databaseUrl: string | null;
   readonly sepoliaRpcConfigured: boolean;
   readonly indexer: IndexerConfig;
+  readonly market: MarketPriceConfig;
   readonly requestBodyLimit: string;
   readonly rateLimitWindowMs: number;
   readonly rateLimitMaxRequests: number;
@@ -81,6 +83,48 @@ function parseBoolean(value: string | undefined, fallback: boolean): boolean {
   if (value === "true") return true;
   if (value === "false") return false;
   throw new ConfigurationError("Boolean configuration value is invalid.");
+}
+
+function createMarketPriceConfig(
+  environment: NodeJS.ProcessEnv,
+): MarketPriceConfig {
+  const maxBatchSize = parsePositiveInteger(
+    environment.MARKET_PRICE_MAX_BATCH_SIZE,
+    25,
+    "MARKET_PRICE_MAX_BATCH_SIZE",
+  );
+  const maxAssets = parsePositiveInteger(
+    environment.MARKET_PRICE_MAX_ASSETS,
+    50,
+    "MARKET_PRICE_MAX_ASSETS",
+  );
+  if (maxBatchSize > maxAssets) {
+    throw new ConfigurationError(
+      "MARKET_PRICE_MAX_BATCH_SIZE cannot exceed MARKET_PRICE_MAX_ASSETS.",
+    );
+  }
+  const maxDecimalPlaces = parsePositiveInteger(
+    environment.MARKET_PRICE_MAX_DECIMAL_PLACES,
+    36,
+    "MARKET_PRICE_MAX_DECIMAL_PLACES",
+  );
+  return {
+    enabled: parseBoolean(environment.MARKET_PRICE_ENABLED, true),
+    maxAssets,
+    maxBatchSize,
+    freshnessMaxAgeMs: parsePositiveInteger(
+      environment.MARKET_PRICE_FRESHNESS_MAX_AGE_MS,
+      300_000,
+      "MARKET_PRICE_FRESHNESS_MAX_AGE_MS",
+    ),
+    maxTimestampFutureSkewMs: parsePositiveInteger(
+      environment.MARKET_PRICE_MAX_FUTURE_SKEW_MS,
+      300_000,
+      "MARKET_PRICE_MAX_FUTURE_SKEW_MS",
+    ),
+    maxDecimalPlaces,
+    supportedQuoteCurrencies: Object.freeze(["USD"]),
+  };
 }
 
 function parseIndexerRpcUrl(
@@ -254,6 +298,7 @@ export function loadConfig(
       environment,
       sepoliaRpcConfigured,
     ),
+    market: createMarketPriceConfig(environment),
     requestBodyLimit: environment.REQUEST_BODY_LIMIT ?? "64kb",
     rateLimitWindowMs,
     rateLimitMaxRequests,
