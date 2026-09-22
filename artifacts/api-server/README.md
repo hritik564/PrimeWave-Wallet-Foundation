@@ -21,6 +21,12 @@ Public metadata endpoints:
 - `GET /api/v1/metadata/tokens?networkId=<id>&addresses=<csv>` — a bounded
   batch of at most 50 token identities.
 
+Indexer status:
+
+- `GET /api/v1/indexing/status` — sanitized read-only indexing configuration,
+  cursor, progress, and error status. There is no public start-indexing
+  endpoint.
+
 Token identity is always the normalized pair
 `networkId + contractAddress`. Missing records return explicit `unavailable`
 metadata rather than invented names, symbols, decimals, logos, or verification.
@@ -44,6 +50,14 @@ Configuration is loaded in `src/config.ts` and is environment-specific:
 - `LOG_LEVEL` — supported Pino log level.
 - `SEPOLIA_RPC_URL` — server-only configuration presence marker. Its value is
   never returned by metadata endpoints.
+- `INDEXER_ENABLED` — enables the manually invoked indexing service boundary;
+  it does not start a worker. Defaults to `true`.
+- `INDEXER_<NETWORK_ID>_RPC_URL` — HTTPS RPC endpoint configuration for a
+  supported network, for example `INDEXER_ETHEREUM_SEPOLIA_RPC_URL`.
+  `SEPOLIA_RPC_URL` is used for `ethereum-sepolia` when its indexer-specific
+  variable is absent.
+- `INDEXER_RPC_TIMEOUT_MS` and the `INDEXER_MAX_*` variables — bounded
+  provider-response and block-range limits. See `src/config.ts` for defaults.
 
 No backend secret is placed in Expo public configuration. No credentials are
 invented in this repository.
@@ -64,7 +78,9 @@ must never grant or imply local signing permission.
 The existing `@workspace/db` package remains the PostgreSQL/Drizzle
 foundation. Phase 8.2 adds only `public_network_metadata` and
 `public_token_metadata`, with bounded fields and a composite unique token
-identity constraint. The migration is generated under `lib/db/migrations`.
+identity constraint. Phase 8.3 adds `indexer_state`, `indexed_blocks`,
+`indexed_transactions`, `indexed_logs`, and `indexed_token_transfers`. The
+migrations are generated under `lib/db/migrations`.
 
 ## Metadata model
 
@@ -88,3 +104,39 @@ If the metadata database is unavailable, network metadata falls back to the
 safe catalog and token requests return explicit unavailable records. The mobile
 wallet remains local-first and does not require this backend for creation,
 recovery, authentication, signing, or broadcasting.
+
+## Phase 8.3 indexing foundation
+
+The indexer is separated into read-only RPC access, observation, normalization,
+validation, and persistence:
+
+```text
+configured RPC
+  -> chain ID verification
+  -> bounded block/log observation
+  -> strict normalization and ERC-20 Transfer decoding
+  -> transactional, idempotent persistence
+  -> future activity synchronization
+```
+
+Only configured server-side RPC URLs are used. RPC credentials are never
+stored in database rows or returned by the API. The RPC client exposes only
+the read methods needed by the observer and has no raw-RPC proxy.
+
+Manual execution is available through the service boundary for tests and future
+administrative orchestration, but no public start endpoint or infinite worker
+was added. The public status endpoint exposes only network identity,
+configuration presence, cursor progress, safe status values, and bounded error
+metadata.
+
+The cursor advances only after a bounded range is normalized and persisted.
+Block number/hash/parent relationships are checked, chain IDs are verified
+against configuration, and parent discontinuities enter `reorg_detected`
+without advancing the successful cursor. Deep reorg reconciliation remains
+deferred.
+
+Indexed logs use network identity plus transaction hash and log index.
+Recognized ERC-20 Transfer events retain exact integer amounts as decimal
+strings. Token metadata is referenced conceptually through the existing
+`networkId + canonical contractAddress` identity; verification and trust are
+not copied into indexing records.

@@ -1309,3 +1309,63 @@ broadcast, or execute transactions. When persistence is unavailable, network
 metadata falls back to the safe catalog and token responses explicitly report
 `unavailable`; the mobile wallet does not depend on the backend for local
 wallet operation.
+
+## Phase 8.3 — blockchain indexing foundation
+
+Phase 8.3 adds a backend-only, read-only observation foundation for public EVM
+data. It does not modify the mobile Activity architecture, local
+`ActivityRepository`, signing flow, broadcast flow, DApp flow, swap flow, or
+any wallet secret boundary.
+
+The indexing pipeline is intentionally separated:
+
+```text
+server-configured RPC
+  ↓
+read-only RPC client
+  ↓
+chain ID verification and bounded observation
+  ↓
+block/log/transaction normalization
+  ↓
+ERC-20 Transfer decoding
+  ↓
+validation and reorg checks
+  ↓
+transactional idempotent persistence
+  ↓
+future synchronization layer
+```
+
+The existing network identity model is reused. Each indexer network retains
+`networkId`, configured `chainId`, environment, enabled status, and a
+server-only RPC endpoint. Endpoints come from environment configuration;
+credentials are never persisted or returned. PrimeWave remains a placeholder
+and cannot be indexed until it has an approved chain ID and endpoint.
+
+The supported manual service operations are `getStatus`, `indexNextRange`, and
+bounded `indexRange`. No public start-indexing endpoint or continuously running
+worker was added. A configured chain ID is verified against `eth_chainId`
+before observation.
+
+The persistence foundation contains:
+
+- `indexer_state` for deterministic cursor, latest observed block, status, and
+  bounded error metadata
+- `indexed_blocks` for block number/hash/parent/timestamp evidence
+- `indexed_transactions` for normalized public transaction observations
+- `indexed_logs` for generic normalized logs
+- `indexed_token_transfers` for recognized ERC-20 Transfer observations
+
+Indexing is retry-safe through composite database identities and conflict-safe
+inserts. The successful cursor advances only after the full bounded range is
+persisted. Parent continuity is checked within a range, against stored
+evidence, and against the observed previous block. A mismatch enters
+`reorg_detected` and does not advance the cursor. Deep reorg reconciliation is
+deferred.
+
+All integer quantities remain exact strings or `bigint` values; no floating
+point conversion or fiat inference is performed. ERC-20 Transfer observations
+use network identity, canonical contract address, exact raw amount, block
+identity, transaction hash, and log index. A Transfer event is evidence only;
+it does not establish token legitimacy, trust, or verification.

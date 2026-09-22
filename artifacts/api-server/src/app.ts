@@ -9,12 +9,20 @@ import { requireJsonContentType, requestIdMiddleware } from "./lib/request-valid
 import { secretMaterialGuard, securityHeaders } from "./lib/security";
 import { createRouter } from "./routes";
 import type { MetadataRepository } from "./metadata/types";
+import { createMetadataRepository } from "./metadata/repository";
+import { createIndexerRepository } from "./indexing/repository";
+import { IndexerService } from "./indexing/service";
 
 export function createApp(
   config: ServerConfig = loadConfig(),
   repository?: MetadataRepository,
 ): Express {
   const app: Express = express();
+  const metadataRepository = repository ?? createMetadataRepository(config);
+  const indexerService = new IndexerService(
+    config.indexer,
+    createIndexerRepository(config),
+  );
   const rateLimiter = new MemoryRateLimiter(
     config.rateLimitWindowMs,
     config.rateLimitMaxRequests,
@@ -60,8 +68,14 @@ export function createApp(
 
   // Keep the existing workflow startup probe working while the versioned
   // namespace becomes the only new API boundary.
-   app.use(`${config.apiPrefix}`, createRouter(config, repository));
-   app.use("/api", createRouter(config, repository));
+  app.use(
+    `${config.apiPrefix}`,
+    createRouter(config, metadataRepository, indexerService),
+  );
+  app.use(
+    "/api",
+    createRouter(config, metadataRepository, indexerService),
+  );
   app.use((_request, _response, next) => {
     next(new HttpError(404, "NOT_FOUND", "The requested API resource was not found."));
   });

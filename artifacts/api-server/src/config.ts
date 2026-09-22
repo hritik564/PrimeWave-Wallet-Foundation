@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { createPublicNetworkCatalog } from "./metadata/catalog";
+import type { IndexerConfig } from "./indexing/types";
 
 export type ServerEnvironment = "development" | "test" | "production";
 
@@ -10,6 +12,7 @@ export interface ServerConfig {
   readonly corsAllowedOrigins: readonly string[];
   readonly databaseUrl: string | null;
   readonly sepoliaRpcConfigured: boolean;
+  readonly indexer: IndexerConfig;
   readonly requestBodyLimit: string;
   readonly rateLimitWindowMs: number;
   readonly rateLimitMaxRequests: number;
@@ -73,6 +76,121 @@ function parseOrigins(value: string | undefined, environment: ServerEnvironment)
   return Object.freeze(origins);
 }
 
+function parseBoolean(value: string | undefined, fallback: boolean): boolean {
+  if (value === undefined) return fallback;
+  if (value === "true") return true;
+  if (value === "false") return false;
+  throw new ConfigurationError("Boolean configuration value is invalid.");
+}
+
+function parseIndexerRpcUrl(
+  value: string | undefined,
+  environment: ServerEnvironment,
+): string | null {
+  const trimmed = value?.trim();
+  if (!trimmed) return null;
+  let parsed: URL;
+  try {
+    parsed = new URL(trimmed);
+  } catch {
+    throw new ConfigurationError("Indexer RPC URL is invalid.");
+  }
+  if (parsed.username || parsed.password || parsed.search || parsed.hash) {
+    throw new ConfigurationError(
+      "Indexer RPC URLs must not contain credentials, query parameters, or fragments.",
+    );
+  }
+  const localDevelopment =
+    environment === "development" &&
+    parsed.protocol === "http:" &&
+    ["localhost", "127.0.0.1", "[::1]"].includes(parsed.hostname);
+  if (parsed.protocol !== "https:" && !localDevelopment) {
+    throw new ConfigurationError(
+      "Indexer RPC URLs must use HTTPS outside local development.",
+    );
+  }
+  return parsed.toString().replace(/\/$/, "");
+}
+
+function indexerEnvironmentKey(networkId: string): string {
+  return `INDEXER_${networkId.replace(/-/g, "_").toUpperCase()}_RPC_URL`;
+}
+
+function createIndexerConfig(
+  environment: ServerEnvironment,
+  env: NodeJS.ProcessEnv,
+  sepoliaRpcConfigured: boolean,
+): IndexerConfig {
+  const catalog = createPublicNetworkCatalog({ sepoliaRpcConfigured });
+  const enabled = parseBoolean(env.INDEXER_ENABLED, true);
+  const networks = catalog
+    .filter(
+      (network): network is typeof network & { chainId: number } =>
+        network.chainId !== null,
+    )
+    .map((network) => {
+      const configuredValue =
+        env[indexerEnvironmentKey(network.networkId)] ??
+        (network.networkId === "ethereum-sepolia"
+          ? env.SEPOLIA_RPC_URL
+          : undefined);
+      const rpcUrl = parseIndexerRpcUrl(configuredValue, environment);
+      return {
+        networkId: network.networkId,
+        chainId: network.chainId,
+        environment: network.environment,
+        enabled: enabled && rpcUrl !== null,
+        rpcUrl,
+      };
+    });
+  return {
+    enabled,
+    rpcTimeoutMs: parsePositiveInteger(
+      env.INDEXER_RPC_TIMEOUT_MS,
+      10_000,
+      "INDEXER_RPC_TIMEOUT_MS",
+    ),
+    networks,
+    bounds: {
+      maxBlockRange: parsePositiveInteger(
+        env.INDEXER_MAX_BLOCK_RANGE,
+        100,
+        "INDEXER_MAX_BLOCK_RANGE",
+      ),
+      maxLogRange: parsePositiveInteger(
+        env.INDEXER_MAX_LOG_RANGE,
+        100,
+        "INDEXER_MAX_LOG_RANGE",
+      ),
+      maxLogsPerRequest: parsePositiveInteger(
+        env.INDEXER_MAX_LOGS_PER_REQUEST,
+        1_000,
+        "INDEXER_MAX_LOGS_PER_REQUEST",
+      ),
+      maxTransactionsPerBlock: parsePositiveInteger(
+        env.INDEXER_MAX_TRANSACTIONS_PER_BLOCK,
+        100,
+        "INDEXER_MAX_TRANSACTIONS_PER_BLOCK",
+      ),
+      maxCalldataBytes: parsePositiveInteger(
+        env.INDEXER_MAX_CALLDATA_BYTES,
+        131_072,
+        "INDEXER_MAX_CALLDATA_BYTES",
+      ),
+      maxTopicsPerLog: parsePositiveInteger(
+        env.INDEXER_MAX_TOPICS_PER_LOG,
+        4,
+        "INDEXER_MAX_TOPICS_PER_LOG",
+      ),
+      maxErrorLength: parsePositiveInteger(
+        env.INDEXER_MAX_ERROR_LENGTH,
+        512,
+        "INDEXER_MAX_ERROR_LENGTH",
+      ),
+    },
+  };
+}
+
 export function loadConfig(
   environment: NodeJS.ProcessEnv = process.env,
 ): ServerConfig {
@@ -119,6 +237,7 @@ export function loadConfig(
     "RATE_LIMIT_MAX_REQUESTS",
   );
 
+  const sepoliaRpcConfigured = Boolean(environment.SEPOLIA_RPC_URL?.trim());
   return Object.freeze({
     environment: currentEnvironment,
     port,
@@ -129,7 +248,12 @@ export function loadConfig(
       currentEnvironment,
     ),
     databaseUrl,
-    sepoliaRpcConfigured: Boolean(environment.SEPOLIA_RPC_URL?.trim()),
+    sepoliaRpcConfigured,
+    indexer: createIndexerConfig(
+      currentEnvironment,
+      environment,
+      sepoliaRpcConfigured,
+    ),
     requestBodyLimit: environment.REQUEST_BODY_LIMIT ?? "64kb",
     rateLimitWindowMs,
     rateLimitMaxRequests,

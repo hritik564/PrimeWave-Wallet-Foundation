@@ -22,3 +22,16 @@ working directory even when the config supplies an absolute-looking path.
 
 **How to apply:** Keep the schema path absolute if needed, but use
 `out: "./migrations"` for the existing `lib/db` package.
+
+Read-only backend status endpoints should degrade to bounded persistence-error
+status when a newly generated development migration has not been applied; they
+must not leak raw database errors or turn health-adjacent status checks into
+500s.
+
+**Why:** The managed development database can lag behind reviewed schema
+migrations, while configuration/status endpoints still need to remain safe and
+observable before an explicit migration step.
+
+**How to apply:** Catch repository-read failures at the status boundary,
+normalize them to a generic bounded persistence error, and keep disabled
+networks free of unrelated persistence errors.

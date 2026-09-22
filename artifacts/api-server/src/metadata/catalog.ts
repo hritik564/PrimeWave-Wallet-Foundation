@@ -14,7 +14,7 @@ const explorer = (
 });
 
 export function createPublicNetworkCatalog(
-  config: ServerConfig,
+  config: Pick<ServerConfig, "sepoliaRpcConfigured">,
 ): readonly PublicNetworkMetadata[] {
   return [
     {

@@ -1448,7 +1448,7 @@ WaveX API
   └─ future public-data services
        ↓
 PostgreSQL/Drizzle foundation
-  └─ no Phase 8.1 application tables
+  └─ public metadata and read-only observation tables only
 ```
 
 Backend authentication, when added later, will identify a user or application.
@@ -1519,3 +1519,63 @@ the mobile wallet dependent on the backend: network reads use the safe public
 catalog and token reads return explicit `unavailable` records. No unrestricted
 pagination, arbitrary SQL, dynamic SQL, or client-controlled remote fetch path
 was added.
+
+## Phase 8.3 read-only indexing boundary
+
+Phase 8.3 adds public-chain observation only. The indexer has no signing,
+broadcasting, custody, wallet control, DApp signing, approval execution, swap
+execution, seed phrase access, private-key access, or transaction mutation
+capability.
+
+### RPC boundary
+
+The server-side RPC client has an explicit allowlist containing only the read
+methods required by the observer: chain ID, block number, block reads, log
+reads, transaction receipt reads, and other bounded read methods reserved for
+future observation. It has no `eth_sendRawTransaction` method and is not
+exposed as an arbitrary RPC proxy.
+
+RPC endpoints are resolved from server environment configuration. They are
+validated for HTTPS outside local development, reject credentials, query
+strings, and fragments, and never enter API responses or database rows. Before
+any configured network is indexed, the remote chain ID must equal the
+configured chain ID. Mismatches fail explicitly.
+
+### Bounded observation and normalization
+
+Manual indexing requires a bounded block range. Provider responses are bounded
+by block range, log count, transaction count per block, calldata/data size,
+topic count, and persisted error length. There is no unbounded historical scan
+and no infinite worker loop.
+
+Blocks, transactions, logs, hashes, addresses, quantities, topics, and
+calldata are normalized and validated before persistence. Integer amounts remain
+exact; JavaScript floating point and fiat inference are prohibited.
+
+Recognized ERC-20 Transfer logs are normalized as public evidence using the
+existing `networkId + canonical contractAddress` identity. Transfer events do
+not imply token legitimacy, trust, verification, or metadata availability.
+
+### Reorg and idempotency boundary
+
+Block number, block hash, parent hash, and timestamp are retained. The observer
+checks parent continuity within the requested range, against stored parent
+evidence, and against the remote previous block. A mismatch records bounded
+`reorg_detected` state and leaves the successful cursor unchanged. Deep reorg
+reconciliation is explicitly deferred.
+
+Database uniqueness covers network plus block number, network plus transaction
+hash, and network plus transaction hash plus log index. Conflict-safe inserts
+make retries idempotent; the cursor is advanced only in the same persistence
+transaction as the successfully normalized range.
+
+### Public API and mobile boundary
+
+The only public indexer endpoint is sanitized read-only status. It reveals
+network identity, configured/disabled state, cursor progress, status, and
+bounded error codes/messages. It does not expose provider URLs, credentials,
+raw RPC responses, database details, or a start-indexing command.
+
+The mobile wallet does not consume indexed data in Phase 8.3. Activity
+synchronization, mobile Activity UI changes, notifications, pricing, analytics,
+and future transaction reconciliation remain separate phases.

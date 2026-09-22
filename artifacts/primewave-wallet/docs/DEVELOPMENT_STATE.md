@@ -2,8 +2,8 @@
 
 ## Current phase
 
-**Phase 8.2 — WaveX public metadata services (implemented; pending security
-review)**
+**Phase 8.3 — WaveX blockchain indexing foundation (implemented; pending
+security review)**
 
 The native wallet/security path remains the production-controlled path. A
 separate development-only Replit web preview test mode is also available for
@@ -664,4 +664,33 @@ increment.
 - Deferred account metadata writes, arbitrary URL fetching, image proxying,
   indexing, prices, notifications, analytics, transaction synchronization,
   swaps, DApp backend services, custody, signing, broadcasting, deployment,
-  and Phase 8.3.
+  and mobile integration of metadata.
+
+## Phase 8.3 completion
+
+- Added a backend-only read-only indexing module separated into RPC access,
+  bounded observation, normalization, validation, decoding, and persistence.
+- Added environment-driven multi-network indexer configuration with chain ID
+  verification and no RPC URL/credential exposure through the API or database.
+- Added deterministic bounded block-range execution with resume-from-cursor
+  support and no automatic historical scan or infinite worker.
+- Added block parent/hash continuity checks and explicit `reorg_detected`
+  handling that does not advance the successful cursor.
+- Added strict normalization for EVM addresses, hashes, quantities, topics,
+  calldata, blocks, transactions, logs, and exact BigInt token amounts.
+- Added provider-neutral generic log and ERC-20 Transfer observation models.
+  Transfer observations remain evidence and do not imply trust or verification.
+- Added `indexer_state`, `indexed_blocks`, `indexed_transactions`,
+  `indexed_logs`, and `indexed_token_transfers` with composite uniqueness and
+  conflict-safe retry behavior.
+- Added sanitized read-only `GET /api/v1/indexing/status`; no public
+  start-indexing or arbitrary RPC endpoint exists.
+- Added focused deterministic tests for chain mismatch, bounded ranges,
+  parent discontinuity, reorg state, exact Transfer amounts, normalization,
+  persistence cursor behavior, and read-only RPC method boundaries.
+- No mobile Activity architecture, local ActivityRepository, signing,
+  broadcasting, DApp, swap, notification, price, analytics, or custody
+  behavior was changed.
+- Deferred complete transaction synchronization, mobile Activity integration,
+  deep reorg reconciliation, production worker deployment, production
+  deployment, and Phase 8.4.
