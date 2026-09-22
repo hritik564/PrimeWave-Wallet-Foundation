@@ -1,0 +1,783 @@
+PHASE 8.7 — WAVEX PRIVACY-SAFE ANALYTICS INFRASTRUCTURE
+
+Build ONLY Phase 8.7.
+
+Do not begin Phase 9 or any later phase automatically.
+
+After Phase 8.7 is complete, STOP.
+
+The existing WaveX architecture is authoritative:
+
+- Phase 8.1 Backend Foundation & Security Boundary
+- Phase 8.2 Public Metadata
+- Phase 8.3 Read-only Blockchain Indexing
+- Phase 8.4 Transaction Synchronization & Reconciliation
+- Phase 8.5 Market & Price Data Infrastructure
+- Phase 8.6 Notification Infrastructure
+- Existing mobile wallet security architecture
+- Existing Activity, Swap, DApp, authentication, signing, and broadcasting architecture
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Build a minimal, privacy-safe analytics and telemetry infrastructure.
+
+The purpose is to understand:
+
+- product feature usage
+- application reliability
+- performance
+- backend reliability
+- crashes/errors
+- aggregate product behavior
+
+The purpose is NOT to identify, profile, monitor, or track individual users or wallets.
+
+Core principle:
+
+MEASURE THE PRODUCT, NOT THE PERSON.
+
+==================================================
+2. PRIVACY-FIRST DESIGN
+==================================================
+
+Analytics must collect the minimum information necessary.
+
+Do NOT collect or persist:
+
+- seed phrases
+- mnemonics
+- private keys
+- wallet PINs
+- PIN hashes
+- SecureStore contents
+- vault keys
+- encryption keys
+- signing capabilities
+- raw signed transactions
+- raw transaction calldata unless explicitly required for an operational error and safely redacted
+- push tokens
+- authentication credentials
+- API keys
+- database credentials
+
+Avoid collecting:
+
+- full wallet addresses
+- full transaction hashes
+- unnecessary device identifiers
+- unnecessary IP addresses
+- precise location
+- contact information
+- personal profile data
+- arbitrary user-generated text
+
+==================================================
+3. NO WALLET PROFILING
+==================================================
+
+Analytics must NOT create profiles based on:
+
+- wallet address
+- transaction history
+- token holdings
+- portfolio value
+- trading behavior
+- swap volume
+- DApp usage associated with a wallet
+- blockchain activity
+
+Do not correlate analytics events with indexed blockchain activity.
+
+Do not join analytics data with:
+
+- account_sync_state
+- indexed_transactions
+- indexed_token_transfers
+- reconciliation_records
+- notification device registrations
+
+Analytics must remain a separate privacy boundary.
+
+==================================================
+4. ANALYTICS IDENTITY
+==================================================
+
+Do NOT use public wallet addresses as analytics identifiers.
+
+Do NOT use blockchain transaction hashes as analytics identifiers.
+
+If an anonymous analytics identifier is required:
+
+- generate it client-side or through a privacy-preserving mechanism
+- make it random/non-semantic
+- do not derive it from wallet addresses
+- do not derive it from device hardware identifiers
+- do not encode personal information
+- document its lifecycle and reset behavior
+
+Do not create cross-wallet identity graphs.
+
+Prefer session-scoped or installation-scoped identifiers where possible.
+
+==================================================
+5. EVENT MODEL
+==================================================
+
+Create a provider-neutral analytics event model.
+
+Conceptually:
+
+- eventId
+- eventName
+- eventVersion
+- anonymous installation/session identifier where necessary
+- timestamp
+- app version
+- platform
+- environment
+- bounded event properties
+
+Event properties must be explicitly allowlisted.
+
+Do NOT accept arbitrary JSON properties from clients.
+
+==================================================
+6. EVENT ALLOWLIST
+==================================================
+
+Create a centralized event schema/allowlist.
+
+Examples of acceptable product events:
+
+- app_opened
+- onboarding_started
+- onboarding_completed
+- wallet_created_completed
+- wallet_import_completed
+- screen_viewed
+- asset_search_used
+- receive_screen_opened
+- send_review_opened
+- transaction_reviewed
+- transaction_broadcast_started
+- transaction_completed
+- swap_review_opened
+- swap_completed
+- dapp_connection_started
+- dapp_connection_completed
+- settings_opened
+
+These are examples only.
+
+Only implement events that can be collected without sensitive data.
+
+Do NOT automatically instrument every action.
+
+==================================================
+7. TRANSACTION ANALYTICS
+==================================================
+
+If transaction-related product events are tracked, they must contain only minimal operational/product information.
+
+Acceptable examples may include:
+
+- transaction flow started
+- transaction flow completed
+- transaction flow failed
+- transaction type category
+- network category
+- success/failure category
+- duration bucket
+
+Do NOT collect:
+
+- wallet address
+- transaction hash
+- raw calldata
+- recipient address
+- sender address
+- exact wallet balance
+- exact portfolio value
+- exact transaction amount unless explicitly justified and privacy-safe
+
+Prefer categorical/bucketed values where useful.
+
+==================================================
+8. SWAP ANALYTICS
+==================================================
+
+If swap product events are tracked, collect only minimal product information.
+
+Possible categories:
+
+- quote requested
+- quote received
+- review opened
+- execution started
+- execution completed
+- execution failed
+
+Possible safe properties:
+
+- network category
+- provider category
+- failure category
+- duration bucket
+
+Do NOT collect:
+
+- wallet address
+- transaction hash
+- exact trade amount
+- exact portfolio value
+- raw calldata
+- signed transaction
+- provider API key
+
+Do not infer trading behavior profiles.
+
+==================================================
+9. DAPP ANALYTICS
+==================================================
+
+If DApp product events are tracked, keep them coarse.
+
+Possible events:
+
+- connection_started
+- connection_approved
+- connection_rejected
+- session_disconnected
+- signing_review_opened
+- signing_completed
+- transaction_review_opened
+- transaction_completed
+
+Do NOT collect:
+
+- DApp account addresses
+- raw typed-data payloads
+- signed messages
+- private signatures
+- raw transaction calldata
+- complete DApp URLs unless explicitly justified
+
+Prefer coarse DApp categories where needed.
+
+Do not create a record of a user's complete DApp activity.
+
+==================================================
+10. ERROR TELEMETRY
+==================================================
+
+Create a safe error telemetry boundary.
+
+Error events may include:
+
+- error category
+- stable error code
+- application area
+- operation category
+- platform
+- app version
+- environment
+- duration bucket if useful
+
+Do NOT send:
+
+- raw exception objects
+- raw stack traces
+- request bodies
+- authorization headers
+- database URLs
+- API keys
+- wallet secrets
+- raw blockchain payloads
+
+Create centralized redaction before telemetry leaves the application.
+
+==================================================
+11. PERFORMANCE TELEMETRY
+==================================================
+
+Allow bounded performance measurements such as:
+
+- startup duration bucket
+- screen-load duration bucket
+- RPC latency bucket
+- backend request latency bucket
+- quote latency bucket
+- indexing synchronization duration bucket
+
+Prefer buckets over exact timestamps where exact precision isn't necessary.
+
+Do not collect detailed behavioral timelines.
+
+==================================================
+12. ANALYTICS PROVIDER ABSTRACTION
+==================================================
+
+Create a provider-neutral analytics interface.
+
+Conceptually:
+
+AnalyticsProvider
+
+- identify anonymous installation/session if applicable
+- track event
+- track safe error
+- track performance
+- flush if applicable
+
+Keep provider-specific SDKs isolated.
+
+Do NOT install a commercial analytics SDK simply to demonstrate the interface.
+
+If no provider is approved:
+
+- use deterministic in-memory/mock provider for tests
+- explicitly represent analytics as unconfigured in runtime
+
+Do not fabricate analytics delivery.
+
+==================================================
+13. SERVER-SIDE ANALYTICS
+==================================================
+
+If backend telemetry is collected, it must follow the same privacy boundary.
+
+Do not automatically log every API request as an analytics event.
+
+Do not convert request logs into user profiles.
+
+Safe operational telemetry may include:
+
+- endpoint category
+- HTTP status category
+- latency bucket
+- service/component
+- error category
+- environment
+
+Avoid storing:
+
+- full IP addresses
+- authorization headers
+- request bodies
+- wallet addresses
+- transaction hashes
+
+==================================================
+14. LOGGING SEPARATION
+==================================================
+
+Analytics and operational logs are different systems.
+
+Do not use analytics as a replacement for security logging.
+
+Do not use security logs as product analytics.
+
+Maintain separate boundaries.
+
+Security events should remain subject to their own access and retention policies.
+
+==================================================
+15. API DESIGN
+==================================================
+
+If server-side event ingestion is implemented, create a bounded endpoint under:
+
+/api/v1/analytics/...
+
+The endpoint must:
+
+- validate event names
+- validate event version
+- validate event properties against allowlists
+- bound event count
+- bound payload size
+- reject unknown properties
+- rate limit requests
+- sanitize errors
+- reject secret-shaped fields
+
+Do NOT create:
+
+POST /analytics/anything
+
+or an arbitrary event/property ingestion API.
+
+==================================================
+16. BATCHING
+==================================================
+
+If batching is supported:
+
+- bound event count
+- bound total payload size
+- validate every event
+- reject or safely isolate invalid events
+- prevent unbounded queues
+- prevent infinite retries
+
+Do not allow clients to upload arbitrary historical event archives.
+
+==================================================
+17. RETENTION
+==================================================
+
+Define bounded retention for analytics data.
+
+Do not create an indefinite analytics archive by default.
+
+Document:
+
+- event retention
+- error telemetry retention
+- performance telemetry retention
+- deletion/cleanup behavior
+
+If exact retention duration is not yet a product decision, create configuration rather than inventing a permanent policy.
+
+==================================================
+18. USER CONTROL
+==================================================
+
+Design analytics so that a future user-facing analytics/privacy preference can disable optional product telemetry.
+
+Do not make core wallet functionality depend on analytics availability.
+
+If analytics is disabled or unavailable:
+
+- wallet creation still works
+- recovery still works
+- authentication still works
+- signing still works
+- broadcasting still works
+- swaps still work
+- DApps still work
+
+Analytics must be strictly non-essential.
+
+==================================================
+19. FAILURE ISOLATION
+==================================================
+
+Analytics failures must NEVER break wallet functionality.
+
+Provider timeout:
+
+→ ignore/fail safely
+
+Analytics server unavailable:
+
+→ wallet continues
+
+Malformed analytics event:
+
+→ reject/drop safely
+
+Analytics configuration missing:
+
+→ explicit unconfigured state
+
+Do not block:
+
+- wallet unlock
+- transaction confirmation
+- signing
+- broadcast
+- swap execution
+- DApp signing
+
+on analytics delivery.
+
+==================================================
+20. DATABASE
+==================================================
+
+If persistence is introduced, use existing PostgreSQL/Drizzle infrastructure.
+
+Keep analytics schema separate from:
+
+- wallet/account data
+- blockchain index
+- synchronization
+- notifications
+- token metadata
+- price data
+
+Do not create foreign-key relationships to wallet addresses or transaction tables merely for convenience.
+
+Possible conceptual tables:
+
+- analytics_events
+- analytics_event_batches
+
+Only create what is actually necessary.
+
+==================================================
+21. DATABASE PRIVACY
+==================================================
+
+Analytics database records must not contain:
+
+- private keys
+- seed phrases
+- PINs
+- push tokens
+- wallet addresses
+- transaction hashes
+- raw calldata
+- raw signatures
+- provider API keys
+- authorization credentials
+
+Do not create columns named for secret material.
+
+Do not store arbitrary JSON blobs without schema validation.
+
+==================================================
+22. API RESPONSE PRIVACY
+==================================================
+
+Analytics ingestion endpoints should return minimal responses.
+
+Do not return:
+
+- stored event payloads
+- analytics identifiers unnecessarily
+- internal database IDs
+- provider details
+- internal telemetry data
+
+Use a simple accepted/rejected result.
+
+==================================================
+23. TESTING
+==================================================
+
+Add focused tests for:
+
+- event allowlist
+- unknown event rejection
+- unknown property rejection
+- payload size limits
+- batch size limits
+- secret-shaped field rejection
+- wallet-address rejection where appropriate
+- transaction-hash rejection where appropriate
+- raw calldata rejection
+- push-token rejection
+- provider API key rejection
+- error redaction
+- analytics provider failure isolation
+- anonymous ID format
+- anonymous ID non-derivation from wallet address
+- rate limiting
+- bounded retention/cleanup
+- server-side telemetry privacy
+- account isolation / absence of account correlation
+
+Use deterministic mock analytics providers.
+
+==================================================
+24. SECURITY SOURCE AUDIT
+==================================================
+
+Before completion, search the analytics implementation for:
+
+- privateKey
+- mnemonic
+- seed
+- seedPhrase
+- walletPin
+- PIN
+- SecureStore
+- SecureVault
+- signingKey
+- signature
+- rawTransaction
+- calldata
+- walletAddress
+- transactionHash
+- pushToken
+- authorization
+- cookie
+- IP
+
+Review each occurrence.
+
+Some terms may appear in defensive validation code or tests.
+
+The final implementation must not transmit or persist prohibited data.
+
+==================================================
+25. DEPENDENCY DISCIPLINE
+==================================================
+
+Do not add a third-party analytics provider SDK unless explicitly approved.
+
+Prefer:
+
+- existing project infrastructure
+- provider-neutral interfaces
+- deterministic mocks
+- minimal dependencies
+
+Do not introduce a large analytics stack.
+
+==================================================
+26. LIVE SMOKE TEST
+==================================================
+
+A production analytics provider is NOT required for this phase.
+
+If no provider is configured:
+
+- test the mock provider
+- test unconfigured runtime behavior
+- test failure isolation
+
+Do NOT fabricate a live analytics delivery.
+
+==================================================
+27. DATABASE MIGRATION
+==================================================
+
+If analytics persistence is introduced:
+
+- generate Drizzle migrations
+- validate migration consistency
+- verify constraints
+- test clean development migration where possible
+- do not apply destructive production migrations
+
+If persistence is unnecessary for this phase, do not create speculative tables.
+
+==================================================
+28. MOBILE INTEGRATION
+==================================================
+
+Do NOT heavily instrument the existing mobile app.
+
+Do NOT modify:
+
+- wallet creation
+- recovery
+- PIN
+- biometrics
+- SecureStore
+- signing
+- broadcasting
+- swap execution
+- DApp signing
+
+If a minimal provider-neutral client telemetry boundary is necessary, keep it isolated and fail-safe.
+
+Analytics must never become a dependency of wallet security operations.
+
+==================================================
+29. DOCUMENTATION
+==================================================
+
+Update:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- backend README
+- analytics README if created
+
+Document:
+
+- privacy principles
+- event allowlist
+- anonymous identity
+- prohibited data
+- retention
+- provider abstraction
+- failure isolation
+- user-control boundary
+- separation from security logs
+- separation from blockchain/account data
+
+==================================================
+30. STRICTLY DO NOT IMPLEMENT
+==================================================
+
+Do NOT implement:
+
+- Google Analytics
+- Firebase Analytics
+- Mixpanel
+- Amplitude
+- PostHog
+- Segment
+- advertising trackers
+- behavioral profiling
+- wallet tracking
+- portfolio profiling
+- blockchain activity profiling
+- precise location tracking
+- contact syncing
+- fingerprinting
+- cross-device identity graphs
+- marketing campaigns
+- price alerts
+- notification campaigns
+- server-side signing
+- transaction broadcasting
+- custody
+- private-key storage
+- seed-phrase storage
+- cloud wallet recovery
+- production analytics deployment
+
+==================================================
+31. VALIDATION
+==================================================
+
+Before reporting completion:
+
+1. Run Phase 8.7 focused tests.
+2. Run complete existing test suite.
+3. Run TypeScript validation.
+4. Run backend build.
+5. Run Expo validation/static build.
+6. Run Drizzle migration consistency checks if schema changed.
+7. Run git diff --check.
+8. Inspect dependencies.
+9. Perform the privacy/security source audit.
+10. Verify analytics failure cannot block wallet operations.
+11. Verify prohibited data cannot enter analytics.
+12. Verify no Phase 9 work was started.
+
+Final report must include:
+
+- files created/changed
+- analytics architecture
+- event allowlist
+- anonymous identity model
+- error telemetry
+- performance telemetry
+- retention model
+- API endpoints
+- database schema if any
+- provider abstraction
+- privacy/security audit
+- tests
+- TypeScript/build results
+- migration status
+- warnings
+- deferred work
+
+If everything passes, finish exactly with:
+
+PHASE 8.7 DEVELOPMENT COMPLETE — PENDING SECURITY REVIEW
+
+STOP.
+
+Do not begin Phase 9.
