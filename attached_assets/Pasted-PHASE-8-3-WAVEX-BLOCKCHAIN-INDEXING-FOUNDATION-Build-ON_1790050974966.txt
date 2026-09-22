@@ -1,0 +1,717 @@
+PHASE 8.3 — WAVEX BLOCKCHAIN INDEXING FOUNDATION
+
+Build ONLY Phase 8.3.
+
+Do not begin Phase 8.4 or any later Phase 8 work automatically.
+
+The existing WaveX wallet is strictly non-custodial.
+Phase 8.1 backend security and Phase 8.2 metadata architecture are authoritative.
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Establish a backend blockchain observation/indexing foundation for public EVM blockchain data.
+
+The purpose of this phase is to create the infrastructure that can later support:
+
+- transaction history synchronization
+- ERC-20 transfer activity
+- wallet activity feeds
+- block/event observation
+- reconciliation
+
+This phase is READ-ONLY.
+
+The indexer observes public blockchain state.
+
+It must NEVER:
+
+- sign transactions
+- broadcast transactions
+- hold private keys
+- hold seed phrases
+- execute transfers
+- execute approvals
+- execute swaps
+- control wallets
+- perform DApp signing
+- perform wallet custody
+
+==================================================
+2. IMPORTANT SCOPE BOUNDARY
+==================================================
+
+Do NOT build the complete transaction synchronization system yet.
+
+Do NOT modify the existing mobile Activity architecture.
+
+Do NOT replace the existing local ActivityRepository.
+
+Do NOT create push notifications.
+
+Do NOT create price feeds.
+
+Do NOT create analytics.
+
+Do NOT create swap backend services.
+
+Do NOT create DApp backend services.
+
+Do NOT create a generalized third-party indexing platform integration unless explicitly required.
+
+This sprint establishes the OBSERVATION + NORMALIZATION + PERSISTENCE FOUNDATION.
+
+==================================================
+3. INSPECT EXISTING ARCHITECTURE
+==================================================
+
+Before making changes, inspect:
+
+- Phase 8.1 backend foundation
+- Phase 8.2 metadata models
+- existing PostgreSQL/Drizzle schema
+- existing EVM NetworkRegistry
+- existing RPC provider abstractions
+- existing Activity models
+- existing transaction models
+- existing token identity rules
+
+Reuse existing abstractions where appropriate.
+
+Do not create competing network or token identity systems.
+
+==================================================
+4. INDEXER ARCHITECTURE
+==================================================
+
+Create a clearly separated backend indexing module.
+
+Use boundaries equivalent to:
+
+Blockchain RPC
+      ↓
+Block/Event Observer
+      ↓
+Normalization
+      ↓
+Validation
+      ↓
+Persistence
+      ↓
+Future Activity Sync
+
+Separate:
+
+- RPC access
+- chain observation
+- event decoding
+- normalization
+- persistence
+- indexing state
+
+The indexer must not contain wallet signing logic.
+
+==================================================
+5. NETWORK ABSTRACTION
+==================================================
+
+Use the existing network identity model.
+
+Do not hardcode Ethereum-only architecture.
+
+The indexing system should support multiple EVM networks through configuration.
+
+At minimum, the architecture must distinguish:
+
+- networkId
+- chainId
+- environment
+- RPC configuration
+- enabled/disabled indexing status
+
+Do not expose RPC credentials through API responses.
+
+Do not store RPC credentials in database records.
+
+Do not hardcode private RPC URLs.
+
+Use environment/configuration for RPC endpoints.
+
+==================================================
+6. RPC OBSERVATION CLIENT
+==================================================
+
+Create a server-side read-only EVM RPC abstraction.
+
+It should support only methods required for indexing, such as:
+
+- eth_chainId
+- eth_blockNumber
+- eth_getBlockByNumber
+- eth_getBlockByHash
+- eth_getLogs
+- eth_getTransactionByHash
+- eth_getTransactionReceipt
+- eth_getCode where genuinely required
+
+Do NOT add:
+
+- eth_sendRawTransaction
+- transaction signing
+- wallet private-key access
+
+If an existing safe EVM RPC abstraction can be reused, prefer reuse.
+
+The indexing RPC client must fail safely.
+
+==================================================
+7. CHAIN ID VERIFICATION
+==================================================
+
+Before indexing a configured network:
+
+1. Query the remote chain ID.
+2. Compare it with configured chainId.
+3. Reject the endpoint if it does not match.
+4. Never silently index the wrong chain.
+
+Persisting data must always retain the network identity.
+
+A chain mismatch must be an explicit error.
+
+==================================================
+8. INDEXING STATE
+==================================================
+
+Create persistent indexing state.
+
+The state should allow the backend to know:
+
+- networkId
+- chainId
+- last successfully indexed block
+- latest observed block
+- indexing status
+- last successful run
+- last error metadata
+- updatedAt
+
+Do not persist raw RPC responses unnecessarily.
+
+Do not store provider credentials.
+
+Use bounded sanitized error information.
+
+The indexing cursor must be deterministic.
+
+==================================================
+9. BLOCK INDEXING
+==================================================
+
+Implement bounded block observation.
+
+The indexer should be capable of:
+
+- obtaining the latest block
+- determining the next block to process
+- processing a bounded block range
+- persisting successful progress
+- resuming from the last successful block
+
+Do NOT scan an unlimited historical range automatically.
+
+Require explicit bounded ranges.
+
+For example, configuration/request values should enforce a maximum block range.
+
+Do not allow a client request to cause an unbounded historical scan.
+
+==================================================
+10. REORGANIZATION / REORG AWARENESS
+==================================================
+
+The architecture must account for EVM chain reorganizations.
+
+Where practical, persist block identity:
+
+- block number
+- block hash
+- parent hash
+- timestamp where available
+
+Before advancing the indexing cursor, validate the expected parent relationship.
+
+If a chain inconsistency/reorg is detected:
+
+- stop or enter a safe reconciliation state
+- do not silently continue
+- preserve enough information for later reconciliation
+
+Do not implement a complex deep-reorg algorithm in this phase unless already supported cleanly.
+
+Document the limitation.
+
+==================================================
+11. EVENT INDEXING
+==================================================
+
+Create a generic normalized blockchain event model.
+
+At minimum support observation of logs with:
+
+- networkId
+- chainId
+- blockNumber
+- blockHash
+- transactionHash
+- transactionIndex where available
+- logIndex
+- contractAddress
+- topics
+- data
+- timestamp where available
+- observation/indexing metadata
+
+Use the blockchain transaction hash + log index + network identity as a deterministic event identity where appropriate.
+
+Do not use token name/symbol as identity.
+
+==================================================
+12. ERC-20 TRANSFER EVENTS
+==================================================
+
+Recognize the standard ERC-20 Transfer event:
+
+Transfer(address,address,uint256)
+
+Normalize recognized events into a provider-neutral public transfer representation.
+
+Include:
+
+- networkId
+- chainId
+- token contract address
+- from
+- to
+- raw amount
+- block number
+- block hash
+- transaction hash
+- log index
+- timestamp where available
+
+Use exact integer representation.
+
+Never convert token amounts through floating point.
+
+Do not infer fiat value.
+
+Do not infer token trust.
+
+Do not infer that a contract is legitimate merely because it emits a Transfer event.
+
+==================================================
+13. NATIVE TRANSACTIONS
+==================================================
+
+Do NOT attempt to infer native ETH/native-asset transfers solely from arbitrary transaction fields in this sprint unless the architecture can do so deterministically.
+
+It is acceptable to establish transaction-observation models now.
+
+Clearly distinguish:
+
+- observed transaction
+- observed ERC-20 transfer
+- future derived activity
+
+Do not create false activity records.
+
+==================================================
+14. TRANSACTION OBSERVATION MODEL
+==================================================
+
+Create a normalized public blockchain transaction observation model.
+
+Possible fields:
+
+- networkId
+- chainId
+- transactionHash
+- blockNumber
+- blockHash
+- transactionIndex
+- from
+- to
+- value
+- gas
+- gasPrice / fee fields where available
+- nonce
+- input/calldata reference or bounded representation
+- transaction type
+- timestamp
+- status where receipt information is available
+- observation timestamp
+
+Keep exact numeric values.
+
+Do not interpret arbitrary calldata as a specific application action unless explicitly decoded by a trusted deterministic decoder.
+
+==================================================
+15. DATABASE SCHEMA
+==================================================
+
+Use PostgreSQL/Drizzle.
+
+Create only indexing foundation tables, such as:
+
+- indexer_state
+- indexed_blocks
+- indexed_transactions
+- indexed_logs
+- indexed_token_transfers
+
+Exact table names may follow the existing project conventions.
+
+Required uniqueness/isolation:
+
+- network identity
+- chain identity
+- transaction hash
+- log index
+- token transfer identity
+
+Use appropriate composite unique constraints.
+
+Do not store:
+
+- private keys
+- seed phrases
+- PINs
+- signing secrets
+- RPC credentials
+
+==================================================
+16. IDEMPOTENCY
+==================================================
+
+Indexing must be safe to retry.
+
+Repeated processing of the same block/event must not create duplicate records.
+
+Use deterministic identities and database constraints.
+
+If a block or event has already been indexed:
+
+- do not duplicate it
+- safely reconcile/upsert where appropriate
+
+Do not rely only on application-level duplicate checks.
+
+Use database constraints as a second line of defense.
+
+==================================================
+17. NORMALIZATION
+==================================================
+
+Create strict normalization helpers for:
+
+- EVM addresses
+- chain IDs
+- block numbers
+- transaction hashes
+- log indexes
+- BigInt numeric values
+- topics
+- calldata/data bounds
+
+Never use JavaScript floating point for blockchain integer amounts.
+
+Malformed blockchain responses must be rejected or recorded as bounded indexing errors.
+
+Do not persist arbitrary malformed provider data indefinitely.
+
+==================================================
+18. RPC RESPONSE LIMITS
+==================================================
+
+Protect the backend against unexpectedly large provider responses.
+
+Bound:
+
+- block ranges
+- log ranges
+- logs per request
+- transactions processed per batch
+- calldata/data length
+- topic counts
+- error message length
+
+Do not allow a public HTTP request to directly proxy arbitrary RPC methods.
+
+The indexing RPC client is an internal backend component.
+
+==================================================
+19. INDEXER EXECUTION MODEL
+==================================================
+
+Create a reusable indexer service boundary.
+
+It should support operations conceptually equivalent to:
+
+- getStatus()
+- indexNextRange()
+- indexRange(startBlock, endBlock)
+- resume()
+- stop safely
+- reconcile bounded state
+
+Do not require a continuously running production worker yet.
+
+A bounded/manual execution model is acceptable for this phase.
+
+Do not create an infinite background loop solely to demonstrate functionality.
+
+==================================================
+20. ERROR HANDLING
+==================================================
+
+Indexer failures must be:
+
+- typed
+- sanitized
+- bounded
+- associated with network/indexing context
+- safe to persist
+
+Do not persist:
+
+- API keys
+- RPC URLs containing credentials
+- authorization headers
+- raw request bodies
+- secrets
+
+The indexer should distinguish:
+
+- RPC failure
+- chain mismatch
+- malformed block
+- malformed log
+- persistence failure
+- reorg/inconsistency
+- validation failure
+
+==================================================
+21. API EXPOSURE
+==================================================
+
+Do NOT expose a public endpoint that allows arbitrary blockchain indexing commands.
+
+If an administrative status endpoint is needed, keep it read-only and sanitized.
+
+Do not expose:
+
+- RPC credentials
+- internal provider URLs
+- raw internal errors
+- database details
+
+Do not create public "start indexing" endpoints.
+
+==================================================
+22. SECURITY
+==================================================
+
+Perform a source audit for:
+
+- server-side signing
+- private keys
+- seed phrases
+- wallet custody
+- eth_sendRawTransaction
+- arbitrary RPC proxying
+- SSRF
+- unbounded block ranges
+- unbounded log queries
+- unbounded database queries
+- SQL injection
+- log leakage
+- credential leakage
+
+The indexer must remain strictly read-only.
+
+==================================================
+23. PHASE 8.2 INTEGRATION
+==================================================
+
+ERC-20 transfer records may reference public token metadata through the existing metadata architecture.
+
+Do not duplicate token metadata unnecessarily.
+
+Token identity must remain:
+
+networkId + canonical contract address.
+
+Do not copy token verification/trust conclusions into the indexing layer.
+
+A transfer observation is simply blockchain evidence.
+
+==================================================
+24. MOBILE BOUNDARY
+==================================================
+
+Do NOT integrate the indexer directly into the mobile app yet.
+
+Do not change:
+
+- Activity UI
+- ActivityReadModel
+- local ActivityRepository
+- transaction signing
+- transaction broadcasting
+- DApp signing
+- Swap execution
+
+The future synchronization layer will consume the indexed data later.
+
+==================================================
+25. TESTING
+==================================================
+
+Add focused tests for:
+
+- network/chain identity validation
+- chain mismatch rejection
+- block normalization
+- block cursor advancement
+- bounded block ranges
+- parent/block continuity
+- reorg/inconsistency detection
+- transaction normalization
+- ERC-20 Transfer decoding
+- malformed logs
+- deterministic event identity
+- duplicate event protection
+- duplicate transaction protection
+- BigInt/exact amount handling
+- bounded provider responses
+- RPC error normalization
+- persistence failure handling
+- resume behavior
+- secret-material rejection
+- no arbitrary RPC proxying
+
+Use deterministic mocked RPC fixtures.
+
+Do NOT require live blockchain access for the test suite.
+
+==================================================
+26. LIVE SMOKE TEST
+==================================================
+
+If an existing development RPC is configured, a bounded read-only smoke test may be performed.
+
+Maximum scope:
+
+- verify chain ID
+- read latest block
+- optionally read one bounded block/log range
+
+Do NOT perform transactions.
+
+Do NOT send raw transactions.
+
+Do NOT require production RPC credentials in source control.
+
+If no suitable RPC is configured, report that clearly instead of inventing a successful live test.
+
+==================================================
+27. DOCUMENTATION
+==================================================
+
+Update:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- backend README
+- indexing README if created
+
+Document:
+
+- observer architecture
+- indexing cursor
+- reorg limitations
+- event identity
+- transaction observation
+- ERC-20 transfer normalization
+- retry/idempotency behavior
+- read-only security boundary
+- future transaction synchronization boundary
+
+==================================================
+28. STRICTLY DO NOT IMPLEMENT
+==================================================
+
+Do NOT implement:
+
+- transaction synchronization to mobile
+- Activity feed integration
+- price feeds
+- token pricing
+- notifications
+- analytics
+- swap backend
+- DApp backend
+- server-side signing
+- transaction broadcasting
+- custody
+- private-key storage
+- seed-phrase storage
+- cloud recovery
+- arbitrary RPC proxy
+- unrestricted historical indexing
+- production worker deployment
+- production cloud deployment
+
+==================================================
+29. VALIDATION
+==================================================
+
+Before reporting completion:
+
+1. Run all Phase 8.3 focused tests.
+2. Run the complete existing test suite.
+3. Run TypeScript validation.
+4. Run backend build.
+5. Run Expo validation/static build.
+6. Run database migration consistency checks.
+7. Run git diff --check.
+8. Inspect dependencies.
+9. Perform the source security audit.
+10. Confirm no mobile wallet security boundary was weakened.
+
+Final report must include:
+
+- files created/changed
+- database schema
+- indexing architecture
+- supported observation types
+- RPC methods
+- reorg handling
+- idempotency strategy
+- security audit
+- test results
+- TypeScript/build results
+- live smoke test result if performed
+- warnings
+- deferred work
+
+If all requirements pass, finish exactly with:
+
+PHASE 8.3 DEVELOPMENT COMPLETE — PENDING SECURITY REVIEW
+
+STOP.
+
+Do not begin Phase 8.4.
