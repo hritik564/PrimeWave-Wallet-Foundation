@@ -1,0 +1,510 @@
+PHASE 8.2 — WAVEX PUBLIC METADATA SERVICES
+
+Build ONLY Phase 8.2.
+
+Do not begin Phase 8.3 or any later Phase 8 work automatically.
+
+The existing WaveX wallet is strictly non-custodial.
+The Phase 8.1 backend security boundary is authoritative and must remain intact.
+
+==================================================
+1. OBJECTIVE
+==================================================
+
+Build the backend foundation for PUBLIC metadata.
+
+This phase should support metadata for:
+
+- public wallet/account metadata
+- networks
+- ERC-20 tokens
+- token logos/icons
+- metadata provenance
+- metadata status
+- verification status
+
+This is a metadata service.
+
+It is NOT a wallet service, custody service, signing service, blockchain indexer, price service, or transaction service.
+
+==================================================
+2. REUSE PHASE 8.1
+==================================================
+
+Reuse the existing:
+
+- API versioning
+- configuration system
+- request validation
+- sanitized errors
+- security middleware
+- logging/redaction
+- rate limiting
+- PostgreSQL/Drizzle boundary
+- backend architecture
+- non-custodial security controls
+
+Do not create a competing API/security architecture.
+
+==================================================
+3. TOKEN IDENTITY
+==================================================
+
+The authoritative token identity remains:
+
+(networkId, contractAddress)
+
+Contract addresses must be normalized consistently.
+
+For EVM tokens:
+
+- network identity is mandatory
+- contract address is mandatory
+- checksum normalization may be used for presentation
+- canonical identity comparison must be deterministic
+
+Do NOT identify tokens by:
+
+- name
+- symbol
+- logo
+- decimals
+- popularity
+- balance
+- transaction count
+
+These are metadata attributes, not identity.
+
+==================================================
+4. TOKEN METADATA MODEL
+==================================================
+
+Create a provider-neutral public token metadata model.
+
+Possible fields include:
+
+- networkId
+- contractAddress
+- name
+- symbol
+- decimals
+- logo/icon reference
+- description if available
+- metadataStatus
+- provenance
+- verificationStatus
+- updatedAt
+
+Keep metadata fields bounded.
+
+Do not assume metadata exists.
+
+Represent unavailable/partial/invalid metadata explicitly.
+
+Do not silently invent:
+
+- token names
+- symbols
+- decimals
+- logos
+- verification
+- trust status
+
+==================================================
+5. VERIFICATION ≠ METADATA
+==================================================
+
+Preserve the architecture established in Phase 3.
+
+Explicitly separate:
+
+- metadata
+- metadata provenance
+- verification status
+- discovery status
+- visibility
+- trust
+
+A token having valid ERC-20 metadata does NOT make it verified.
+
+A token having a logo does NOT make it verified.
+
+A token appearing in the database does NOT make it trusted.
+
+Do not introduce a generic "safe token" or "trusted token" classification.
+
+==================================================
+6. NETWORK METADATA
+==================================================
+
+Create a public network metadata representation.
+
+Reuse the existing NetworkRegistry concepts where possible.
+
+Network metadata may include:
+
+- networkId
+- chainId
+- displayName
+- native currency name
+- native currency symbol
+- native decimals
+- explorer metadata
+- environment
+- enabled/configured status where appropriate
+
+Do not expose RPC credentials or secret query parameters.
+
+Do not create public endpoints that return secret-bearing RPC URLs.
+
+PrimeWave remains a configured/placeholder network according to the existing wallet architecture.
+
+Do not invent PrimeWave Mainnet values.
+
+==================================================
+7. WALLET / ACCOUNT PUBLIC METADATA
+==================================================
+
+Define the backend representation for PUBLIC wallet metadata only.
+
+Permitted examples:
+
+- public address
+- account label
+- account index if intentionally shared
+- supported public networks
+- created/updated timestamps
+- public preferences where appropriate
+
+Do NOT create or store:
+
+- mnemonic
+- seed phrase
+- private key
+- PIN
+- PIN hash
+- SecureStore contents
+- vault key
+- encryption key
+- signing capability
+- biometric information
+- wallet recovery material
+
+The backend must not be required for wallet creation, recovery, derivation, authentication, signing, or broadcasting.
+
+==================================================
+8. LOGO / ICON ARCHITECTURE
+==================================================
+
+Create provider-neutral logo metadata.
+
+A logo should have provenance.
+
+For example, the model may distinguish:
+
+- verified provider metadata
+- user-provided metadata
+- registry metadata
+- unavailable
+
+Do not treat the presence of a logo as verification.
+
+Do not download arbitrary remote images during this phase unless an existing trusted provider is already configured.
+
+Do not add a logo API provider merely for demonstration.
+
+Use safe bounded references/URLs where needed.
+
+Do not allow arbitrary server-side fetching based directly on an untrusted client URL.
+
+==================================================
+9. API DESIGN
+==================================================
+
+Create only metadata endpoints needed by this phase.
+
+Use:
+
+/api/v1/...
+
+Potential read-only endpoints:
+
+GET public network metadata
+
+GET token metadata by network + contract
+
+GET metadata for a bounded list of tokens
+
+GET public account metadata only if there is a clear existing use case
+
+Do not create broad "admin" endpoints.
+
+Do not create write endpoints exposed to arbitrary clients unless required by the architecture.
+
+Do not create:
+
+- transfer endpoints
+- approval endpoints
+- signing endpoints
+- broadcasting endpoints
+- swap endpoints
+- DApp execution endpoints
+- transaction indexing endpoints
+- price endpoints
+
+==================================================
+10. DATABASE
+==================================================
+
+If persistence is needed, use the existing PostgreSQL/Drizzle architecture.
+
+Create only the metadata tables required for this phase.
+
+Suggested conceptual separation:
+
+- network metadata
+- token metadata
+- metadata provenance/status
+
+Do not create secret-bearing columns.
+
+Use appropriate uniqueness constraints.
+
+Token identity should be unique by:
+
+networkId + canonical contract address
+
+Do not make token symbol or name unique globally.
+
+Add timestamps where useful.
+
+Do not build a speculative database schema for future indexing/pricing/notifications.
+
+==================================================
+11. PUBLIC READ SAFETY
+==================================================
+
+Metadata endpoints must:
+
+- validate network IDs
+- validate EVM addresses
+- bound requested token counts
+- bound query lengths
+- reject malformed requests
+- return sanitized errors
+- apply rate limiting
+- avoid unrestricted database queries
+- avoid unbounded pagination
+- avoid arbitrary URL fetching
+
+Do not let clients request unlimited token metadata in a single request.
+
+==================================================
+12. CACHE / FRESHNESS
+==================================================
+
+If caching is introduced, make it explicit.
+
+Distinguish:
+
+- cached
+- fresh
+- stale
+- unavailable
+
+Do not silently return stale metadata as if it were fresh.
+
+Do not introduce an unbounded in-memory cache.
+
+Prefer bounded database-backed metadata persistence if persistence is required.
+
+==================================================
+13. MOBILE INTEGRATION BOUNDARY
+==================================================
+
+Do not rewrite the existing mobile asset architecture.
+
+The existing mobile layers remain authoritative for:
+
+- token identity
+- local asset state
+- wallet balances
+- visibility
+- local discovery
+- verification separation
+
+The backend provides supplementary public metadata.
+
+The mobile client must continue to work when metadata backend is unavailable.
+
+Backend failure must result in:
+
+- unavailable metadata
+- stale metadata where explicitly appropriate
+- deterministic local fallback
+
+Never fabricate metadata.
+
+==================================================
+14. SECURITY
+==================================================
+
+Audit all new code for:
+
+- secret-bearing request fields
+- authorization leakage
+- unrestricted URLs
+- SSRF-style arbitrary fetching
+- unbounded requests
+- unbounded database queries
+- SQL injection
+- unsafe dynamic SQL
+- log leakage
+- sensitive error leakage
+
+Do not add a remote image proxy.
+
+Do not add arbitrary URL fetching.
+
+Do not accept user-provided URLs and fetch them server-side.
+
+==================================================
+15. TESTING
+==================================================
+
+Add focused tests for:
+
+- token identity normalization
+- duplicate token identity rejection
+- valid ERC-20 address
+- invalid address
+- network validation
+- metadata status
+- provenance
+- verification separation
+- unavailable metadata
+- partial metadata
+- bounded batch requests
+- malformed requests
+- rate limiting
+- sanitized errors
+- database constraints
+- logo metadata handling
+- no arbitrary remote URL fetching
+- public account metadata cannot contain prohibited secret fields
+
+Also verify existing secret-material rejection remains active.
+
+==================================================
+16. MOBILE REGRESSION
+==================================================
+
+Run:
+
+- full existing test suite
+- TypeScript
+- Expo validation/build
+- backend tests
+- backend build
+- git diff inspection
+
+The existing wallet must continue passing.
+
+Do not change wallet signing, SecureStore, LocalWalletEngine, WalletAccessManager, TransactionSigningEngine, TransactionBroadcastEngine, or DApp signing architecture except where absolutely required for a clean metadata boundary.
+
+==================================================
+17. DOCUMENTATION
+==================================================
+
+Update:
+
+- docs/ARCHITECTURE.md
+- docs/SECURITY_ARCHITECTURE.md
+- docs/DEVELOPMENT_STATE.md
+- backend README
+
+Document:
+
+- metadata responsibility
+- token identity
+- provenance
+- verification separation
+- logo architecture
+- network metadata
+- public account metadata
+- backend availability/fallback behavior
+- API boundaries
+
+==================================================
+18. STRICTLY DO NOT IMPLEMENT
+==================================================
+
+Do NOT implement:
+
+- blockchain indexing
+- transaction synchronization
+- price feeds
+- CoinGecko
+- CoinMarketCap
+- swap backend
+- notifications
+- analytics
+- DApp backend
+- transaction broadcasting
+- server-side signing
+- custody
+- seed phrase backup
+- private-key storage
+- cloud wallet recovery
+- production deployment
+
+==================================================
+19. FINAL SECURITY CHECK
+==================================================
+
+Before reporting completion, inspect all Phase 8.2 code.
+
+Confirm:
+
+- no secret-bearing database columns
+- no private wallet data
+- no signing
+- no custody
+- no broadcasting
+- no arbitrary server-side URL fetching
+- no unrestricted metadata queries
+- no metadata treated as verification
+- no logo treated as trust
+- no fake metadata
+- no PrimeWave values invented
+
+==================================================
+20. FINAL REPORT
+==================================================
+
+Report:
+
+- files created/changed
+- API endpoints
+- database schema changes
+- metadata model
+- provenance model
+- verification model
+- logo architecture
+- security controls
+- tests
+- TypeScript
+- Expo build
+- backend build
+- git diff
+- dependencies
+- warnings
+- deferred work
+
+If everything passes, finish exactly with:
+
+PHASE 8.2 DEVELOPMENT COMPLETE — PENDING SECURITY REVIEW
+
+STOP.
+
+Do not begin Phase 8.3.
