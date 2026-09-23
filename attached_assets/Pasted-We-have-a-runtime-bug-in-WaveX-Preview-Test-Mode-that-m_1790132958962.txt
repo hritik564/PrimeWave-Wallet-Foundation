@@ -1,0 +1,191 @@
+We have a runtime bug in WaveX Preview Test Mode that must be diagnosed before making another implementation change.
+
+IMPORTANT UX REQUIREMENT:
+
+A wallet with zero balance is NOT an unavailable blockchain state.
+
+WaveX must distinguish these states:
+
+1. RPC succeeds + native balance = 0
+   → VALID blockchain data
+   → show 0 BNB
+   → portfolio value $0.00
+   → do NOT show "Blockchain data unavailable"
+
+2. RPC succeeds + native balance > 0
+   → VALID blockchain data
+   → show the real balance
+
+3. RPC succeeds for native balance but token balances are zero/unavailable
+   → native portfolio must still be available
+   → do NOT convert the entire portfolio to "Blockchain data unavailable"
+
+4. RPC/network request genuinely fails
+   → UNAVAILABLE
+   → show "Blockchain data unavailable"
+
+5. Selected network is intentionally unconfigured
+   → CONFIGURATION_UNAVAILABLE
+   → show an appropriate configuration message
+
+CURRENT PREVIEW ADDRESS:
+
+0x1Ef7EA6f787891789852f5E51896966b51589a62
+
+CURRENT SCREEN:
+
+Preview Test Mode
+Selected network: BNB Smart Chain
+UI currently shows:
+
+"Blockchain data unavailable"
+"Preview diagnostic: NETWORK_UNAVAILABLE"
+"Portfolio data is currently unavailable. Try refreshing again later."
+
+The user states that this address currently contains both BNB and USDT.
+
+DO NOT:
+- hardcode any balance
+- fabricate $0.15 or any other amount
+- add fake preview balances
+- change the Preview address again
+- add private keys/mnemonics
+- modify SecureStore/vault/auth/signing
+- use backend data
+- bypass the existing EVM RPC provider
+- hide genuine RPC failures
+
+TASK:
+
+1. First diagnose the actual runtime failure in the browser Preview.
+
+2. Add temporary development-only diagnostics if necessary.
+
+3. Trace the exact call path from:
+   Preview Test Mode
+   → selected BNB network
+   → EVM RPC provider
+   → eth_chainId
+   → eth_getBalance
+   → portfolio/aggregation
+   → PortfolioReadModel
+   → WalletHomeShell
+
+4. Log only safe public diagnostics:
+   - network ID
+   - expected chain ID
+   - RPC method
+   - RPC response status
+   - normalized error category/code
+   - whether a balance result was received
+   - raw balance as bigint only if it contains no secret material
+   - portfolio state transition
+
+NEVER log:
+- private keys
+- mnemonic/recovery phrase
+- PIN
+- SecureStore values
+- vault material
+- signing capabilities
+- authentication secrets
+- API keys
+
+5. Specifically determine whether:
+   A. eth_chainId succeeds but eth_getBalance fails
+   B. eth_getBalance succeeds but portfolio aggregation converts the result to unavailable
+   C. RPC provider rejects the Preview request
+   D. network configuration/selection is incorrectly marked unavailable
+   E. an error from one asset/token read is incorrectly poisoning the entire portfolio
+   F. stale-request/context logic is incorrectly discarding a successful response
+   G. browser CORS/transport behavior differs from the server-side/live RPC test
+   H. another concrete issue exists
+
+6. Test the EXACT request:
+
+eth_getBalance(
+  "0x1Ef7EA6f787891789852f5E51896966b51589a62",
+  "latest"
+)
+
+against the currently selected BNB Smart Chain configuration through the EXISTING EvmRpcProvider.
+
+7. Test zero-balance behavior explicitly.
+
+Create/extend tests proving:
+
+- successful eth_getBalance returning 0x0 produces an AVAILABLE portfolio with zero balance
+- successful eth_getBalance returning a positive bigint produces AVAILABLE portfolio data
+- RPC failure produces UNAVAILABLE
+- one token-read failure does not incorrectly invalidate a successfully-read native balance
+- network configuration failure produces the appropriate unavailable/configuration state
+- stale request cancellation still works
+
+8. Review the state model.
+
+Do not use a generic "unavailable" state for every exception.
+
+The portfolio layer must preserve the distinction between:
+
+AVAILABLE_ZERO
+AVAILABLE_NONZERO
+UNAVAILABLE
+CONFIGURATION_UNAVAILABLE
+STALE/INVALID_CONTEXT
+ERROR
+
+Use the project's existing state naming conventions where possible rather than unnecessarily redesigning the architecture.
+
+9. UI requirement:
+
+If the selected network is configured and the native balance read succeeds with zero:
+
+Display:
+
+BNB
+0 BNB
+$0.00
+
+or the project's equivalent presentation.
+
+Do NOT display:
+"Blockchain data unavailable"
+
+10. IMPORTANT:
+
+Do not make a broad refactor.
+
+This is a targeted runtime diagnosis and state-handling fix.
+
+First report:
+- exact root cause
+- exact file(s) responsible
+- exact runtime evidence
+- whether eth_chainId succeeded
+- whether eth_getBalance succeeded
+- returned balance/result or normalized failure
+- why the UI currently becomes NETWORK_UNAVAILABLE
+
+Then implement ONLY the minimal fix required.
+
+After the fix run:
+
+- focused Preview/portfolio tests
+- full mobile test suite
+- TypeScript
+- Expo checks
+- iOS static bundle
+- Android static bundle
+- git diff --check
+
+Also verify in browser Preview:
+
+1. BNB selected
+2. Refresh
+3. real balance is displayed if present
+4. zero balance displays $0.00 rather than unavailable
+5. no fake data
+6. Preview Test Mode remains development-only
+7. no secrets are involved
+
+Do not proceed to any UI/UX redesign in this task.
