@@ -28,6 +28,10 @@ import type { SwapQuote, SwapQuoteService } from '@/src/core/swaps';
 import type { SwapReviewApproval, SwapReviewSnapshot } from '@/src/core/swaps';
 import type { Wallet } from '@/src/core/wallet/models';
 import type { DAppSession } from '@/src/core/dapp';
+import type {
+  AuthenticationSettings,
+  BiometricAvailability,
+} from '@/src/core/security';
 import { ReceiveScreen } from './ReceiveScreen';
 import {
   TransactionReviewScreen,
@@ -47,6 +51,7 @@ import { WalletSwapExecutionScreen } from './WalletSwapExecutionScreen';
 import { assetIdentityKey, type PublicSendDraft } from './WalletSendScreen.logic';
 import { copyPublicAddress } from './public-address-actions';
 import { DAppSessionsScreen } from './dapp/DAppSessionsScreen';
+import { WalletSettingsScreen } from './WalletSettingsScreen';
 import {
   assetDisplayName,
   assetDisplaySubtitle,
@@ -1026,11 +1031,14 @@ export function WalletHomeShell({
   createBroadcastDependency,
   activityService,
   activityReadModelService,
+  authenticationSettings,
+  biometricAvailability,
   swapQuoteService,
   dappSessions = [],
   dappAvailable = false,
   onDAppDisconnect = async () => undefined,
   onNetworkSelect,
+  onSecurity,
   onLock,
   onComingSoon,
 }: {
@@ -1052,11 +1060,14 @@ export function WalletHomeShell({
   ) => Promise<TransactionBroadcastDependency | null>;
   activityService?: TransactionActivityDependency | null;
   activityReadModelService?: Pick<ActivityReadModelService, 'getActivity'> | null;
+  authenticationSettings: AuthenticationSettings;
+  biometricAvailability: BiometricAvailability;
   swapQuoteService?: SwapQuoteService | null;
   dappSessions?: readonly DAppSession[];
   dappAvailable?: boolean;
   onDAppDisconnect?: (sessionId: string) => Promise<void>;
   onNetworkSelect: (networkId: string) => NetworkSelectionResult;
+  onSecurity?: () => void;
   onLock: () => void;
   onComingSoon: (label: string) => void;
 }) {
@@ -1531,11 +1542,21 @@ export function WalletHomeShell({
             sessions={dappSessions}
             wallet={wallet}
           />
-        ) : (
-          <PlaceholderDestination
-            destination={destination}
-            onBack={() => setDestination('home')}
+        ) : destination === 'settings' ? (
+          <WalletSettingsScreen
+            authenticationSettings={authenticationSettings}
+            biometricAvailability={biometricAvailability}
+            network={network}
+            onAccountPress={() => setAccountPanelVisible(true)}
+            onComingSoon={onComingSoon}
+            onLock={onLock}
+            onNetworkPress={() => setNetworkSelectorVisible(true)}
+            onSecurityPress={onSecurity}
+            previewMode={previewMode}
+            wallet={wallet}
           />
+        ) : (
+          <PlaceholderDestination destination={destination} onBack={() => setDestination('home')} />
         )}
       </View>
       <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 10) }]}>

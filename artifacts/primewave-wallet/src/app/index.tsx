@@ -1648,12 +1648,12 @@ export default function FoundationScreen() {
       />
     );
   }
-  else if (view === 'wallet' && currentWallet) content = <WalletHomeShell activityService={activityService} activityReadModelService={activityReadModelService} createConstructionEngine={createConstructionEngine} createSigningDependency={createSigningDependency} createBroadcastDependency={createBroadcastDependency} dappAvailable={dappTransport !== null && !previewMode} dappSessions={dappSessions} onDAppDisconnect={async (sessionId) => {
+  else if (view === 'wallet' && currentWallet) content = <WalletHomeShell activityService={activityService} activityReadModelService={activityReadModelService} authenticationSettings={settings} biometricAvailability={biometricAvailability} createConstructionEngine={createConstructionEngine} createSigningDependency={createSigningDependency} createBroadcastDependency={createBroadcastDependency} dappAvailable={dappTransport !== null && !previewMode} dappSessions={dappSessions} onDAppDisconnect={async (sessionId) => {
     if (!dappTransport) throw new Error('DApp provider transport is unavailable.');
     await dappTransport.disconnect(sessionId);
     setDappSessions((current) => current.filter((session) => session.sessionId !== sessionId));
     if (dappSession?.sessionId === sessionId) setDappSession(null);
-  }} previewMode={previewMode} wallet={currentWallet} network={selectedNetwork} networkRegistry={defaultNetworkRegistry} readModelService={portfolioReadModelService} swapQuoteService={swapQuoteService} onNetworkSelect={handleNetworkSelect} onComingSoon={(message) => setError(message)} onLock={() => void run(async () => {
+  }} onSecurity={() => { setError(''); setView('security'); }} previewMode={previewMode} wallet={currentWallet} network={selectedNetwork} networkRegistry={defaultNetworkRegistry} readModelService={portfolioReadModelService} swapQuoteService={swapQuoteService} onNetworkSelect={handleNetworkSelect} onComingSoon={(message) => setError(message)} onLock={() => void run(async () => {
     if (previewMode) {
       previewTestMode.lockPreviewWallet();
     } else {
