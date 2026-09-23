@@ -1,0 +1,326 @@
+WaveX Debug/Fix — Preview Real Blockchain Balance Runtime Failure
+
+The previous implementation passed all automated tests, but the actual WaveX browser Preview is still showing:
+
+"Blockchain data unavailable"
+"Blockchain data is currently unavailable. No balance is being shown as zero."
+
+The Refresh button also does not appear to trigger a successful balance reload.
+
+This means the implementation is passing unit tests but the real browser runtime/integration path is still failing.
+
+DO NOT add fake/demo balances.
+
+DO NOT hardcode 0.15 BNB.
+
+DO NOT bypass RPC.
+
+We need to diagnose and fix the actual runtime problem.
+
+CURRENT REAL TEST:
+
+Preview Test Mode public address:
+0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+
+Selected network:
+BNB Smart Chain
+
+The address has real BNB on the blockchain.
+
+Expected behavior:
+Preview should call the real configured BNB Smart Chain RPC using eth_getBalance and display the actual native BNB balance.
+
+==================================================
+1. TRACE THE ACTUAL RUNTIME PATH
+==================================================
+
+Trace this exact path in the browser Preview:
+
+WalletHomeShell
+→ Portfolio runtime/read model
+→ Preview Test Mode detection
+→ preview portfolio adapter
+→ network selection
+→ RPC provider
+→ RPC transport
+→ eth_getBalance
+→ returned result
+→ BigInt conversion
+→ PortfolioReadModel
+→ Home UI
+
+Determine EXACTLY where the failure occurs.
+
+Do not rely only on unit tests.
+
+Use development-only sanitized diagnostics if necessary.
+
+Do NOT log:
+- private keys
+- mnemonics
+- PINs
+- SecureStore contents
+- vault material
+- signing capabilities
+- secrets
+
+It is safe to log in development only:
+- selected network ID
+- chain ID
+- public address
+- RPC method name
+- sanitized error category/message
+- whether the request was sent
+- whether a response was received
+
+Do NOT log full RPC URLs if they may contain credentials.
+
+==================================================
+2. VERIFY THE NETWORK CONFIGURATION
+==================================================
+
+Inspect the actual BNB Smart Chain NetworkRegistry entry used by Preview.
+
+Verify:
+
+- network ID
+- chain ID
+- enabled state
+- configured state
+- environment
+- RPC endpoint availability
+- selected network identity
+
+Confirm that Preview is actually using BNB Smart Chain and not silently falling back to Ethereum.
+
+Expected BNB Smart Chain chain ID:
+
+56
+
+Do not change network configuration unless a concrete configuration error is found.
+
+==================================================
+3. VERIFY THE RPC CALL
+==================================================
+
+Verify that the browser runtime actually reaches:
+
+eth_getBalance
+
+with:
+
+[address, "latest"]
+
+The address must be:
+
+0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+
+Do not hardcode the balance.
+
+If the request fails, identify the ACTUAL failure category.
+
+Examples:
+
+- CORS/browser restriction
+- network unavailable
+- invalid RPC URL
+- RPC endpoint rejects browser requests
+- chain ID mismatch
+- provider initialization failure
+- JSON-RPC error
+- response validation failure
+- BigInt conversion failure
+- network context mismatch
+- Preview adapter failure
+- read-model failure
+- UI state/refresh failure
+
+Do not hide the underlying cause behind the generic "Blockchain data unavailable" message during development diagnosis.
+
+==================================================
+4. IMPORTANT: CHECK BROWSER CORS
+==================================================
+
+Because this is running in a browser-based Replit Preview, specifically determine whether the configured BNB RPC endpoint permits browser-origin requests.
+
+If the RPC endpoint is valid from a server/Node environment but blocks browser requests because of CORS:
+
+DO NOT disable security.
+
+DO NOT add a public proxy.
+
+DO NOT send secrets to a proxy.
+
+Instead report clearly that the browser Preview cannot directly reach that RPC endpoint because of its browser/CORS policy.
+
+Then determine whether an existing WaveX development-safe RPC transport can be used for Preview without changing production architecture.
+
+Do not introduce a backend proxy unless explicitly approved in a separate task.
+
+==================================================
+5. VERIFY REFRESH BUTTON
+==================================================
+
+The Refresh button must actually trigger a new balance read.
+
+Trace:
+
+Refresh tap
+→ refresh handler
+→ portfolio reload
+→ preview adapter
+→ eth_getBalance
+→ UI state update
+
+Determine why the current Refresh button appears non-functional.
+
+Possible causes to investigate:
+
+- callback not connected
+- refresh state already locked
+- error state does not expose refresh handler
+- Home shell uses stale callback
+- Preview adapter is not invoked on refresh
+- request is made but UI does not update
+- stale-request protection incorrectly rejects the refresh result
+- selected network/account context mismatch
+
+Fix the actual cause.
+
+Do not simply remove the Refresh button.
+
+==================================================
+6. STALE REQUEST PROTECTION
+==================================================
+
+The previous implementation added stale-request protection.
+
+Verify that this protection is not incorrectly rejecting the initial Preview balance or refresh result.
+
+It must reject only genuinely stale account/network requests.
+
+A normal refresh on the same:
+
+account + network
+
+must be accepted.
+
+==================================================
+7. REAL BALANCE REQUIREMENT
+==================================================
+
+When the runtime path is fixed:
+
+If RPC reports:
+
+150000000000000000 wei
+
+the UI must display:
+
+0.15 BNB
+
+using existing exact bigint formatting.
+
+If RPC reports:
+
+0
+
+the UI must display:
+
+0 BNB
+
+and NOT:
+
+Blockchain data unavailable
+
+If RPC fails:
+
+show the existing unavailable state with a working Refresh action.
+
+==================================================
+8. DO NOT CHANGE PRODUCTION SECURITY
+==================================================
+
+Do not modify:
+
+- SecureStore
+- LocalWalletEngine
+- wallet secrets
+- mnemonic handling
+- private key handling
+- authentication
+- signing
+- transaction construction
+- broadcasting
+- swap execution
+- DApp signing
+- backend custody
+
+Preview remains read-only.
+
+==================================================
+9. TESTS
+==================================================
+
+After identifying the runtime issue, add/update tests for the actual cause.
+
+At minimum verify:
+
+- Preview BNB network selection
+- Preview public address
+- real eth_getBalance request shape
+- successful positive balance
+- zero balance
+- RPC failure
+- refresh invokes a new read
+- same-context refresh is not rejected as stale
+- network change invalidates previous request
+- production/non-preview path unchanged
+
+If a browser-specific limitation such as CORS is confirmed, document it explicitly rather than creating a fake workaround.
+
+==================================================
+10. VALIDATION
+==================================================
+
+Run:
+
+- focused tests
+- full mobile test suite
+- TypeScript
+- Expo checks
+- iOS bundle
+- Android bundle
+- static diff/security inspection
+
+Most importantly, perform an actual browser Preview runtime test.
+
+Verify:
+
+1. Open Preview.
+2. Enter Preview Test Mode.
+3. Select BNB Smart Chain.
+4. Observe the balance request.
+5. Confirm the real BNB balance appears.
+6. Tap Refresh.
+7. Confirm a NEW eth_getBalance request occurs.
+8. Confirm the balance updates successfully.
+9. Switch network and confirm the old balance is not displayed for the new network.
+
+REPORT:
+
+Do not just report that tests passed.
+
+Report:
+
+1. Exact runtime failure cause.
+2. Exact file(s) responsible.
+3. Exact fix.
+4. Whether the RPC request actually reached the BNB RPC.
+5. Whether CORS was involved.
+6. Whether Refresh was wired correctly.
+7. Exact network and chain ID used.
+8. Confirmation that no fake balance was added.
+9. Browser Preview result after the fix.
+10. Test results and build results.
+11. Any remaining limitation.
