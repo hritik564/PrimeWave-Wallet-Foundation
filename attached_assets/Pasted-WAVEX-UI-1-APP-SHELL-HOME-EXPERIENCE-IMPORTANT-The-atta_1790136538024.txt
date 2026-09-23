@@ -1,0 +1,1011 @@
+WAVEX UI-1 — APP SHELL + HOME EXPERIENCE
+
+IMPORTANT:
+The attached image is the PRIMARY VISUAL REFERENCE for this task.
+
+Reference name:
+
+"WAVEX UI-1 — APP SHELL + HOME EXPERIENCE"
+
+DO NOT reinterpret the visual direction.
+
+DO NOT invent a different design language.
+
+DO NOT make independent aesthetic decisions where the reference and this specification already define the answer.
+
+The reference image + this prompt together form the UI-1 specification.
+
+==================================================
+PRODUCT
+==================================================
+
+Product name:
+
+WAVEX
+
+WaveX is a non-custodial EVM wallet.
+
+UX benchmark:
+
+MetaMask-level simplicity and usability.
+
+IMPORTANT:
+Do NOT copy MetaMask visually.
+
+Use MetaMask as inspiration for:
+- information hierarchy
+- simplicity
+- account switching
+- network switching
+- primary actions
+- progressive disclosure
+- wallet usability
+
+Use WaveX for:
+- visual identity
+- colors
+- typography
+- branding
+- component language
+- futuristic/financial aesthetic
+
+==================================================
+CORE DESIGN PHILOSOPHY
+==================================================
+
+SIMPLE ON THE SURFACE.
+SOPHISTICATED UNDER THE HOOD.
+
+The user should understand the wallet within seconds.
+
+The Home screen hierarchy must be:
+
+1. WAVEX identity
+2. Account
+3. Network
+4. Total balance
+5. Portfolio change when real data exists
+6. Primary actions
+7. Assets
+8. Bottom navigation
+
+Do not bury essential wallet information under decorative UI.
+
+Do not create a dashboard-like analytics interface.
+
+This is a wallet.
+
+==================================================
+CRITICAL IMPLEMENTATION RULE
+==================================================
+
+THIS IS A PRESENTATION-LAYER SPRINT.
+
+Existing wallet/business/security/blockchain logic is authoritative.
+
+DO NOT rewrite or recreate:
+
+- wallet engine
+- wallet creation
+- wallet import
+- SecureStore
+- vault
+- PIN
+- authentication
+- biometrics
+- signing
+- transaction construction
+- broadcasting
+- confirmation
+- EVM RPC
+- network registry
+- account state
+- portfolio aggregation
+- portfolio read model
+- token engine
+- swap engine
+- activity engine
+- DApp engine
+- backend
+- Preview Test Mode
+
+Do not move business logic into UI components.
+
+Do not create duplicate services.
+
+Do not create duplicate portfolio state.
+
+Do not create duplicate account state.
+
+Do not create duplicate network state.
+
+Reuse the existing architecture.
+
+==================================================
+DESIGN SYSTEM
+==================================================
+
+UI-0 is complete.
+
+Use the centralized WaveX design system created in UI-0.
+
+Do NOT introduce a competing theme.
+
+Do NOT scatter raw colors through screen components.
+
+Use the existing:
+
+- color tokens
+- typography tokens
+- spacing tokens
+- radius tokens
+- shadows
+- gradients
+- motion tokens
+- buttons
+- icon buttons
+- cards
+- badges
+- asset icons
+- asset rows
+- bottom navigation
+- bottom sheets
+- loading states
+- empty states
+- error states
+
+If an existing component needs a visual adjustment, update/reuse the UI-0 component instead of creating a duplicate.
+
+==================================================
+VISUAL DIRECTION
+==================================================
+
+The attached reference defines the intended appearance.
+
+Use:
+
+BACKGROUND:
+Near-black / midnight navy.
+
+SURFACES:
+Dark navy with subtle elevation.
+
+PRIMARY:
+Bright cyan / WaveX cyan.
+
+SECONDARY:
+Electric blue.
+
+ACCENT:
+Controlled violet.
+
+TEXT:
+White primary.
+Cool blue-gray secondary.
+
+SEMANTIC:
+Green success.
+Yellow warning.
+Red error.
+Blue info.
+
+IMPORTANT:
+
+Do NOT turn every surface into neon glass.
+
+Do NOT add excessive glow.
+
+Do NOT add particles.
+
+Do NOT add futuristic decorative animations.
+
+The result must feel like a premium financial/Web3 product.
+
+Think:
+
+"Apple-like clarity with WaveX Web3 identity."
+
+==================================================
+SCREEN A — AUTHENTICATED APP SHELL
+==================================================
+
+Redesign the authenticated shell around the UI-1 reference.
+
+Top header:
+
+LEFT:
+WaveX logo/icon + WAVEX wordmark.
+
+RIGHT:
+Account selector
+Settings icon
+
+Account selector visual:
+
+Account 1
+0x1Ef7...9a62
+
+The actual account name/address must come from existing account context.
+
+Do NOT hardcode this address in production UI.
+
+Preview may display the existing Preview Test Mode address through the existing Preview context.
+
+Settings icon:
+
+Navigate to the existing Settings destination.
+
+Do not create a new settings implementation.
+
+==================================================
+BOTTOM NAVIGATION
+==================================================
+
+Exactly:
+
+Home
+Assets
+Swap
+Activity
+Settings
+
+Use the UI-0 WaveXBottomNavigation.
+
+ACTIVE:
+Cyan.
+
+INACTIVE:
+Muted blue-gray.
+
+Do not add additional tabs.
+
+Do not change navigation architecture.
+
+Bottom navigation must:
+
+- respect safe areas
+- have proper touch targets
+- have accessibility labels
+- visually communicate the active destination
+- maintain the existing routes
+
+==================================================
+SCREEN B — HOME LOADED
+==================================================
+
+Follow the attached reference closely.
+
+The Home screen should contain:
+
+--------------------------------
+HEADER
+--------------------------------
+
+WaveX logo
+Account control
+Settings
+
+--------------------------------
+NETWORK
+--------------------------------
+
+A compact network selector:
+
+[network icon] BNB Smart Chain   ▾
+                 BNB • Connected
+
+Use actual selected network.
+
+Do not hardcode BNB.
+
+The network selector must use NetworkRegistry.
+
+--------------------------------
+BALANCE
+--------------------------------
+
+Large portfolio balance.
+
+This is the visual focal point.
+
+Use the UI-0 balance typography.
+
+Example shown in the reference is illustrative only.
+
+DO NOT hardcode:
+
+$243.56
+$3,482.21
+or any other number.
+
+Use the real PortfolioReadModel.
+
+If fiat portfolio value is available:
+display it.
+
+If fiat value is unavailable:
+do not fabricate one.
+
+If portfolio balance is zero:
+display a valid zero state.
+
+For example:
+
+$0.00
+
+Do NOT show "Blockchain data unavailable" when the blockchain request succeeded and balance is zero.
+
+--------------------------------
+PORTFOLIO CHANGE
+--------------------------------
+
+If the existing price architecture provides valid portfolio change data:
+
+show it.
+
+Otherwise:
+
+do not invent it.
+
+Do not show fake percentages.
+
+--------------------------------
+PRIMARY ACTIONS
+--------------------------------
+
+Four circular/rounded actions as shown in the reference:
+
+Send
+Receive
+Swap
+Buy
+
+IMPORTANT:
+
+Send:
+→ existing Send flow.
+
+Receive:
+→ existing Receive flow.
+
+Swap:
+→ existing Swap flow.
+
+BUY:
+
+Only show Buy if an actual existing Buy feature exists.
+
+If no real Buy functionality exists, DO NOT create fake Buy behavior.
+
+Instead either:
+- omit Buy
+OR
+- present a clearly controlled unavailable state consistent with the product.
+
+Do not create a fake purchase flow.
+
+The reference shows the intended visual position, not permission to invent functionality.
+
+--------------------------------
+ASSET SECTION
+--------------------------------
+
+Section:
+
+Your Assets                     See all
+
+"See all"
+→ existing Assets screen.
+
+Use existing PortfolioReadModel.
+
+Use UI-0 AssetRow.
+
+Asset row hierarchy:
+
+TOKEN ICON
+
+Asset Name
+SYMBOL • NETWORK
+
+                         BALANCE
+                         FIAT VALUE
+
+Token icon is the primary visual anchor.
+
+Network is secondary.
+
+Verification status must remain independent from the icon.
+
+Do not imply trust/verification through styling.
+
+--------------------------------
+ASSET COUNT
+--------------------------------
+
+Do not overwhelm Home with a huge list.
+
+Show a compact preview of assets.
+
+Use the existing PortfolioReadModel and deterministic ordering.
+
+"See all" opens Assets.
+
+==================================================
+SCREEN C — HOME LOADING
+==================================================
+
+Follow the second phone in the reference.
+
+Do NOT show a giant spinner.
+
+Show structural skeletons:
+
+- balance skeleton
+- action skeletons if necessary
+- asset-row skeletons
+
+Preserve the layout.
+
+The user should understand what is loading.
+
+Use UI-0 Skeleton components.
+
+Do not freeze navigation unnecessarily.
+
+==================================================
+SCREEN D — HOME ERROR
+==================================================
+
+Follow the third phone in the reference.
+
+If the portfolio genuinely fails:
+
+Show:
+
+Couldn't load your balance.
+
+Secondary text:
+
+Check your connection and try again.
+
+Primary action:
+
+Retry
+
+Use the existing refresh/read mechanism.
+
+Do not expose technical errors such as:
+
+NETWORK_UNAVAILABLE
+eth_chainId
+RPC
+JSON-RPC
+FetchRpcTransport
+
+on the primary Home surface.
+
+Development-only Preview diagnostics may remain available through existing development mechanisms.
+
+IMPORTANT:
+
+Do not convert every error into zero.
+
+Only successful zero balance becomes:
+
+AVAILABLE ZERO.
+
+==================================================
+ZERO BALANCE STATE
+==================================================
+
+This is a strict requirement.
+
+If:
+
+eth_getBalance succeeds
+
+and returns:
+
+0x0
+
+the portfolio is AVAILABLE.
+
+Home must show:
+
+0 balance
+
+and appropriate zero fiat value:
+
+$0.00
+
+or equivalent.
+
+It must NOT show:
+
+Blockchain data unavailable.
+
+The following distinction must remain intact:
+
+AVAILABLE + ZERO
+≠
+UNAVAILABLE
+
+==================================================
+SCREEN E — ACCOUNT SELECTOR
+==================================================
+
+Create the Account Selector as a bottom sheet.
+
+Follow the attached reference.
+
+Header:
+
+Accounts
+
+Account rows:
+
+[account icon]
+
+Account 1
+0x1Ef7...9a62
+
+Selected account:
+cyan check.
+
+Additional accounts:
+display existing account context only.
+
+Do not fabricate accounts.
+
+Bottom actions:
+
+Add account
+Import account
+Manage accounts
+
+IMPORTANT:
+
+Only make an action interactive if the underlying architecture already supports it.
+
+If functionality is not ready:
+show a controlled unavailable/coming-soon state.
+
+Do NOT invent account creation/import logic.
+
+Do NOT expose:
+- seed phrase
+- private key
+- PIN
+- vault data
+
+The selector is a presentation layer over existing account management.
+
+==================================================
+SCREEN F — NETWORK SELECTOR
+==================================================
+
+Create a bottom sheet matching the attached reference.
+
+Header:
+
+Select Network
+
+Network rows:
+
+[network icon]
+Network name
+Native currency
+
+Example visual list from the reference:
+
+BNB Smart Chain
+Ethereum
+Polygon
+Arbitrum
+Base
+Optimism
+PrimeWave
+
+IMPORTANT:
+
+The actual list MUST come from the existing NetworkRegistry.
+
+Do not hardcode a separate list.
+
+Each network must preserve:
+
+- configured
+- unconfigured
+- disabled
+- selected
+
+states.
+
+Selected network:
+cyan check.
+
+Unconfigured:
+small "Not configured" badge.
+
+Disabled:
+disabled appearance.
+
+Do not silently switch network.
+
+Use existing:
+
+NetworkRegistry.selectActiveNetwork()
+
+Do not implement a second network-selection mechanism.
+
+PrimeWave Mainnet must remain honest if it is still a placeholder/unconfigured network.
+
+Never invent:
+- RPC
+- chain configuration
+- balance
+- explorer
+- token data
+
+==================================================
+ACCOUNT + NETWORK CONTEXT
+==================================================
+
+When account changes:
+
+Use existing account context.
+
+When network changes:
+
+Use existing network context.
+
+Portfolio must refresh through the existing architecture.
+
+Do not manually call RPC from UI.
+
+Do not manually calculate portfolio values in components.
+
+UI must consume the existing read models/services.
+
+==================================================
+PREVIEW TEST MODE
+==================================================
+
+Preserve the existing Preview Test Mode.
+
+Preview address remains sourced from:
+
+PREVIEW_TEST_ADDRESS
+
+Do NOT duplicate the address in Home components.
+
+Do NOT hardcode:
+
+0x1Ef7EA6f787891789852f5E51896966b51589a62
+
+inside visual components.
+
+Real Preview blockchain data must continue using:
+
+Preview public address
+→ selected configured network
+→ existing EVM RPC Provider
+→ real blockchain data
+
+No fake balances.
+
+No fake transactions.
+
+No fake fiat.
+
+No secrets.
+
+No SecureStore.
+
+No private keys.
+
+No mnemonic.
+
+No signing.
+
+No backend.
+
+==================================================
+REFRESH
+==================================================
+
+Home Refresh must use the existing portfolio refresh mechanism.
+
+When pressed:
+
+1. show subtle refresh progress
+2. issue a new real read
+3. update Home
+4. clear refreshing state
+
+Do not:
+- start polling
+- create duplicate requests
+- change network
+- change account
+- bypass stale-request protection
+
+Use the existing stable Preview wallet identity fix.
+
+==================================================
+VISUAL DETAILS
+==================================================
+
+Follow the reference image closely for:
+
+HEADER:
+compact and premium.
+
+NETWORK:
+compact outlined selector.
+
+BALANCE:
+large, high-contrast, centered/visually dominant.
+
+ACTIONS:
+round/soft-circular cyan controls.
+
+ASSETS:
+compact rows with strong token icon.
+
+CARDS:
+dark elevated surfaces.
+
+BORDERS:
+subtle blue/cyan.
+
+GLOW:
+restrained.
+
+BOTTOM NAV:
+compact and clear.
+
+==================================================
+SPACING
+==================================================
+
+Do NOT reproduce excessive empty vertical space from the current prototype.
+
+The Home screen should use the screen efficiently.
+
+At 390x844:
+
+The user should see:
+
+Header
+Network
+Balance
+Actions
+At least 2–4 asset rows
+Bottom navigation
+
+without excessive scrolling.
+
+Do not cram the interface either.
+
+Use the UI-0 spacing tokens.
+
+==================================================
+MOTION
+==================================================
+
+Use UI-0 motion.
+
+Implement only subtle motion:
+
+- screen entrance
+- account selector opening
+- network selector opening
+- action press
+- asset row press
+- refresh
+- selection state
+
+No excessive animation.
+
+==================================================
+ACCESSIBILITY
+==================================================
+
+Required accessible labels:
+
+Open account selector
+Open network selector
+Open settings
+Send
+Receive
+Swap
+Buy if implemented
+View all assets
+Refresh portfolio
+Select network
+Select account
+
+Touch targets must be appropriate.
+
+Do not rely on color alone.
+
+==================================================
+RESPONSIVE TESTING
+==================================================
+
+Test at:
+
+390x844
+402x874
+
+Also test Android-compatible dimensions.
+
+Check:
+
+- safe areas
+- Dynamic Type / text scaling
+- bottom navigation
+- asset rows
+- account sheet
+- network sheet
+
+No hardcoded device-specific positioning.
+
+==================================================
+DO NOT REDESIGN OTHER SCREENS
+==================================================
+
+This sprint ONLY covers:
+
+1. Global authenticated App Shell
+2. Home
+3. Account Selector
+4. Network Selector
+
+Do NOT redesign:
+
+Assets
+Send
+Receive
+Swap
+Activity
+Transaction Details
+DApps
+Settings
+Onboarding
+
+Those are later UI sprints.
+
+==================================================
+TESTING
+==================================================
+
+Add/update focused tests for:
+
+HOME:
+- renders
+- real account
+- real network
+- positive portfolio
+- zero portfolio
+- unavailable portfolio
+- loading
+- refresh
+- retry
+- navigation
+
+ACCOUNT:
+- opens
+- current account
+- selection
+- safe presentation
+- no secret material
+
+NETWORK:
+- opens
+- registry-backed networks
+- selected state
+- configured state
+- unconfigured state
+- disabled state
+- selection
+- PrimeWave placeholder handling
+
+PREVIEW:
+- Preview remains isolated
+- real blockchain balance remains functional
+- no fake data
+- no secrets
+
+Run:
+
+- focused tests
+- full mobile test suite
+- TypeScript
+- Expo checks
+- iOS static export
+- Android static export
+- git diff --check
+
+==================================================
+SECURITY CHECK
+==================================================
+
+Inspect the diff for accidental introduction of:
+
+- private keys
+- mnemonic
+- seed phrase
+- PIN
+- SecureStore reads
+- vault material
+- signing capability
+- authentication secrets
+- API keys
+
+There must be none.
+
+==================================================
+FINAL VISUAL VALIDATION
+==================================================
+
+The actual Preview must be rendered after implementation.
+
+Verify:
+
+1. Home loaded
+2. Home loading
+3. Home error
+4. Account selector
+5. Network selector
+6. positive real balance
+7. zero balance
+8. Refresh
+9. bottom navigation
+
+Capture screenshots at:
+
+390x844
+402x874
+
+Compare them directly against the attached UI-1 reference.
+
+Do not merely say the design is "similar".
+
+Identify any intentional deviations and explain why.
+
+==================================================
+STOP CONDITION
+==================================================
+
+DO NOT automatically start UI-2.
+
+Stop after UI-1.
+
+FINAL REPORT MUST INCLUDE:
+
+1. Files changed
+2. Screens implemented
+3. Components reused from UI-0
+4. Existing services consumed
+5. No business-logic changes
+6. Home loaded screenshot/result
+7. Home loading screenshot/result
+8. Home error screenshot/result
+9. Account selector screenshot/result
+10. Network selector screenshot/result
+11. Positive balance verification
+12. Zero balance verification
+13. Refresh verification
+14. Focused test results
+15. Full test results
+16. TypeScript
+17. iOS build/export
+18. Android build/export
+19. git diff --check
+20. Security inspection
+21. Any deviations from the attached reference
+
+DO NOT PROCEED TO UI-2.
