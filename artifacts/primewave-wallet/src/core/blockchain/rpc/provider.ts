@@ -24,6 +24,22 @@ function isDevelopmentBuild(): boolean {
   return typeof __DEV__ !== 'undefined' && __DEV__;
 }
 
+function safeTransportError(error: unknown): {
+  readonly errorType: string;
+  readonly errorMessage: string;
+} {
+  if (error instanceof Error) {
+    return {
+      errorType: error.name,
+      errorMessage: error.message.slice(0, 160),
+    };
+  }
+  return {
+    errorType: typeof error,
+    errorMessage: 'Non-Error transport rejection',
+  };
+}
+
 const RPC_METHODS = new Set<EvmRpcMethod>([
   'eth_chainId',
   'eth_blockNumber',
@@ -432,7 +448,7 @@ export class FetchRpcTransport implements RpcTransport {
     ) => Promise<{
       status: number;
       text(): Promise<string>;
-    }> = globalThis.fetch as unknown as (
+    }> = globalThis.fetch?.bind(globalThis) as unknown as (
       url: string,
       init: {
         method: 'POST';
@@ -453,6 +469,20 @@ export class FetchRpcTransport implements RpcTransport {
       () => controller?.abort(),
       request.timeoutMs,
     );
+    const hostname = (() => {
+      try {
+        return new URL(request.endpoint.url).hostname;
+      } catch {
+        return 'invalid-endpoint';
+      }
+    })();
+    if (isDevelopmentBuild()) {
+      secureLogger.debug('Browser RPC transport started', {
+        hostname,
+        method: JSON.parse(request.body).method,
+        fetchImplementationType: typeof this.fetchImplementation,
+      });
+    }
     try {
       const response = await this.fetchImplementation(request.endpoint.url, {
         method: 'POST',
@@ -467,7 +497,24 @@ export class FetchRpcTransport implements RpcTransport {
       } catch {
         // The provider normalizes non-JSON bodies as malformed responses.
       }
+      if (isDevelopmentBuild()) {
+        secureLogger.debug('Browser RPC transport resolved', {
+          hostname,
+          method: JSON.parse(request.body).method,
+          responseStatus: response.status,
+          resultReceived: true,
+        });
+      }
       return { status: response.status, body: parsedBody };
+    } catch (error) {
+      if (isDevelopmentBuild()) {
+        secureLogger.warning('Browser RPC transport rejected', {
+          hostname,
+          method: JSON.parse(request.body).method,
+          ...safeTransportError(error),
+        });
+      }
+      throw error;
     } finally {
       clearTimeout(timer);
     }
