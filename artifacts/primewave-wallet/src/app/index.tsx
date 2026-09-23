@@ -870,7 +870,7 @@ export default function FoundationScreen() {
   const [dappSigningError, setDappSigningError] = useState<string | null>(null);
   const dappRequestRef = useRef<DAppRequest | null>(null);
   const dappTransactionResponseSentRef = useRef(false);
-  const [, setAccessRevision] = useState(0);
+  const [accessRevision, setAccessRevision] = useState(0);
   const appState = useRef(AppState.currentState);
   const walletRef = useRef<Wallet | null>(null);
   const selectedNetworkRef = useRef(selectedNetwork);
@@ -970,11 +970,18 @@ export default function FoundationScreen() {
     return access;
   };
 
-  const currentWallet = previewMode
-    ? previewTestMode.getDisplayWallet()
-    : access?.getStatus() === 'unlocked'
-      ? (() => { try { return nativeAccess().getWallet(); } catch { return null; } })()
-      : null;
+  const currentWallet = useMemo(
+    () => {
+      if (previewMode) return previewTestMode.getDisplayWallet();
+      if (access?.getStatus() !== 'unlocked') return null;
+      try {
+        return nativeAccess().getWallet();
+      } catch {
+        return null;
+      }
+    },
+    [access, accessRevision, previewMode, previewTestMode],
+  );
   walletRef.current = currentWallet;
   selectedNetworkRef.current = selectedNetwork;
 

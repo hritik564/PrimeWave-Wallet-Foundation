@@ -18,3 +18,4 @@
 - [DApp public boundary](dapp-public-boundary.md) — DApp input stays public and untrusted; session scope, permissions, and future execution remain separate.
 - [WalletConnect RN transport](walletconnect-transport.md) — Reown WalletKit needs RN compat/polyfills; keep provider state in explicit in-memory storage and proposals pending until authorization.
 - [Metadata backend toolchain quirks](metadata-backend-quirks.md) — Express 5 query objects are getter-backed, and Drizzle migration output must be package-relative in this workspace.
+- [Preview wallet render stability](preview-wallet-render-stability.md) — memoize the development wallet object so Home portfolio effects do not invalidate on unrelated parent renders.

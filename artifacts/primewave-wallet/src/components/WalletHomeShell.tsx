@@ -1075,6 +1075,8 @@ export function WalletHomeShell({
   const [sendAssetKey, setSendAssetKey] = useState<string | null>(null);
   const portfolioRequestRef = useRef(0);
   const account = wallet.accounts[0];
+  const previewDiagnosticsEnabled =
+    previewMode && typeof __DEV__ !== 'undefined' && __DEV__;
 
   const accountQuery = useMemo(
     () => ({
@@ -1089,7 +1091,23 @@ export function WalletHomeShell({
   const loadPortfolio = useCallback(
     async (isRefresh = false) => {
       const requestId = ++portfolioRequestRef.current;
+      if (previewDiagnosticsEnabled) {
+        secureLogger.debug('Preview portfolio request started in Home shell', {
+          requestId,
+          isRefresh,
+          accountId: accountQuery.accountId,
+          address: accountQuery.accountAddress,
+          networkId: accountQuery.networkId,
+        });
+      }
       if (!account) {
+        if (previewDiagnosticsEnabled) {
+          secureLogger.warning('Preview portfolio request skipped without account', {
+            requestId,
+            isRefresh,
+            networkId: accountQuery.networkId,
+          });
+        }
         setPortfolioState('error');
         setPortfolioError('The active public account is unavailable.');
         return;
@@ -1102,17 +1120,47 @@ export function WalletHomeShell({
       setPortfolioError(null);
       try {
         const next = await readModelService.getPortfolio(accountQuery);
-        if (requestId !== portfolioRequestRef.current) return;
+        if (requestId !== portfolioRequestRef.current) {
+          if (previewDiagnosticsEnabled) {
+            secureLogger.debug('Preview portfolio result ignored as stale', {
+              requestId,
+              currentRequestId: portfolioRequestRef.current,
+              networkId: accountQuery.networkId,
+            });
+          }
+          return;
+        }
+        const nextState = getPortfolioState(next.assets.length);
+        if (previewDiagnosticsEnabled) {
+          secureLogger.debug('Preview portfolio result accepted in Home shell', {
+            requestId,
+            networkId: next.networkId,
+            chainId: next.chainId,
+            assetCount: next.assets.length,
+            state: nextState,
+          });
+        }
         setPortfolio(next);
-        setPortfolioState(getPortfolioState(next.assets.length));
+        setPortfolioState(nextState);
       } catch (error) {
-        if (requestId !== portfolioRequestRef.current) return;
+        if (requestId !== portfolioRequestRef.current) {
+          if (previewDiagnosticsEnabled) {
+            secureLogger.debug('Preview portfolio error ignored as stale', {
+              requestId,
+              currentRequestId: portfolioRequestRef.current,
+              networkId: accountQuery.networkId,
+              errorCode: safePortfolioDiagnostic(error),
+            });
+          }
+          return;
+        }
         const message =
-          previewMode && typeof __DEV__ !== 'undefined' && __DEV__
+          previewDiagnosticsEnabled
             ? safePortfolioDiagnostic(error) ?? safePortfolioMessage(error)
             : safePortfolioMessage(error);
-        if (previewMode && typeof __DEV__ !== 'undefined' && __DEV__) {
+        if (previewDiagnosticsEnabled) {
           secureLogger.warning('Preview portfolio request failed in Home shell', {
+            requestId,
             networkId: accountQuery.networkId,
             address: accountQuery.accountAddress,
             errorCode: safePortfolioDiagnostic(error),
@@ -1129,20 +1177,88 @@ export function WalletHomeShell({
         }
       } finally {
         if (requestId === portfolioRequestRef.current) {
+          if (previewDiagnosticsEnabled) {
+            secureLogger.debug('Preview portfolio request finished in Home shell', {
+              requestId,
+              networkId: accountQuery.networkId,
+              refreshing: false,
+            });
+          }
           setRefreshing(false);
+        } else if (previewDiagnosticsEnabled) {
+          secureLogger.debug('Preview portfolio finalization ignored as stale', {
+            requestId,
+            currentRequestId: portfolioRequestRef.current,
+            networkId: accountQuery.networkId,
+          });
         }
       }
     },
-    [account, accountQuery, readModelService],
+    [account, accountQuery, previewDiagnosticsEnabled, readModelService],
   );
 
+  const refreshPortfolio = useCallback(() => {
+    if (previewDiagnosticsEnabled) {
+      secureLogger.debug('Preview portfolio refresh press received', {
+        requestId: portfolioRequestRef.current,
+        accountId: accountQuery.accountId,
+        address: accountQuery.accountAddress,
+        networkId: accountQuery.networkId,
+        refreshing,
+      });
+    }
+    void loadPortfolio(true);
+  }, [
+    accountQuery,
+    loadPortfolio,
+    previewDiagnosticsEnabled,
+    refreshing,
+  ]);
+
   useEffect(() => {
-    portfolioRequestRef.current += 1;
+    const invalidatedRequestId = ++portfolioRequestRef.current;
+    if (previewDiagnosticsEnabled) {
+      secureLogger.debug('Preview portfolio effect starting initial read', {
+        requestId: invalidatedRequestId,
+        networkId: accountQuery.networkId,
+        accountId: accountQuery.accountId,
+        address: accountQuery.accountAddress,
+      });
+    }
     void loadPortfolio();
     return () => {
       portfolioRequestRef.current += 1;
+      if (previewDiagnosticsEnabled) {
+        secureLogger.debug('Preview portfolio effect invalidated', {
+          requestId: portfolioRequestRef.current,
+          networkId: accountQuery.networkId,
+        });
+      }
     };
-  }, [loadPortfolio]);
+  }, [
+    accountQuery,
+    loadPortfolio,
+    previewDiagnosticsEnabled,
+  ]);
+
+  useEffect(() => {
+    if (!previewDiagnosticsEnabled) return;
+    secureLogger.debug('Preview portfolio UI state rendered', {
+      requestId: portfolioRequestRef.current,
+      networkId: network.id,
+      state: portfolioState,
+      refreshing,
+      hasPortfolio: portfolio !== null,
+      hasError: portfolioError !== null,
+    });
+  }, [
+    network.id,
+    portfolio,
+    portfolioError,
+    portfolioState,
+    previewDiagnosticsEnabled,
+    refreshing,
+  ]);
 
   useEffect(() => {
     if (reviewDraft && reviewDraft.networkId !== network.id) {
@@ -1196,7 +1312,7 @@ export function WalletHomeShell({
             refreshControl={
               <RefreshControl
                 colors={[theme.colors.accent]}
-                onRefresh={() => void loadPortfolio(true)}
+                onRefresh={refreshPortfolio}
                 refreshing={refreshing}
                 tintColor={theme.colors.accent}
               />
@@ -1224,7 +1340,7 @@ export function WalletHomeShell({
                 network.configurationStatus === 'configured' &&
                 network.chainId !== null
               }
-              onRefresh={() => void loadPortfolio(true)}
+              onRefresh={refreshPortfolio}
               refreshing={refreshing}
               state={portfolioState}
             />
@@ -1341,7 +1457,7 @@ export function WalletHomeShell({
               setDestination('send');
             }}
             onBack={() => setDestination('home')}
-            onRefresh={() => void loadPortfolio(true)}
+            onRefresh={refreshPortfolio}
             previewMode={previewMode}
             refreshing={refreshing}
             state={portfolioState}

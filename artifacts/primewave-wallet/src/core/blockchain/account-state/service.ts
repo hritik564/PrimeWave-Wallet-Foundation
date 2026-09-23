@@ -145,6 +145,17 @@ export class EvmAccountStateService {
       ]);
       this.assertNetworkUnchanged();
       const raw = parseQuantity(rawHex, 'eth_getBalance');
+      if (typeof __DEV__ !== 'undefined' && __DEV__) {
+        secureLogger.debug('Native balance RPC result received', {
+          networkId: this.network.id,
+          chainId: this.network.chainId,
+          endpointId: this.provider.getEndpointId(),
+          method: 'eth_getBalance',
+          address: maskAddress(normalizedAddress),
+          rawBalance: raw.toString(),
+          resultReceived: true,
+        });
+      }
       return {
         address: normalizedAddress,
         networkId: this.network.id,

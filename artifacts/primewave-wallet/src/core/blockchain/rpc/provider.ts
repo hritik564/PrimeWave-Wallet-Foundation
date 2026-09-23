@@ -20,6 +20,10 @@ import type {
 
 export const DEFAULT_RPC_TIMEOUT_MS = 10_000;
 
+function isDevelopmentBuild(): boolean {
+  return typeof __DEV__ !== 'undefined' && __DEV__;
+}
+
 const RPC_METHODS = new Set<EvmRpcMethod>([
   'eth_chainId',
   'eth_blockNumber',
@@ -544,6 +548,15 @@ export class EvmRpcProvider {
   ): Promise<EvmRpcResult<M>> {
     const id = this.nextRequestId();
     const request = createJsonRpcRequest(id, method, params);
+    if (isDevelopmentBuild()) {
+      secureLogger.debug('RPC request started', {
+        networkId: this.network.id,
+        chainId: this.network.chainId,
+        endpointId: this.endpoint.id,
+        method,
+        requestId: id,
+      });
+    }
     let response: RpcTransportResponse;
     try {
       response = await withTimeout(
@@ -592,13 +605,18 @@ export class EvmRpcProvider {
         id,
         method,
       );
-      secureLogger.debug('RPC request completed', {
-        networkId: this.network.id,
-        chainId: this.network.chainId,
-        endpointId: this.endpoint.id,
-        method,
-        success: true,
-      });
+      if (isDevelopmentBuild()) {
+        secureLogger.debug('RPC request completed', {
+          networkId: this.network.id,
+          chainId: this.network.chainId,
+          endpointId: this.endpoint.id,
+          method,
+          requestId: id,
+          responseStatus: response.status,
+          resultReceived: true,
+          success: true,
+        });
+      }
       return result;
     } catch (error) {
       const normalized =
