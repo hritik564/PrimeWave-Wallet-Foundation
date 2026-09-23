@@ -1,0 +1,254 @@
+We have now confirmed the Preview blockchain balance and Refresh flow are working correctly.
+
+Before beginning the WaveX UI/UX redesign, fix the current Settings destination.
+
+CURRENT PROBLEM:
+
+The Settings tab currently displays only a placeholder:
+
+"Settings are coming soon."
+
+The screenshot shows the Settings destination is essentially empty.
+
+We need a functional Settings foundation before the upcoming UI/UX redesign.
+
+IMPORTANT:
+
+This is NOT the full UI/UX redesign yet.
+
+Keep the existing visual design and architecture intact.
+
+Build the functional Settings information architecture and interactions now. The later UI/UX phase will redesign the visual presentation.
+
+DO NOT change:
+- wallet architecture
+- SecureStore/vault architecture
+- authentication architecture
+- signing
+- broadcasting
+- RPC
+- portfolio
+- Preview blockchain behavior
+- transaction architecture
+- DApp architecture
+
+==================================================
+SETTINGS STRUCTURE
+==================================================
+
+Create a real Settings screen with these sections:
+
+1. WALLET
+
+Account
+- Show current account label
+- Show account index
+- Show shortened public address
+- Open the existing account-management destination if available
+- Do not expose secrets
+
+Networks
+- Open existing network selector/management flow
+- Show currently selected network
+- Respect configured/unconfigured/disabled states
+- Do not create fake network configuration
+
+Lock Wallet
+- Use the existing wallet lock/access flow
+- In Preview Test Mode, use the existing Preview lock behavior
+- Do not bypass native authentication in production
+
+==================================================
+2. SECURITY
+==================================================
+
+Security status
+
+Display the currently known wallet security state using existing architecture.
+
+Examples:
+- PIN configured
+- Biometric enabled/disabled/unsupported/unavailable
+- Native secure storage status where the existing architecture can safely expose it
+
+IMPORTANT:
+
+Do not expose:
+- PIN
+- mnemonic
+- private key
+- vault key
+- SecureStore contents
+- signing capability
+- authentication secrets
+
+Do not invent new security APIs.
+
+If a security capability does not yet have a safe public read-only status API, show an appropriate "Not available" or "Managed by device" state rather than exposing internals.
+
+Recovery / Secret Management:
+
+Do NOT implement secret export/reveal yet unless the existing reviewed architecture explicitly supports a safe user-authorized flow.
+
+A placeholder/action such as:
+
+"Recovery phrase"
+"Managed securely on this device"
+
+is acceptable if necessary, but do not create fake functionality.
+
+==================================================
+3. PREFERENCES
+==================================================
+
+Notifications
+
+Show notification preference status using the existing backend/mobile notification architecture where available.
+
+If mobile push notifications are not yet implemented, show:
+
+"Notifications are not configured yet."
+
+Do not fabricate registration or push state.
+
+Display preferences
+
+If an actual fiat currency/display preference already exists, expose it.
+
+If it does not exist, do not invent a persistence system in this task.
+
+It can remain:
+
+"Coming soon"
+
+but inside a proper Settings row rather than making the entire Settings page a placeholder.
+
+==================================================
+4. ABOUT
+==================================================
+
+Show:
+
+WaveX
+
+Wallet version
+
+Environment/development information where appropriate.
+
+Use the existing app/package version source rather than hardcoding a fake version if possible.
+
+Include placeholders for:
+
+Privacy Policy
+Terms
+Support
+
+Only make them interactive if corresponding functionality/routes already exist.
+
+==================================================
+PREVIEW TEST MODE
+==================================================
+
+Preview Test Mode must remain explicitly isolated.
+
+In Preview:
+
+- do not expose real SecureStore controls
+- do not claim native biometric configuration is active
+- do not expose recovery secrets
+- do not create fake production security state
+- keep the existing Preview lock/reset behavior
+- clearly identify development-only Preview behavior where necessary
+
+==================================================
+INTERACTION REQUIREMENTS
+==================================================
+
+Settings rows should be functional where the underlying feature already exists.
+
+Examples:
+
+Account
+→ existing account management
+
+Networks
+→ existing network selector
+
+Lock Wallet
+→ existing lock flow
+
+Security
+→ security information/status
+
+Notifications
+→ existing notification settings if available
+
+About
+→ app information
+
+Unsupported functionality should use a controlled "Not available yet" state.
+
+Do not create dead-looking blank sections.
+
+==================================================
+DESIGN CONSTRAINT
+==================================================
+
+Do NOT redesign the visual system yet.
+
+Use the existing WaveX components, colors, typography, spacing, cards and navigation.
+
+The upcoming UI/UX phase will completely refine:
+
+- Settings hierarchy
+- icons
+- cards
+- spacing
+- animations
+- typography
+- section headers
+- bottom sheets
+- account/network presentation
+- security presentation
+
+This task is only to establish the functional Settings foundation.
+
+==================================================
+TESTING
+==================================================
+
+Add focused Settings tests covering:
+
+- Settings renders
+- Account row
+- Network row
+- Security status
+- Notification state
+- About/version information
+- Lock Wallet action
+- Preview isolation
+- no secret material exposed
+- unsupported features do not crash
+- navigation works
+
+Then run:
+
+- focused Settings tests
+- full mobile test suite
+- TypeScript
+- Expo checks
+- iOS static bundle
+- Android static bundle
+- git diff --check
+
+Do not start the UI/UX redesign after this task.
+
+Return a concise report containing:
+
+1. Files changed
+2. Settings sections implemented
+3. Which interactions are real vs unavailable
+4. Preview-specific behavior
+5. Security inspection
+6. Test results
+7. Build results
