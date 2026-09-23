@@ -1,0 +1,879 @@
+We are beginning the WaveX Wallet UI/UX transformation.
+
+IMPORTANT:
+
+I am providing a visual reference image titled:
+
+"WAVEX — Master UI/UX Reference"
+
+Use this image as the PRIMARY VISUAL DIRECTION for the design system.
+
+Do not blindly copy the screens shown in the image.
+
+The image communicates:
+- visual language
+- hierarchy
+- spacing philosophy
+- component style
+- typography
+- color direction
+- navigation style
+- information density
+- premium Web3 wallet aesthetic
+
+Our UX benchmark is MetaMask.
+
+Our visual identity is WaveX.
+
+The goal is:
+
+META MASK-LEVEL USABILITY
++
+WAVEX VISUAL IDENTITY
+
+The result should feel like a serious, premium, production-grade financial/Web3 application — not a futuristic concept demo.
+
+==================================================
+CORE PRODUCT PRINCIPLE
+==================================================
+
+WaveX should follow:
+
+"SIMPLE ON THE SURFACE.
+SOPHISTICATED UNDER THE HOOD."
+
+A new user should immediately understand:
+
+- How much they own
+- Which network they are using
+- Which account is active
+- How to Send
+- How to Receive
+- How to Swap
+- Where their assets are
+- Where their transactions are
+- Where connected DApps are
+- Where security settings are
+
+Advanced blockchain information should exist through progressive disclosure.
+
+Do not overwhelm the primary screens with:
+- chain IDs
+- raw calldata
+- gas internals
+- technical RPC information
+- contract addresses
+- hashes
+- provider metadata
+
+Those belong in advanced/detail surfaces.
+
+==================================================
+NON-NEGOTIABLE ARCHITECTURE RULE
+==================================================
+
+THIS SPRINT IS DESIGN-SYSTEM ONLY.
+
+Do NOT redesign individual production screens yet.
+
+Do NOT modify wallet/business logic.
+
+Do NOT modify:
+- wallet creation
+- wallet import
+- SecureStore
+- vault
+- authentication
+- PIN
+- biometrics
+- signing
+- transaction construction
+- broadcasting
+- confirmation
+- portfolio services
+- token engine
+- network engine
+- swap engine
+- DApp engine
+- backend
+- Activity engine
+
+Do not recreate any of these inside UI components.
+
+The existing production services, models, state, navigation contracts and security boundaries are authoritative.
+
+UI must consume those existing boundaries.
+
+==================================================
+OBJECTIVE OF UI-0
+==================================================
+
+Create a centralized WaveX Design System that all future screens will use.
+
+The design system must become the single source of truth for:
+
+1. Colors
+2. Typography
+3. Spacing
+4. Radius
+5. Shadows
+6. Borders
+7. Gradients
+8. Icons
+9. Buttons
+10. Inputs
+11. Cards
+12. Asset rows
+13. Transaction rows
+14. Network badges
+15. Account badges
+16. Bottom navigation
+17. Bottom sheets
+18. Modals
+19. Status states
+20. Loading states
+21. Empty states
+22. Error states
+23. Toasts
+24. Animation/motion
+25. Accessibility states
+
+==================================================
+1. COLOR SYSTEM
+==================================================
+
+Establish semantic design tokens rather than scattering raw hex values through components.
+
+Direction:
+
+Background:
+- near-black
+- midnight navy
+- subtle blue undertone
+
+Surfaces:
+- elevated dark navy
+- slightly lighter cards
+- pressed/selected states
+
+Primary:
+- WaveX cyan
+- electric blue
+
+Accent:
+- controlled violet
+
+Semantic:
+- Success
+- Warning
+- Error
+- Info
+
+Text:
+- primary white
+- secondary cool gray
+- muted blue-gray
+- disabled
+
+Borders:
+- subtle cool border
+- active cyan border
+- focus border
+
+Do NOT overuse gradients or neon.
+
+Neon should communicate:
+- primary action
+- active state
+- important emphasis
+
+It should NOT illuminate every component.
+
+The application should feel premium and restrained.
+
+==================================================
+2. TYPOGRAPHY
+==================================================
+
+Define centralized typography tokens.
+
+Required hierarchy:
+
+Display
+Large balance
+Page title
+Section heading
+Card title
+Body
+Secondary body
+Label
+Caption
+Micro label
+
+Balance numbers are extremely important.
+
+Large portfolio balances should have:
+- strong weight
+- excellent readability
+- generous spacing
+- tabular/numeric-friendly appearance where supported
+
+Transaction amounts should be visually scannable.
+
+Do not use decorative typography for functional information.
+
+Typography must remain readable on small screens.
+
+==================================================
+3. SPACING SYSTEM
+==================================================
+
+Create a consistent spacing scale.
+
+Do not allow every screen to invent its own padding/margin values.
+
+Use a predictable system for:
+
+- screen margins
+- card padding
+- row spacing
+- section spacing
+- icon gaps
+- button spacing
+- bottom navigation spacing
+- modal spacing
+
+The UI should feel rhythmically consistent.
+
+==================================================
+4. RADIUS SYSTEM
+==================================================
+
+Create centralized radius tokens for:
+
+- small controls
+- inputs
+- buttons
+- cards
+- large cards
+- bottom sheets
+- dialogs
+- pills
+
+Avoid excessive rounded corners.
+
+The design should feel modern and premium rather than cartoon-like.
+
+==================================================
+5. COMPONENT SYSTEM
+==================================================
+
+Create reusable WaveX primitives.
+
+At minimum:
+
+WaveXButton
+- Primary
+- Secondary
+- Outline
+- Destructive
+- Disabled
+- Loading
+
+WaveXIconButton
+
+WaveXCard
+
+WaveXInput
+
+WaveXSearchInput
+
+WaveXSegmentedControl
+
+WaveXChip
+
+WaveXBadge
+
+WaveXNetworkBadge
+
+WaveXAccountBadge
+
+WaveXAssetIcon
+
+WaveXAssetRow
+
+WaveXTransactionRow
+
+WaveXSectionHeader
+
+WaveXBottomSheet
+
+WaveXModal
+
+WaveXToast
+
+WaveXDivider
+
+WaveXSkeleton
+
+WaveXEmptyState
+
+WaveXErrorState
+
+WaveXLoadingState
+
+WaveXStatusIndicator
+
+WaveXBottomNavigation
+
+Reuse the existing AssetIcon/TokenLogo architecture where appropriate.
+
+Do not create a second competing token-icon system.
+
+==================================================
+6. ASSET VISUAL LANGUAGE
+==================================================
+
+Assets are one of the most important visual elements of a wallet.
+
+Asset rows should prioritize:
+
+[Token Icon]  Asset Name
+              Symbol / Network
+                              Balance
+                              Fiat value
+
+Examples:
+
+BNB
+BNB • BNB Smart Chain
+
+USDT
+USDT • BNB Smart Chain
+
+The token icon is the primary visual anchor.
+
+Network identity should be secondary.
+
+Verification must remain independent from iconography.
+
+Never imply that a token is verified merely because it has a logo.
+
+Never label a token malicious/scam without trusted evidence.
+
+==================================================
+7. TRANSACTION VISUAL LANGUAGE
+==================================================
+
+Activity should eventually follow an asset-first model.
+
+Example:
+
+[BNB icon + network badge]
+
+Sent BNB
+To: 0x1Ef7...9a62
+
+                         -0.0097 BNB
+                         $X.XX
+
+Date / status
+
+For received:
+
+Received BNB
+From: 0x....
+
+                         +0.0097 BNB
+
+For swaps:
+
+Swapped
+BNB → USDT
+
+                         -0.01 BNB
+                         +X USDT
+
+Do not infer swaps where the underlying data does not explicitly establish a swap.
+
+==================================================
+8. BUTTON HIERARCHY
+==================================================
+
+Primary action:
+
+Bright cyan/electric blue.
+
+Use for:
+- Create Wallet
+- Continue
+- Review
+- Confirm
+- Send
+- Swap
+
+Secondary:
+Dark elevated surface.
+
+Outline:
+Transparent/dark with subtle border.
+
+Destructive:
+Semantic error treatment.
+
+Disabled:
+Clearly disabled but still readable.
+
+Loading:
+Never make users wonder whether their action worked.
+
+==================================================
+9. INPUTS
+==================================================
+
+Inputs must be:
+
+- clean
+- dark
+- high contrast
+- clearly focused
+- large enough for touch
+- accessible
+
+Address inputs should support:
+- paste
+- scan where implemented
+- validation state
+- readable shortened address where appropriate
+
+Amount inputs should prioritize the number.
+
+MAX should be visually accessible but secondary to the amount.
+
+==================================================
+10. NETWORK SELECTOR
+==================================================
+
+Network selection should feel extremely simple.
+
+Primary display:
+
+[Network Icon] BNB Smart Chain
+               BNB
+
+Chevron
+
+The network selector should open a polished bottom sheet.
+
+Each network row should contain:
+
+Network icon
+Network name
+Native symbol
+Selected state
+
+Configured/unconfigured/disabled states must remain honest.
+
+Never silently change networks because a DApp requested it.
+
+==================================================
+11. ACCOUNT SELECTOR
+==================================================
+
+Account presentation:
+
+Account 1
+0x1Ef7...9a62
+
+The account selector should eventually support:
+
+- account list
+- active account
+- account creation
+- account import
+- account management
+
+without exposing secret material in normal UI.
+
+==================================================
+12. BOTTOM NAVIGATION
+==================================================
+
+Primary navigation:
+
+Home
+Assets
+Swap
+Activity
+Settings
+
+Keep it simple.
+
+Selected tab:
+- cyan
+- clear icon state
+- readable label
+
+Unselected:
+- muted cool gray
+
+Do not overdecorate navigation.
+
+==================================================
+13. BOTTOM SHEETS
+==================================================
+
+Use bottom sheets for:
+
+- network selection
+- account selection
+- token selection
+- transaction filters
+- advanced options
+- contextual actions
+
+Bottom sheets should:
+
+- animate smoothly
+- have clear hierarchy
+- have a drag/close affordance where appropriate
+- respect safe areas
+- remain accessible
+- never obscure critical confirmation information
+
+==================================================
+14. STATUS SYSTEM
+==================================================
+
+Create consistent visual states:
+
+AVAILABLE
+SUCCESS
+PENDING
+WARNING
+ERROR
+UNAVAILABLE
+DISABLED
+SELECTED
+ACTIVE
+PROCESSING
+
+Important:
+
+AVAILABLE + ZERO BALANCE is a VALID state.
+
+Never visually represent:
+
+0 balance
+
+as:
+
+Blockchain unavailable.
+
+The UI must preserve the distinction between:
+
+AVAILABLE
+AVAILABLE ZERO
+UNAVAILABLE
+CONFIGURATION UNAVAILABLE
+STALE
+ERROR
+
+==================================================
+15. LOADING
+==================================================
+
+Use skeletons or subtle loading states.
+
+Do not use large generic spinners everywhere.
+
+For portfolio:
+
+show structure while loading where possible.
+
+For actions:
+
+button can transition to processing.
+
+Never leave a control permanently disabled because of an unresolved request.
+
+==================================================
+16. ERROR DESIGN
+==================================================
+
+Errors should tell users:
+
+What happened
++
+What they can do
+
+Avoid technical messages on primary screens.
+
+Bad:
+
+NETWORK_UNAVAILABLE: eth_chainId failed
+
+Better:
+
+"Couldn't load your balance."
+
+Then:
+
+"Check your connection and try again."
+
+Technical information may exist inside an advanced diagnostic/detail surface where appropriate.
+
+==================================================
+17. MOTION SYSTEM
+==================================================
+
+Create a restrained WaveX motion language.
+
+Use animation for:
+
+- button press
+- selection
+- navigation
+- bottom sheets
+- loading
+- refresh
+- success
+- transaction completion
+
+Avoid:
+- excessive glowing
+- constant movement
+- distracting particle effects
+- unnecessary animation on every element
+
+Motion should communicate state, not decoration.
+
+==================================================
+18. ACCESSIBILITY
+==================================================
+
+Design system must support:
+
+- minimum touch targets
+- readable contrast
+- dynamic text sizing
+- screen readers
+- accessible labels
+- focus states
+- reduced-motion consideration
+- keyboard navigation where applicable
+
+Do not use color alone to communicate state.
+
+==================================================
+19. RESPONSIVE DESIGN
+==================================================
+
+The same design system must work across:
+
+- small iPhones
+- large iPhones
+- Android phones
+- different aspect ratios
+- browser Preview
+
+Avoid hardcoded screen-specific dimensions.
+
+Use safe areas correctly.
+
+==================================================
+20. DESIGN PRINCIPLE: PROGRESSIVE DISCLOSURE
+==================================================
+
+Primary screens should be simple.
+
+Example transaction:
+
+Primary:
+
+Send
+To
+Amount
+Network
+Estimated fee
+Review
+
+Advanced:
+
+Nonce
+Gas limit
+Max fee
+Priority fee
+Contract interaction
+Raw transaction details
+
+Do NOT put every blockchain parameter on the primary screen.
+
+==================================================
+21. DESIGN PRINCIPLE: FINANCIAL CLARITY
+==================================================
+
+WaveX handles real user assets.
+
+Therefore:
+
+- balances must be precise
+- fiat values must never be fabricated
+- pending states must be obvious
+- confirmation actions must be deliberate
+- irreversible actions must be clear
+- warnings must be meaningful
+- transaction amounts must be easy to verify
+
+Visual beauty must never reduce financial clarity.
+
+==================================================
+22. DESIGN PRINCIPLE: WAVE X IDENTITY
+==================================================
+
+The product name is:
+
+WAVEX
+
+Do not use:
+
+"PrimeWave Wallet"
+
+as the primary product name in the redesigned UI.
+
+PrimeWave remains the ecosystem/parent identity where appropriate.
+
+The WaveX logo should remain:
+
+Icon + WAVEX wordmark.
+
+Do not introduce unrelated branding.
+
+==================================================
+23. IMPLEMENTATION REQUIREMENTS
+==================================================
+
+First inspect the current project structure.
+
+Identify existing:
+- theme files
+- design tokens
+- components
+- icons
+- navigation
+- asset icons
+- typography
+- existing WaveX visual components
+
+Do not duplicate existing systems unnecessarily.
+
+Where the existing design system is structurally sound, evolve it rather than creating competing systems.
+
+Create/update a centralized design-system layer.
+
+Suggested structure:
+
+src/design-system/
+  tokens/
+  components/
+  icons/
+  typography/
+  motion/
+  index.ts
+
+Use the project's existing conventions if equivalent structures already exist.
+
+==================================================
+24. DOCUMENTATION
+==================================================
+
+Create/update:
+
+docs/WAVEX_UI_UX_SYSTEM.md
+
+Document:
+
+- visual philosophy
+- colors
+- typography
+- spacing
+- radius
+- component usage
+- asset treatment
+- transaction treatment
+- navigation
+- motion
+- accessibility
+- responsive rules
+- do/don't examples
+
+This document becomes the visual contract for all future UI sprints.
+
+==================================================
+25. IMPORTANT — DO NOT IMPLEMENT FUTURE SCREENS YET
+==================================================
+
+Do NOT redesign:
+
+Home
+Assets
+Send
+Receive
+Swap
+Activity
+DApps
+Settings
+Onboarding
+
+in this sprint.
+
+Only establish the design system and reusable primitives.
+
+The following sprints will consume this system.
+
+==================================================
+26. VALIDATION
+==================================================
+
+Create focused tests for the design-system components where appropriate.
+
+Then run:
+
+- focused tests
+- full mobile test suite
+- TypeScript
+- Expo checks
+- iOS static bundle
+- Android static bundle
+- git diff --check
+
+Do not change wallet/security/blockchain behavior.
+
+Do not introduce fake data.
+
+Do not change the Preview blockchain implementation.
+
+==================================================
+SUCCESS CRITERIA
+==================================================
+
+UI-0 is complete when:
+
+1. WaveX has one centralized visual language.
+2. Existing theme duplication is reduced.
+3. Reusable components exist.
+4. Typography is centralized.
+5. Colors are semantic.
+6. Spacing is centralized.
+7. Asset/transaction visual primitives exist.
+8. Navigation primitives exist.
+9. Loading/error/empty states are standardized.
+10. Accessibility rules are documented.
+11. Responsive rules are documented.
+12. Existing wallet logic remains untouched.
+13. All existing tests continue passing.
+14. The design system is ready to drive UI-1 onward.
+
+DO NOT start UI-1 automatically.
+
+Stop after UI-0 and provide a complete implementation report.
