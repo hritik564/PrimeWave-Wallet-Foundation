@@ -34,6 +34,21 @@ export function safePortfolioMessage(error: unknown): string {
   return 'Portfolio data is currently unavailable. Try refreshing again later.';
 }
 
+export function safePortfolioDiagnostic(error: unknown): string | null {
+  const message = safePortfolioMessage(error);
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+  ) {
+    return `${error.code}: ${message}`;
+  }
+  return message === 'Portfolio data is currently unavailable. Try refreshing again later.'
+    ? null
+    : message;
+}
+
 export function getPortfolioState(
   assetCount: number,
 ): Extract<HomePortfolioState, 'available' | 'empty'> {

@@ -22,6 +22,7 @@ import {
   type PortfolioReadModelQuery,
   type PortfolioReadModelService as PortfolioReadModelServiceType,
 } from '@/src/core/portfolio';
+import { secureLogger } from '@/src/core/security/logging';
 import { normalizePublicEvmAddress } from '@/src/core/blockchain/account-state';
 import {
   isPreviewTestModeAvailable,
@@ -36,6 +37,18 @@ type PreviewPortfolioReadModelService = Pick<
   PortfolioReadModelServiceType,
   'getPortfolio'
 >;
+
+function errorCode(error: unknown): string {
+  if (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    typeof error.code === 'string'
+  ) {
+    return error.code;
+  }
+  return 'UNEXPECTED_ERROR';
+}
 
 /**
  * Development-only portfolio adapter.
@@ -75,21 +88,45 @@ export function createPreviewPortfolioReadModelService(
         throw new PortfolioReadModelError('READ_MODEL_CONTEXT_MISMATCH');
       }
 
-      const provider = await createProvider(registry);
-      const accountState = new EvmAccountStateService(registry, provider);
-      const assets = new AssetRegistry(registry);
-      const nativeBalanceService = new NativeAssetBalanceService(assets, [
-        { service: accountState },
-      ]);
-      const tokenService = new ERC20TokenService(assets, []);
-      const aggregation = new PortfolioAggregationService(
-        assets,
-        nativeBalanceService,
-        tokenService,
-        [{ accountState, provider }],
-      );
+      secureLogger.debug('Preview portfolio read started', {
+        networkId: activeNetwork.id,
+        chainId: activeNetwork.chainId,
+        address: normalizedAddress,
+      });
 
-      return new PortfolioReadModelService(aggregation).getPortfolio(query);
+      try {
+        const provider = await createProvider(registry);
+        const accountState = new EvmAccountStateService(registry, provider);
+        const assets = new AssetRegistry(registry);
+        const nativeBalanceService = new NativeAssetBalanceService(assets, [
+          { service: accountState },
+        ]);
+        const tokenService = new ERC20TokenService(assets, []);
+        const aggregation = new PortfolioAggregationService(
+          assets,
+          nativeBalanceService,
+          tokenService,
+          [{ accountState, provider }],
+        );
+
+        const model = await new PortfolioReadModelService(aggregation).getPortfolio(query);
+        secureLogger.debug('Preview portfolio read completed', {
+          networkId: activeNetwork.id,
+          chainId: activeNetwork.chainId,
+          address: normalizedAddress,
+          assetCount: model.assets.length,
+          state: model.state,
+        });
+        return model;
+      } catch (error) {
+        secureLogger.warning('Preview portfolio read failed', {
+          networkId: activeNetwork.id,
+          chainId: activeNetwork.chainId,
+          address: normalizedAddress,
+          errorCode: errorCode(error),
+        });
+        throw error;
+      }
     },
   };
 }

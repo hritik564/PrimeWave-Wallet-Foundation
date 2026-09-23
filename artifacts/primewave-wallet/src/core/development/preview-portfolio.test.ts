@@ -87,14 +87,16 @@ function previewQuery(networkId = 'ethereum') {
 }
 
 function createFixture(options: {
+  readonly networkId?: string;
   readonly nativeBalance?: bigint;
   readonly failBalance?: boolean;
   readonly onBalance?: (registry: NetworkRegistry) => void;
 }) {
-  const registry = createRegistry();
+  const networkId = options.networkId ?? 'ethereum';
+  const registry = createRegistry(networkId);
   const transport = new FakeTransport((method, _params, id) => {
     if (method === 'eth_chainId') {
-      return responseFor(id, `0x${network('ethereum').chainId?.toString(16)}`);
+      return responseFor(id, `0x${network(networkId).chainId?.toString(16)}`);
     }
     if (method === 'eth_getBalance') {
       options.onBalance?.(registry);
@@ -112,6 +114,34 @@ function createFixture(options: {
   });
   return { registry, service, transport };
 }
+
+test('uses the selected BNB Smart Chain network and formats its native balance', async () => {
+  const restore = installPreviewEnvironment(true);
+  try {
+    const fixture = createFixture({
+      networkId: 'bnb-smart-chain',
+      nativeBalance: 150000000000000000n,
+    });
+    const model = await fixture.service.getPortfolio(
+      previewQuery('bnb-smart-chain'),
+    );
+    const asset = model.assets[0];
+
+    assert.equal(model.networkId, 'bnb-smart-chain');
+    assert.equal(model.chainId, 56);
+    assert.equal(asset?.symbol, 'BNB');
+    assert.equal(asset?.rawBalance, 150000000000000000n);
+    assert.equal(asset?.formattedBalance, '0.15');
+    assert.deepEqual(
+      fixture.transport.requests
+        .map((request) => JSON.parse(request.body) as { method: string; params: unknown[] })
+        .find((request) => request.method === 'eth_getBalance')?.params,
+      [PREVIEW_TEST_ADDRESS, 'latest'],
+    );
+  } finally {
+    restore();
+  }
+});
 
 test('reads the preview address from the selected network with exact bigint balance', async () => {
   const restore = installPreviewEnvironment(true);
@@ -132,6 +162,31 @@ test('reads the preview address from the selected network with exact bigint bala
         request.body.includes('eth_sendRawTransaction'),
       ),
       false,
+    );
+  } finally {
+    restore();
+  }
+});
+
+test('performs a new read for a same-context refresh', async () => {
+  const restore = installPreviewEnvironment(true);
+  try {
+    const fixture = createFixture({
+      networkId: 'bnb-smart-chain',
+      nativeBalance: 150000000000000000n,
+    });
+    const query = previewQuery('bnb-smart-chain');
+    fixture.registry.selectActiveNetwork('bnb-smart-chain');
+    const first = await fixture.service.getPortfolio(query);
+    const second = await fixture.service.getPortfolio(query);
+
+    assert.equal(first.assets[0]?.rawBalance, 150000000000000000n);
+    assert.equal(second.assets[0]?.rawBalance, 150000000000000000n);
+    assert.equal(
+      fixture.transport.requests.filter((request) =>
+        request.body.includes('"method":"eth_getBalance"'),
+      ).length,
+      2,
     );
   } finally {
     restore();

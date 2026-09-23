@@ -16,6 +16,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/src/theme';
 import type { EvmNetwork, NetworkRegistry } from '@/src/core/networks';
+import { secureLogger } from '@/src/core/security/logging';
 import {
   PortfolioReadModelError,
   type PortfolioAssetViewModel,
@@ -54,6 +55,7 @@ import {
   type AssetFilter,
   getPortfolioState,
   homeNavigationLabels,
+  safePortfolioDiagnostic,
   safePortfolioMessage,
   shortPublicAddress,
 } from './WalletHomeShell.logic';
@@ -513,6 +515,7 @@ function PortfolioSummary({
   state,
   model,
   errorMessage,
+  diagnosticEnabled,
   onRefresh,
   refreshing,
   networkConfigured,
@@ -520,6 +523,7 @@ function PortfolioSummary({
   state: PortfolioState;
   model: PortfolioReadModel | null;
   errorMessage: string | null;
+  diagnosticEnabled: boolean;
   onRefresh: () => void;
   refreshing: boolean;
   networkConfigured: boolean;
@@ -538,6 +542,9 @@ function PortfolioSummary({
             ? 'Blockchain data is currently unavailable. No balance is being shown as zero.'
             : 'This network is not configured yet. No balance is being shown as zero.'}
         </Text>
+        {diagnosticEnabled && errorMessage ? (
+          <Text style={styles.refreshNotice}>Preview diagnostic: {errorMessage}</Text>
+        ) : null}
         <RefreshButton onPress={onRefresh} refreshing={refreshing} />
       </View>
     );
@@ -727,12 +734,14 @@ function AssetPreview({
 function AssetStatusPanel({
   state,
   errorMessage,
+  diagnosticEnabled,
   networkConfigured,
   onRefresh,
   refreshing,
 }: {
   state: PortfolioState;
   errorMessage: string | null;
+  diagnosticEnabled: boolean;
   networkConfigured: boolean;
   onRefresh: () => void;
   refreshing: boolean;
@@ -779,6 +788,9 @@ function AssetStatusPanel({
               ? 'Blockchain data is currently unavailable. No balance is being shown as zero.'
               : 'This network is not configured yet. No balance is being shown as zero.'}
         </Text>
+        {diagnosticEnabled && errorMessage ? (
+          <Text style={styles.refreshNotice}>Preview diagnostic: {errorMessage}</Text>
+        ) : null}
         <RefreshButton onPress={onRefresh} refreshing={refreshing} />
       </View>
     );
@@ -788,6 +800,7 @@ function AssetStatusPanel({
 }
 
 function AssetsScreen({
+  previewMode,
   state,
   model,
   errorMessage,
@@ -797,6 +810,7 @@ function AssetsScreen({
   onAssetPress,
   refreshing,
 }: {
+  previewMode: boolean;
   state: PortfolioState;
   model: PortfolioReadModel | null;
   errorMessage: string | null;
@@ -904,6 +918,7 @@ function AssetsScreen({
         })}
       </View>
       <AssetStatusPanel
+        diagnosticEnabled={previewMode}
         errorMessage={errorMessage}
         networkConfigured={
           network.configurationStatus === 'configured' &&
@@ -1092,7 +1107,18 @@ export function WalletHomeShell({
         setPortfolioState(getPortfolioState(next.assets.length));
       } catch (error) {
         if (requestId !== portfolioRequestRef.current) return;
-        const message = safePortfolioMessage(error);
+        const message =
+          previewMode && typeof __DEV__ !== 'undefined' && __DEV__
+            ? safePortfolioDiagnostic(error) ?? safePortfolioMessage(error)
+            : safePortfolioMessage(error);
+        if (previewMode && typeof __DEV__ !== 'undefined' && __DEV__) {
+          secureLogger.warning('Preview portfolio request failed in Home shell', {
+            networkId: accountQuery.networkId,
+            address: accountQuery.accountAddress,
+            errorCode: safePortfolioDiagnostic(error),
+            isRefresh,
+          });
+        }
         setPortfolioError(message);
         if (isRefresh && portfolio) {
           setPortfolioState(getPortfolioState(portfolio.assets.length));
@@ -1102,7 +1128,9 @@ export function WalletHomeShell({
           setPortfolioState('unavailable');
         }
       } finally {
-        setRefreshing(false);
+        if (requestId === portfolioRequestRef.current) {
+          setRefreshing(false);
+        }
       }
     },
     [account, accountQuery, readModelService],
@@ -1189,6 +1217,7 @@ export function WalletHomeShell({
               onPress={() => setNetworkSelectorVisible(true)}
             />
             <PortfolioSummary
+              diagnosticEnabled={previewMode}
               errorMessage={portfolioError}
               model={portfolio}
               networkConfigured={
@@ -1313,6 +1342,7 @@ export function WalletHomeShell({
             }}
             onBack={() => setDestination('home')}
             onRefresh={() => void loadPortfolio(true)}
+            previewMode={previewMode}
             refreshing={refreshing}
             state={portfolioState}
           />

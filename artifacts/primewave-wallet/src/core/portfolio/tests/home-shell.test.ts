@@ -7,6 +7,7 @@ import {
   filterPortfolioAssets,
   getPortfolioState,
   homeNavigationLabels,
+  safePortfolioDiagnostic,
   safePortfolioMessage,
   shortPublicAddress,
 } from '@/src/components/WalletHomeShell.logic';
@@ -131,5 +132,13 @@ test('sanitizes application errors before they reach the Home UI', () => {
   assert.equal(
     safePortfolioMessage(new PortfolioReadModelError('READ_MODEL_AGGREGATION_FAILED')),
     'The portfolio read-model could not be generated.',
+  );
+  assert.equal(
+    safePortfolioDiagnostic(new PortfolioReadModelError('READ_MODEL_AGGREGATION_FAILED')),
+    'READ_MODEL_AGGREGATION_FAILED: The portfolio read-model could not be generated.',
+  );
+  assert.equal(
+    safePortfolioDiagnostic(new Error('private RPC URL and stack')),
+    null,
   );
 });
