@@ -1,0 +1,198 @@
+We still have a Preview runtime issue.
+
+DO NOT change the wallet architecture, portfolio state model, Preview address, RPC endpoint, or add fake data.
+
+CURRENT FACTS:
+
+Preview address:
+0x1Ef7EA6f787891789852f5E51896966b51589a62
+
+Selected network:
+BNB Smart Chain
+chainId 56
+RPC:
+https://bsc-rpc.publicnode.com
+
+The exact existing RPC path has already been proven to work:
+
+eth_chainId
+→ 0x38
+
+eth_getBalance(
+  "0x1Ef7EA6f787891789852f5E51896966b51589a62",
+  "latest"
+)
+→ 0x2291ef404290d9
+
+Actual balance:
+0.009730605969477849 BNB
+
+The full portfolio path also succeeded in the diagnostic environment:
+
+state: ready
+asset: BNB
+availability: available
+balance: positive
+
+However, the actual Replit browser Preview still displays:
+
+"Blockchain data unavailable"
+
+with:
+
+"Preview diagnostic: NETWORK_UNAVAILABLE"
+
+AND the Home screen Refresh button appears to do nothing.
+
+Reset Local Preview does not fix it.
+
+TASK: Diagnose the actual browser Preview runtime behavior.
+
+IMPORTANT:
+This is now a runtime/event/state investigation, not a portfolio redesign.
+
+1. Trace the Home Refresh button from the actual rendered WalletHomeShell through every handler it invokes.
+
+2. Add temporary development-only diagnostics around:
+
+- Refresh button press
+- refresh handler invocation
+- current account ID/address
+- current network ID
+- refresh request ID
+- Preview portfolio request start
+- eth_chainId request start/result/failure
+- eth_getBalance request start/result/failure
+- portfolio read-model request start/result
+- stale-request checks
+- loading state changes
+- error state changes
+- final rendered portfolio state
+
+Only log safe public/runtime data.
+
+NEVER log:
+- private keys
+- mnemonic/recovery phrase
+- PIN
+- SecureStore data
+- vault material
+- signing capability
+- authentication secrets
+- API keys
+
+3. Specifically verify whether the Refresh button's onPress/onClick actually fires.
+
+If it does NOT fire:
+- find why the button is not receiving the event
+- inspect Pressable/Touchable/button layering
+- inspect disabled/loading state
+- inspect pointerEvents
+- inspect any overlay intercepting touches
+- inspect navigation/container layers
+
+If it DOES fire:
+- trace whether it actually invokes the Preview portfolio refresh
+- trace whether the refresh promise starts
+- trace whether it resolves/rejects
+- trace whether the UI state is updated afterward
+
+4. Compare initial portfolio load versus manual Refresh.
+
+Determine whether they use:
+A. the same function
+B. different functions
+C. the same Preview adapter
+D. different network/account context
+E. a stale request/context guard that incorrectly rejects the refreshed result
+F. an error state that remains latched and prevents successful refresh
+
+5. Verify the browser Preview runtime specifically.
+
+The previous direct browser/RPC diagnostic proved that the browser environment can successfully execute:
+
+POST https://bsc-rpc.publicnode.com
+
+with:
+
+eth_chainId
+eth_getBalance
+
+Therefore do NOT conclude merely "RPC works" or "RPC is down".
+
+We need to know why the actual rendered WaveX Preview instance is receiving/normalizing:
+
+NETWORK_UNAVAILABLE
+
+while the same browser environment can successfully make the request.
+
+6. Inspect for a Preview-specific issue such as:
+
+- stale closure
+- incorrect useEffect dependency
+- refresh callback referencing old network/address
+- refresh state not triggering a new read
+- request ID invalidation
+- AbortController cancellation
+- component unmount/remount
+- Preview mode state being recreated
+- exception swallowed before state update
+- promise not awaited
+- error state persisting after a successful request
+- refresh button being visually present but functionally disabled
+- Web Preview-specific event handling
+
+Do not assume any of these is the cause; prove the actual cause from runtime evidence.
+
+7. IMPORTANT UX REQUIREMENT:
+
+Once the transport succeeds:
+
+0 balance → AVAILABLE → show 0 BNB / $0.00
+
+positive balance → AVAILABLE → show actual balance
+
+RPC failure → UNAVAILABLE → show Blockchain data unavailable
+
+Do not modify this state model because of the current bug.
+
+8. If the root cause is a small Preview refresh/runtime bug, implement the MINIMAL fix.
+
+Do not introduce a broad refactor.
+
+9. After fixing, verify in the actual browser Preview:
+
+- BNB selected
+- Home loads
+- real 0.009730605969477849 BNB is displayed
+- pressing Refresh visibly triggers a new read
+- Refresh successfully updates the displayed data
+- temporarily switch to another configured network and back if supported
+- zero balance remains a valid available state
+- genuine RPC failure still produces unavailable state
+- no fake balances
+
+10. Run:
+
+- focused Preview tests
+- portfolio tests
+- full mobile test suite
+- TypeScript
+- Expo checks
+- iOS static bundle
+- Android static bundle
+- git diff --check
+
+FINAL REPORT MUST INCLUDE:
+
+A. exact root cause
+B. exact file/function responsible
+C. runtime evidence proving the Refresh button event fires or does not fire
+D. runtime evidence for the portfolio request
+E. runtime evidence for eth_chainId
+F. runtime evidence for eth_getBalance
+G. why the UI remained NETWORK_UNAVAILABLE
+H. exact minimal fix made
+I. test results
+
+Do not proceed to UI/UX redesign.
