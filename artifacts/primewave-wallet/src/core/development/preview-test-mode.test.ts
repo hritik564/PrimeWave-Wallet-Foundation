@@ -86,7 +86,7 @@ test('uses only public simulated state for create, PIN, lock, unlock, and reset'
     });
 
     const wallet = preview.createPreviewWallet();
-    assert.equal(wallet.accounts[0].address, '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266');
+    assert.equal(wallet.accounts[0].address, '0x1Ef7EA6f787891789852f5E51896966b51589a62');
     assert.equal(environment.storage.values.size, 1);
     const storedState = [...environment.storage.values.values()][0];
     assert.equal(storedState.includes('mnemonic'), false);
@@ -106,7 +106,7 @@ test('uses only public simulated state for create, PIN, lock, unlock, and reset'
     preview.lockPreviewWallet();
     assert.equal(preview.getState().phase, 'locked');
     assert.equal(preview.getWallet(), null);
-    assert.equal(preview.getDisplayWallet().accounts[0].address, '0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266');
+    assert.equal(preview.getDisplayWallet().accounts[0].address, '0x1Ef7EA6f787891789852f5E51896966b51589a62');
     assert.equal(preview.verifyPreviewPin('482913'), true);
 
     preview.resetPreviewWallet();

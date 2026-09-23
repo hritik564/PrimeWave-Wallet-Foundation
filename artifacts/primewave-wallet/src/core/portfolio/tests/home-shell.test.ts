@@ -61,7 +61,7 @@ test('keeps the Home navigation contract explicit', () => {
     'Activity',
     'Settings',
   ]);
-  assert.equal(shortPublicAddress('0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266'), '0xf39F…2266');
+  assert.equal(shortPublicAddress('0x1Ef7EA6f787891789852f5E51896966b51589a62'), '0x1Ef7…9a62');
   assert.equal(shortPublicAddress('0x1234'), '0x1234');
   assert.equal(shortPublicAddress('   '), 'Unavailable');
 });
