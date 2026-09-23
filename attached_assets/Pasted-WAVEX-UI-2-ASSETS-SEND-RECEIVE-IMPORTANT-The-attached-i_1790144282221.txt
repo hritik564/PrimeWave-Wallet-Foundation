@@ -1,0 +1,1162 @@
+WAVEX UI-2 — ASSETS + SEND + RECEIVE
+
+IMPORTANT:
+The attached image is the PRIMARY VISUAL REFERENCE for this task.
+
+Reference name:
+
+"WAVEX UI-2 — ASSETS + SEND + RECEIVE"
+
+DO NOT reinterpret the visual direction.
+
+DO NOT invent an alternative design.
+
+DO NOT make independent aesthetic decisions where the reference and this specification already define the answer.
+
+The attached reference image + this prompt together form the UI-2 specification.
+
+==================================================
+PRODUCT
+==================================================
+
+Product:
+
+WAVEX
+
+UX benchmark:
+
+MetaMask-level usability.
+
+Visual identity:
+
+WaveX.
+
+The goal is:
+
+SIMPLE ON THE SURFACE.
+SOPHISTICATED UNDER THE HOOD.
+
+UI-0 design system is authoritative.
+
+UI-1 App Shell + Home is already approved.
+
+UI-2 must visually continue the same product language.
+
+==================================================
+CRITICAL ARCHITECTURE RULE
+==================================================
+
+THIS IS A PRESENTATION-LAYER SPRINT.
+
+DO NOT rewrite business logic.
+
+DO NOT recreate blockchain logic inside screens.
+
+DO NOT create duplicate state management.
+
+Existing production services/models are authoritative.
+
+DO NOT modify:
+
+- wallet engine
+- SecureStore
+- vault
+- authentication
+- PIN
+- biometrics
+- signing
+- transaction construction
+- broadcasting
+- confirmation
+- EVM RPC
+- account state
+- network registry
+- token engine
+- portfolio aggregation
+- portfolio read model
+- activity engine
+- swap engine
+- DApp engine
+- backend
+- Preview Test Mode
+
+The existing Send and Receive functionality is authoritative.
+
+UI must consume existing models/services.
+
+==================================================
+SCREENS IN THIS SPRINT
+==================================================
+
+Implement/refine ONLY:
+
+1. Assets
+2. Asset Details
+3. Send
+4. Token Selector
+5. Receive
+6. Receive Network Selector
+
+Do NOT redesign:
+
+Home
+Swap
+Activity
+DApps
+Settings
+Onboarding
+
+Home/App Shell/UI-1 are already approved.
+
+==================================================
+VISUAL DIRECTION
+==================================================
+
+Follow the attached reference closely.
+
+Use UI-0 tokens.
+
+Background:
+near-black / midnight navy.
+
+Surfaces:
+dark elevated navy.
+
+Primary:
+WaveX cyan.
+
+Secondary:
+electric blue.
+
+Accent:
+controlled violet.
+
+Success:
+green.
+
+Warning:
+yellow.
+
+Error:
+red.
+
+Text:
+white primary.
+cool blue-gray secondary.
+
+Borders:
+subtle blue.
+
+Glow:
+restrained.
+
+IMPORTANT:
+
+Do not turn the wallet into a neon dashboard.
+
+Do not add unnecessary decorative graphics.
+
+Prioritize:
+clarity
+trust
+financial readability
+fast scanning
+touch usability.
+
+==================================================
+SCREEN 1 — ASSETS
+==================================================
+
+The Assets screen is the user's complete portfolio browsing surface.
+
+Follow the first phone in the attached reference.
+
+Header:
+
+Assets
+
+Show the real account context using the existing account/network architecture.
+
+The screen should visually prioritize:
+
+1. Portfolio value if genuinely available
+2. Search
+3. Filters
+4. Asset list
+
+Do not fabricate portfolio fiat values.
+
+If fiat data is unavailable, gracefully use the existing data-state behavior.
+
+==================================================
+ASSET SEARCH
+==================================================
+
+Use the existing Asset search behavior.
+
+Search should support the already implemented fields:
+
+- asset name
+- symbol
+- contract address
+- asset ID
+
+Case-insensitive local search.
+
+Do NOT add a new backend search.
+
+Do NOT add remote token search.
+
+Do NOT make network calls just to search the existing asset list.
+
+Use the UI-0 search component.
+
+Visual:
+
+rounded dark search field
+search icon
+clear affordance when text exists
+
+==================================================
+FILTERS
+==================================================
+
+Use compact horizontal filters.
+
+Primary filter structure should follow the existing implemented behavior:
+
+All
+Visible
+Hidden
+
+If the current production Assets implementation has other legitimate filters, preserve them.
+
+Do NOT invent NFT/Popular/Recent behavior unless the underlying data model already supports it.
+
+The attached reference's "Tokens / NFTs / Popular / Recent" is visual inspiration only.
+
+Existing business logic remains authoritative.
+
+Selected filter:
+
+WaveX cyan.
+
+Unselected:
+
+dark elevated surface.
+
+==================================================
+ASSET LIST
+==================================================
+
+Use the existing PortfolioReadModel and Asset presentation model.
+
+Use UI-0 AssetRow.
+
+Do NOT create another asset-row implementation.
+
+Visual hierarchy:
+
+TOKEN ICON
+
+Asset Name
+SYMBOL • NETWORK
+
+                         BALANCE
+                         FIAT VALUE
+
+Examples in the reference image are illustrative.
+
+DO NOT hardcode:
+BNB
+USDT
+ETH
+POL
+MATIC
+or balances.
+
+Render whatever the real portfolio model provides.
+
+Preserve:
+
+- asset identity
+- asset type
+- network
+- contract address
+- metadata
+- visibility
+- verification status
+- provenance
+- availability
+- zero balance
+- positive balance
+- unavailable state
+
+==================================================
+ZERO BALANCE
+==================================================
+
+Strict requirement:
+
+A successfully-read zero balance is valid data.
+
+Show:
+
+0
+
+$0.00
+
+or the appropriate native/token representation.
+
+Do NOT show:
+
+Blockchain data unavailable
+
+when the underlying read succeeded with zero.
+
+==================================================
+UNAVAILABLE ASSET
+==================================================
+
+If an individual asset is unavailable:
+
+Do NOT poison the entire portfolio.
+
+The asset should show its appropriate unavailable state.
+
+Other successfully-read assets remain visible.
+
+Use UI-0 status primitives.
+
+==================================================
+ASSET EMPTY STATES
+==================================================
+
+Support:
+
+No assets
+
+No matching search results
+
+No visible assets
+
+No hidden assets
+
+Unavailable data
+
+Use UI-0 EmptyState/ErrorState.
+
+Do not use generic "Blockchain unavailable" for every empty state.
+
+Examples:
+
+No assets found
+
+Try adjusting your search or filters.
+
+For genuine RPC/network failure:
+
+Couldn't load your assets.
+
+Check your connection and try again.
+
+==================================================
+ASSET LOADING
+==================================================
+
+Use UI-0 skeletons.
+
+Do not use a giant spinner.
+
+Show several realistic asset-row skeletons.
+
+Maintain screen structure while loading.
+
+==================================================
+ASSET REFRESH
+==================================================
+
+Use existing portfolio refresh mechanism.
+
+Refresh must:
+
+- perform a real read
+- preserve account
+- preserve selected network
+- prevent duplicate requests
+- clear loading state
+- respect stale-request protection
+
+Do not introduce polling.
+
+==================================================
+SCREEN 2 — ASSET DETAILS
+==================================================
+
+When an asset row is selected, open the existing asset detail destination/placeholder and visually refine it.
+
+Follow the second phone in the reference.
+
+Header:
+
+Back
+Asset name
+Optional settings/details icon if supported
+
+Primary:
+
+Asset icon
+
+Asset name
+Symbol
+Network
+
+Balance
+
+Fiat value if real data exists.
+
+Below:
+
+Price
+Network
+Contract
+Explorer
+
+Only display fields supported by the existing asset model.
+
+For native assets:
+
+Contract should say:
+
+Native Asset
+
+Do not fabricate a contract address.
+
+For ERC-20:
+
+Show the actual contract address.
+
+Use shortened display with copy/full-address access where the existing architecture supports it.
+
+Actions:
+
+View on Explorer
+Asset details
+Hide asset
+
+Only make actions functional if existing logic supports them.
+
+Do not invent token management functionality.
+
+==================================================
+ASSET VERIFICATION
+==================================================
+
+Verification status must remain separate from:
+
+- logo
+- name
+- symbol
+- popularity
+- balance
+
+Do not visually imply verification simply because an icon exists.
+
+Do not label assets scam/malicious without trusted evidence.
+
+==================================================
+SCREEN 3 — SEND
+==================================================
+
+Follow the third phone in the reference.
+
+The Send screen should feel extremely simple.
+
+Hierarchy:
+
+Send
+
+From
+To
+Asset
+Amount
+
+Then:
+
+Review
+
+Use the existing WalletSendScreen and send logic.
+
+DO NOT recreate validation logic in the UI.
+
+==================================================
+FROM
+==================================================
+
+Use the existing account context.
+
+Display:
+
+Account 1
+0x1Ef7...9a62
+
+Use actual account data.
+
+Allow account context changes only through existing architecture.
+
+Do not expose secrets.
+
+==================================================
+NETWORK
+==================================================
+
+Send must display/use the existing selected network.
+
+Network changes must use the existing network selection architecture.
+
+Do not silently change network.
+
+If the existing Send flow allows explicit network selection, visually present it as shown in the reference.
+
+==================================================
+TO FIELD
+==================================================
+
+Use the existing recipient validation.
+
+Visual:
+
+To
+
+Enter address or scan
+
+Support existing Scan placeholder/implementation.
+
+Do not implement a new scanner in this sprint.
+
+When an address is entered:
+
+show appropriate validation state.
+
+Valid:
+positive confirmation treatment.
+
+Invalid:
+clear error treatment.
+
+Do not display raw technical validation errors.
+
+==================================================
+ASSET SELECTOR
+==================================================
+
+Tapping the Asset field opens the Token Selector bottom sheet.
+
+The selector must use the existing account/network asset context.
+
+Do not create a separate asset registry.
+
+==================================================
+SCREEN 4 — TOKEN SELECTOR
+==================================================
+
+Follow the fourth phone in the reference.
+
+Bottom sheet:
+
+Select Token
+
+Search tokens...
+
+Filters where existing logic supports them.
+
+Asset rows:
+
+Token icon
+Name
+Network
+Balance
+Fiat value
+
+Selected token:
+cyan check.
+
+IMPORTANT:
+
+Only show assets available in the current Send context.
+
+Respect:
+
+- account
+- network
+- visibility
+- availability
+- asset identity
+
+Do not allow a token from another network to be silently selected.
+
+==================================================
+AMOUNT
+==================================================
+
+Use existing exact amount validation.
+
+Visual:
+
+Amount
+
+0.00
+
+≈ $0.00
+
+MAX
+
+Use actual fiat conversion only if available.
+
+Do not fabricate fiat.
+
+MAX must use the existing exact balance behavior.
+
+Do not implement a second MAX calculation.
+
+For native assets:
+
+preserve the existing gas/fee safety behavior.
+
+Do not subtract arbitrary hidden amounts in UI.
+
+The existing transaction construction/review layer remains authoritative.
+
+==================================================
+SEND REVIEW
+==================================================
+
+This sprint is NOT redesigning Transaction Review.
+
+The existing review flow remains authoritative.
+
+Send screen should route to the existing Review screen.
+
+Do not duplicate:
+
+- gas estimation
+- nonce
+- fee calculation
+- balance checks
+- transaction construction
+
+inside the Send UI.
+
+==================================================
+SEND VALIDATION STATES
+==================================================
+
+The visual system must support:
+
+Empty
+Typing
+Valid
+Invalid
+Insufficient balance
+Zero amount
+Over-precision
+Network unavailable
+Token unavailable
+Loading
+
+Use existing logic to determine state.
+
+Do not recreate validation rules.
+
+==================================================
+SEND BUTTON
+==================================================
+
+Use UI-0 primary button.
+
+Disabled until existing send validation says the transaction is reviewable.
+
+Do not use visual enabled state to bypass business validation.
+
+==================================================
+SCREEN 5 — RECEIVE
+==================================================
+
+Follow the fifth phone in the reference.
+
+Receive should be extremely simple.
+
+Header:
+
+Receive
+
+Primary:
+
+QR code
+
+Then:
+
+Account 1
+0x1Ef7EA6f...9a62
+
+Copy button
+
+Network selector
+
+Network warning
+
+Share
+
+Use the existing Receive screen implementation.
+
+Do not recreate QR generation.
+
+Do not modify QR payload behavior.
+
+QR must continue containing ONLY the public address as currently implemented.
+
+No secrets.
+
+==================================================
+RECEIVE NETWORK
+==================================================
+
+Follow the sixth phone.
+
+Tapping network opens the network selector bottom sheet.
+
+Use existing NetworkRegistry.
+
+Each network:
+
+Icon
+Name
+Native symbol
+Status
+
+Selected:
+
+cyan check.
+
+Unconfigured:
+
+Not configured.
+
+Disabled:
+
+Disabled.
+
+PrimeWave:
+
+must remain honest if unconfigured.
+
+Do not invent PrimeWave Mainnet configuration.
+
+==================================================
+RECEIVE NETWORK WARNING
+==================================================
+
+The warning must remain clear.
+
+Example:
+
+Only send BNB Smart Chain assets to this address.
+
+Sending assets from another network may result in permanent loss.
+
+Use the existing network-aware warning logic.
+
+Do not weaken or remove it.
+
+Do not make warnings visually overwhelming.
+
+==================================================
+RECEIVE QR
+==================================================
+
+QR presentation:
+
+Large
+High contrast
+Clear quiet zone
+Easy to scan
+
+Use existing QR implementation.
+
+Do not add a logo to the QR unless the existing implementation already supports it safely.
+
+Do not encode:
+
+- private key
+- mnemonic
+- PIN
+- seed
+- signing capability
+
+==================================================
+COPY / SHARE
+==================================================
+
+Copy:
+
+Use existing clipboard implementation.
+
+Remember:
+
+WaveX should not read clipboard contents.
+
+Share:
+
+Use existing native share/web fallback behavior.
+
+Do not create another share implementation.
+
+==================================================
+NETWORK + ACCOUNT ISOLATION
+==================================================
+
+Assets:
+
+account-scoped + network-scoped.
+
+Send:
+
+account-scoped + network-scoped.
+
+Receive:
+
+account-scoped + selected network.
+
+Never leak an asset from one network into another.
+
+Never show the wrong account address.
+
+==================================================
+PREVIEW TEST MODE
+==================================================
+
+Preserve the existing Preview Test Mode.
+
+Do not hardcode the Preview address in UI components.
+
+Use the existing Preview identity source.
+
+Preview must continue using real read-only blockchain data.
+
+No fake balance.
+
+No fake token balance.
+
+No private key.
+
+No mnemonic.
+
+No SecureStore.
+
+No signing.
+
+No broadcast.
+
+No backend.
+
+==================================================
+ERROR HANDLING
+==================================================
+
+Primary user-facing errors must be human readable.
+
+Bad:
+
+NETWORK_UNAVAILABLE
+eth_chainId
+FetchRpcTransport
+
+Good:
+
+Couldn't load your assets.
+
+Check your connection and try again.
+
+Technical diagnostics may remain development-only.
+
+==================================================
+MOTION
+==================================================
+
+Use UI-0 motion tokens.
+
+Use subtle motion for:
+
+- screen transition
+- token selector opening
+- network selector opening
+- asset selection
+- filter selection
+- button press
+- refresh
+
+No excessive animation.
+
+==================================================
+RESPONSIVE
+==================================================
+
+Verify:
+
+390x844
+402x874
+
+Ensure:
+
+- search fits
+- asset rows remain readable
+- amount field remains comfortable
+- QR remains large enough
+- bottom sheets respect safe areas
+- buttons remain accessible
+
+==================================================
+ACCESSIBILITY
+==================================================
+
+Interactive controls must have accessible labels.
+
+Examples:
+
+Search assets
+Clear search
+Filter assets
+Open asset
+Select token
+Enter recipient address
+Scan address
+Select network
+Copy address
+Share address
+Enter amount
+Use maximum amount
+Review transaction
+
+Do not rely on color alone.
+
+==================================================
+UI-0 REUSE
+==================================================
+
+Reuse:
+
+WaveXButton
+WaveXIconButton
+WaveXCard
+WaveXInput
+WaveXSearchInput
+WaveXSegmentedControl
+WaveXChip
+WaveXBadge
+WaveXNetworkBadge
+WaveXAssetIcon
+WaveXAssetRow
+WaveXSectionHeader
+WaveXBottomSheet
+WaveXModal
+WaveXToast
+WaveXSkeleton
+WaveXEmptyState
+WaveXErrorState
+WaveXStatusIndicator
+
+Do not create duplicate equivalents.
+
+==================================================
+VISUAL DENSITY
+==================================================
+
+Assets should feel information-rich without becoming crowded.
+
+Send should feel focused.
+
+Receive should feel extremely simple.
+
+Do not leave excessive empty space.
+
+Do not cram too many controls.
+
+The reference image is the target balance.
+
+==================================================
+TESTING
+==================================================
+
+Add/update focused tests for:
+
+ASSETS:
+- rendering
+- search
+- filters
+- positive balance
+- zero balance
+- unavailable asset
+- empty state
+- loading
+- refresh
+- account/network isolation
+- navigation
+
+ASSET DETAILS:
+- correct asset
+- correct network
+- correct balance
+- native asset behavior
+- ERC-20 contract behavior
+- explorer behavior
+- unavailable state
+
+SEND:
+- account
+- network
+- asset selection
+- recipient
+- validation
+- amount
+- MAX
+- review gating
+- navigation
+
+TOKEN SELECTOR:
+- correct assets
+- search
+- selection
+- network isolation
+- account isolation
+
+RECEIVE:
+- correct public address
+- QR payload
+- copy
+- share
+- network selection
+- warning
+- Preview isolation
+
+Do not weaken existing tests.
+
+==================================================
+BUILD VALIDATION
+==================================================
+
+Run:
+
+- focused UI-2 tests
+- full mobile test suite
+- TypeScript
+- Expo checks
+- iOS static export
+- Android static export
+- git diff --check
+
+==================================================
+SECURITY DIFF INSPECTION
+==================================================
+
+Verify the diff contains NO:
+
+- private keys
+- mnemonic
+- seed phrase
+- PIN
+- SecureStore secrets
+- vault material
+- signing capabilities
+- authentication secrets
+- API keys
+
+No secrets should enter UI state.
+
+==================================================
+VISUAL VALIDATION
+==================================================
+
+Actually render the following in Preview:
+
+1. Assets loaded
+2. Assets search
+3. Assets filtered
+4. Asset Details
+5. Send empty
+6. Send populated
+7. Token Selector
+8. Receive
+9. Receive Network Selector
+10. Send validation state
+11. Assets loading
+12. Assets empty/error state
+
+Capture screenshots at:
+
+390x844
+402x874
+
+Compare directly against the attached UI-2 reference.
+
+Do not merely report "looks similar".
+
+Identify any deviations.
+
+==================================================
+IMPORTANT — DO NOT REDESIGN OTHER SCREENS
+==================================================
+
+This sprint ONLY covers:
+
+Assets
+Asset Details
+Send
+Token Selector
+Receive
+Receive Network Selector
+
+Do NOT redesign:
+
+Home
+Swap
+Activity
+DApps
+Settings
+Onboarding
+
+==================================================
+STOP CONDITION
+==================================================
+
+DO NOT automatically start UI-3.
+
+Stop after UI-2.
+
+FINAL REPORT MUST INCLUDE:
+
+1. Files changed
+2. Screens implemented
+3. UI-0 components reused
+4. Existing services consumed
+5. Business logic untouched
+6. Assets screenshot
+7. Asset Details screenshot
+8. Send screenshot
+9. Token Selector screenshot
+10. Receive screenshot
+11. Receive Network Selector screenshot
+12. Search/filter verification
+13. Send validation verification
+14. Receive QR/address verification
+15. Positive balance verification
+16. Zero balance verification
+17. Focused tests
+18. Full test suite
+19. TypeScript
+20. iOS export
+21. Android export
+22. git diff --check
+23. Security inspection
+24. Deviations from attached reference
+
+DO NOT PROCEED TO UI-3.
