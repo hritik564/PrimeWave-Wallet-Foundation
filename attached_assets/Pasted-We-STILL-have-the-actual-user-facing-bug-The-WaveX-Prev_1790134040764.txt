@@ -1,0 +1,378 @@
+We STILL have the actual user-facing bug.
+
+The WaveX Preview Home screen continues to show:
+
+"Blockchain data unavailable"
+
+"Blockchain data is currently unavailable. No balance is being shown as zero."
+
+"Preview diagnostic: NETWORK_UNAVAILABLE: Portfolio data is currently unavailable. Try refreshing again later."
+
+The previous task reported that the underlying RPC and portfolio diagnostic path works, but the actual browser Preview still fails.
+
+Therefore the previous task DID NOT VERIFY THE REAL USER FLOW.
+
+DO NOT make another assumption about the root cause.
+
+DO NOT report success based only on:
+- a direct RPC test
+- a unit test
+- a diagnostic service invocation
+- a static bundle
+- a browser bundle loading
+
+We need to reproduce the EXACT rendered Home screen and trace the real request.
+
+CURRENT PREVIEW ADDRESS:
+
+0x1Ef7EA6f787891789852f5E51896966b51589a62
+
+CURRENT NETWORK:
+
+BNB Smart Chain
+chainId: 56
+
+CURRENT RPC:
+
+https://bsc-rpc.publicnode.com
+
+KNOWN GOOD DIRECT RPC RESULT:
+
+eth_chainId
+→ 0x38
+
+eth_getBalance(
+  "0x1Ef7EA6f787891789852f5E51896966b51589a62",
+  "latest"
+)
+→ 0x2291ef404290d9
+
+That corresponds to:
+
+0.009730605969477849 BNB
+
+IMPORTANT:
+
+The user is currently seeing the actual Home screen with BNB selected and "Blockchain data unavailable".
+
+The goal is to determine why THAT screen reaches NETWORK_UNAVAILABLE.
+
+==================================================
+PART 1 — REPRODUCE THE REAL HOME FLOW
+==================================================
+
+Do whatever is necessary in the Preview to reach:
+
+Preview Test Mode
+→ PIN
+→ Home
+→ BNB Smart Chain
+
+Do NOT stop at onboarding.
+
+Do NOT report verification complete if WalletHomeShell is not mounted.
+
+The final diagnostic must be performed while WalletHomeShell is visibly rendered.
+
+==================================================
+PART 2 — TRACE THE REAL REQUEST
+==================================================
+
+Add temporary __DEV__ diagnostics around the EXACT code path used by the rendered Home screen.
+
+Trace:
+
+WalletHomeShell
+→ portfolio loader
+→ Preview adapter
+→ PortfolioReadModelService
+→ PortfolioAggregationService
+→ NativeAssetBalanceService
+→ EvmAccountStateService
+→ EvmRpcProvider
+→ FetchRpcTransport
+→ browser fetch
+
+For every step log a unique request ID.
+
+Example:
+
+[WAVEX-PREVIEW] HOME_LOAD_START request=123
+[WAVEX-PREVIEW] RPC_CHAIN_START request=123
+[WAVEX-PREVIEW] RPC_CHAIN_RESULT request=123
+[WAVEX-PREVIEW] RPC_BALANCE_START request=123
+[WAVEX-PREVIEW] RPC_BALANCE_RESULT request=123
+[WAVEX-PREVIEW] PORTFOLIO_RESULT request=123
+[WAVEX-PREVIEW] HOME_STATE request=123
+
+Only log safe public information.
+
+NEVER log:
+- mnemonic
+- private key
+- PIN
+- SecureStore contents
+- vault material
+- signing capability
+- API keys
+- authentication secrets
+
+==================================================
+PART 3 — IDENTIFY THE FIRST FAILURE
+==================================================
+
+We need the FIRST point where the actual Home request differs from the known-good direct request.
+
+Determine exactly which one happens:
+
+A. Home never starts portfolio loading
+
+B. Home starts portfolio loading but Preview adapter isn't called
+
+C. Preview adapter is called but uses the wrong address
+
+D. Preview adapter is called but uses the wrong network
+
+E. Preview adapter is called but does not reach EvmRpcProvider
+
+F. EvmRpcProvider is called but eth_chainId fails
+
+G. eth_chainId succeeds but the result is discarded
+
+H. eth_getBalance is never called
+
+I. eth_getBalance succeeds but its result is discarded
+
+J. Portfolio service receives the balance but converts it to unavailable
+
+K. PortfolioReadModel receives READY data but converts it to unavailable
+
+L. WalletHomeShell receives READY data but renders the unavailable state
+
+M. A stale-request guard discards the successful result
+
+N. An exception occurs between successful RPC response and UI state
+
+O. Something else — identify it precisely.
+
+Do not guess.
+
+==================================================
+PART 4 — CAPTURE THE ACTUAL BROWSER FETCH
+==================================================
+
+For the actual Home screen request, record:
+
+- request method
+- RPC endpoint hostname only
+- JSON-RPC method
+- HTTP status
+- whether browser fetch resolved/rejected
+- JSON-RPC result/error
+- normalized provider error
+- request ID
+- network ID
+- chain ID
+- address
+- final balance state
+
+For eth_getBalance specifically, confirm whether the actual Home request receives:
+
+0x2291ef404290d9
+
+If it does, trace what happens to that exact value afterward.
+
+==================================================
+PART 5 — CHECK FOR A DIFFERENCE BETWEEN DIAGNOSTIC AND REAL HOME
+==================================================
+
+This is critical.
+
+Compare the code used by the successful diagnostic request with the code used by WalletHomeShell.
+
+They must be compared line-by-line for:
+
+- address
+- networkId
+- chainId
+- RPC endpoint
+- provider instance
+- transport instance
+- request parameters
+- block tag
+- Preview mode state
+- account context
+- stale request handling
+- error normalization
+
+If they are not actually using the same runtime path, explain the difference.
+
+Do NOT assume that because they call the same service names they are identical.
+
+==================================================
+PART 6 — CHECK THE NEW MEMOIZATION FIX
+==================================================
+
+Verify the previous fix actually exists in the CURRENT running Preview bundle.
+
+Specifically verify:
+
+- Preview display wallet identity is stable across FoundationScreen renders
+- WalletHomeShell does not receive a newly-created account object every render
+- loadPortfolio does not get recreated unnecessarily
+- portfolio useEffect is not repeatedly cleaning up
+- portfolioRequestRef is not incremented immediately after a successful request begins
+- successful responses are not being classified as stale
+- setRefreshing(false) always executes in finally
+- an error from an old request cannot overwrite a newer successful request
+
+Add request lifecycle diagnostics to prove this.
+
+==================================================
+PART 7 — CHECK THE REFRESH BUTTON
+==================================================
+
+While the ACTUAL Home screen is visible:
+
+1. Capture initial load.
+2. Press Refresh.
+3. Capture the complete second request.
+
+We need to see:
+
+REFRESH_PRESS
+→ new request ID
+→ eth_chainId
+→ eth_getBalance
+→ portfolio result
+→ refreshing=false
+→ Home state updated
+
+If Refresh is pressed and NO new request occurs, identify exactly why.
+
+If a new request occurs but is discarded, identify exactly why.
+
+If a new request succeeds but UI stays unavailable, identify exactly why.
+
+==================================================
+PART 8 — DO NOT CHANGE STATE SEMANTICS
+==================================================
+
+Keep this requirement:
+
+RPC succeeds with zero:
+
+AVAILABLE
+→ 0 BNB
+→ $0.00
+
+RPC succeeds with positive balance:
+
+AVAILABLE
+→ real BNB balance
+
+RPC genuinely fails:
+
+UNAVAILABLE
+→ Blockchain data unavailable
+
+Do NOT solve this by replacing NETWORK_UNAVAILABLE with zero.
+
+Do NOT hide genuine failures.
+
+==================================================
+PART 9 — MINIMAL FIX ONLY
+==================================================
+
+After identifying the FIRST real failure in the actual Home runtime:
+
+Implement the smallest possible fix.
+
+Do NOT:
+
+- add fake balances
+- add a backend proxy
+- change RPC providers
+- hardcode BNB
+- change wallet architecture
+- change SecureStore
+- change signing
+- change vault
+- change production wallet behavior
+- bypass EvmRpcProvider
+- remove stale-request protection
+- remove error handling
+
+==================================================
+PART 10 — ACTUAL USER-FLOW VERIFICATION
+==================================================
+
+After the fix, the browser Preview MUST be driven through the actual flow:
+
+1. Reset Local Preview
+2. Complete Preview onboarding
+3. Enter Preview PIN
+4. Reach Home
+5. Select BNB Smart Chain
+6. Wait for portfolio load
+7. Observe Home
+8. Press Refresh
+9. Observe second request
+10. Verify displayed BNB balance
+
+Expected:
+
+0.009730605969477849 BNB
+
+or an appropriately formatted equivalent.
+
+The UI must NOT show:
+
+"Blockchain data unavailable"
+
+when that successful balance is returned.
+
+Then test a zero-balance network/address if available.
+
+Expected:
+
+0 BNB
+$0.00
+
+NOT:
+
+Blockchain data unavailable
+
+==================================================
+FINAL REPORT
+==================================================
+
+Do not say "fixed" unless the ACTUAL rendered Home screen has displayed the real BNB balance.
+
+Report:
+
+1. First failing runtime step
+2. Exact file/function
+3. Actual browser evidence
+4. Why previous diagnostic tests passed while Home failed
+5. Exact minimal change
+6. Actual Home screenshot/result after fix
+7. Refresh request evidence
+8. Focused tests
+9. Full tests
+10. TypeScript
+11. Expo checks
+12. iOS bundle
+13. Android bundle
+14. git diff --check
+
+The acceptance criterion is NOT "the RPC works".
+
+The acceptance criterion is:
+
+ACTUAL WAVEX HOME SCREEN
+→ BNB Smart Chain
+→ real RPC
+→ real balance
+→ balance displayed to user
+→ Refresh performs another real read.
