@@ -9,6 +9,7 @@ import {
   View,
 } from 'react-native';
 import { theme } from '@/src/theme';
+import { WaveXNetworkBadge } from '@/src/design-system';
 import type { EvmNetwork } from '@/src/core/networks';
 import type { Wallet } from '@/src/core/wallet/models';
 import { shortPublicAddress } from './WalletHomeShell.logic';
@@ -32,10 +33,12 @@ export function ReceiveScreen({
   wallet,
   network,
   onBack,
+  onNetworkPress,
 }: {
   wallet: Wallet;
   network: EvmNetwork;
   onBack: () => void;
+  onNetworkPress: () => void;
 }) {
   const account = wallet.accounts[0];
   const address = account?.address.trim() ?? '';
@@ -94,9 +97,11 @@ export function ReceiveScreen({
         </Text>
       </View>
 
-      <View
+      <Pressable
         accessibilityLabel={`Network ${network.displayName}, ${networkStatus}`}
-        style={styles.networkContext}
+        accessibilityRole="button"
+        onPress={onNetworkPress}
+        style={({ pressed }) => [styles.networkContext, pressed && styles.pressed]}
       >
         <View style={styles.networkIcon}>
           <Ionicons
@@ -107,17 +112,15 @@ export function ReceiveScreen({
         </View>
         <View style={styles.networkCopy}>
           <Text style={styles.cardEyebrow}>SELECTED NETWORK</Text>
-          <Text style={styles.networkName}>{network.displayName}</Text>
-          <Text style={styles.networkMeta}>
-            {network.nativeCurrency.symbol} • {networkStatus}
-          </Text>
+          <WaveXNetworkBadge name={network.displayName} symbol={network.nativeCurrency.symbol} />
+          <Text style={styles.networkMeta}>{networkStatus}</Text>
         </View>
         <Ionicons
           name={configured ? 'checkmark-circle-outline' : 'information-circle-outline'}
           size={20}
           color={configured ? theme.states.success : theme.states.warning}
         />
-      </View>
+      </Pressable>
 
       <View style={styles.receiveCard}>
         <View

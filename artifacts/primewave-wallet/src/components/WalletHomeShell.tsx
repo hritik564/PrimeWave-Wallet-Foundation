@@ -4,25 +4,30 @@ import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
+  Linking,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/src/theme';
 import {
   WaveXAssetRow,
+  WaveXAssetIcon,
   WaveXBadge,
+  WaveXButton,
   WaveXBottomNavigation,
   WaveXBottomSheet,
   WaveXErrorState,
   WaveXEmptyState,
   WaveXLoadingState,
+  WaveXNetworkBadge,
+  WaveXSearchInput,
+  WaveXSegmentedControl,
+  WaveXSectionHeader,
   WaveXSkeleton,
   WaveXStatusIndicator,
 } from '@/src/design-system';
@@ -79,7 +84,16 @@ import {
 
 const iconSource = require('../../assets/images/icon.png');
 
-type Destination = 'home' | 'assets' | 'receive' | 'send' | 'swap' | 'activity' | 'settings' | 'dapps';
+type Destination =
+  | 'home'
+  | 'assets'
+  | 'asset-details'
+  | 'receive'
+  | 'send'
+  | 'swap'
+  | 'activity'
+  | 'settings'
+  | 'dapps';
 type PortfolioState = 'loading' | 'available' | 'empty' | 'unavailable' | 'error';
 
 export type NetworkSelectionResult =
@@ -107,26 +121,6 @@ function stateColor(asset: PortfolioAssetViewModel): string {
   return theme.colors.mutedForeground;
 }
 
-function AssetIconView({ asset }: { asset: PortfolioAssetViewModel }) {
-  const hasRemoteReference =
-    asset.icon.status === 'available' && asset.icon.reference !== null;
-
-  return (
-    <View style={styles.assetIcon}>
-      {hasRemoteReference ? (
-        <Image
-          accessibilityLabel={`${assetDisplayName(asset)} icon`}
-          contentFit="contain"
-          source={{ uri: asset.icon.reference as string }}
-          style={styles.assetIconImage}
-        />
-      ) : (
-        <Text style={styles.assetInitials}>{asset.icon.fallback.initials}</Text>
-      )}
-    </View>
-  );
-}
-
 function Header({
   wallet,
   detailMode,
@@ -135,7 +129,7 @@ function Header({
   onSettingsPress,
 }: {
   wallet: Wallet;
-  detailMode: 'receive' | 'send' | 'swap' | 'activity' | 'dapps' | null;
+  detailMode: 'receive' | 'send' | 'swap' | 'activity' | 'dapps' | 'asset-details' | null;
   onBack: () => void;
   onAccountPress: () => void;
   onSettingsPress: () => void;
@@ -730,6 +724,133 @@ function AssetPreview({
   );
 }
 
+function AssetDetailsScreen({
+  asset,
+  network,
+  onBack,
+  onReceive,
+  onSend,
+  onSwap,
+}: {
+  asset: PortfolioAssetViewModel | null;
+  network: EvmNetwork;
+  onBack: () => void;
+  onReceive: () => void;
+  onSend: () => void;
+  onSwap: () => void;
+}) {
+  if (!asset) {
+    return (
+      <View style={styles.assetDetailsMissing}>
+        <WaveXErrorState
+          body="The selected asset is no longer available in this portfolio snapshot."
+          title="Couldn't open asset details."
+        />
+        <WaveXButton label="Back to Assets" onPress={onBack} variant="outline" />
+      </View>
+    );
+  }
+
+  const explorerUrl =
+    asset.assetType === 'fungible_token' &&
+    asset.contractAddress &&
+    network.explorer.addressUrlTemplate
+      ? network.explorer.addressUrlTemplate.replace('{address}', asset.contractAddress)
+      : null;
+  const imageUri =
+    asset.icon.status === 'available' && typeof asset.icon.reference === 'string'
+      ? asset.icon.reference
+      : null;
+  const amount = asset.formattedBalance ?? 'Unavailable';
+  const statusTone =
+    asset.availabilityState === 'available'
+      ? asset.balanceState === 'zero'
+        ? 'neutral'
+        : 'success'
+      : 'warning';
+
+  return (
+    <ScrollView
+      accessibilityLabel="Asset details screen"
+      contentContainerStyle={styles.assetDetailsContent}
+      showsVerticalScrollIndicator={false}
+    >
+      <View style={styles.assetDetailsTopBar}>
+        <Pressable
+          accessibilityLabel="Back to assets"
+          accessibilityRole="button"
+          onPress={onBack}
+          style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
+        >
+          <Ionicons name="arrow-back" size={20} color={theme.colors.foreground} />
+        </Pressable>
+        <View style={styles.assetDetailsTopBarCopy}>
+          <Text style={styles.cardEyebrow}>ASSET DETAILS</Text>
+          <Text numberOfLines={1} style={styles.assetDetailsTopBarTitle}>
+            {assetDisplayName(asset)}
+          </Text>
+        </View>
+        <WaveXNetworkBadge name={network.displayName} symbol={network.nativeCurrency.symbol} />
+      </View>
+
+      <View style={styles.assetDetailsHero}>
+        <WaveXAssetIcon
+          imageUri={imageUri}
+          initials={asset.icon.fallback.initials}
+          label={`${assetDisplayName(asset)} icon`}
+        />
+        <Text style={styles.assetDetailsName}>{assetDisplayName(asset)}</Text>
+        <Text style={styles.assetDetailsSymbol}>{assetDisplaySubtitle(asset)}</Text>
+        <WaveXStatusIndicator
+          label={assetStateLabel(asset)}
+          tone={statusTone}
+        />
+        <Text accessibilityLabel={`Asset balance ${amount}`} style={styles.assetDetailsBalance}>
+          {amount}
+        </Text>
+        <Text style={styles.assetDetailsFiat}>Fiat value unavailable</Text>
+      </View>
+
+      <View style={styles.assetDetailsActions}>
+        <WaveXButton icon="arrow-up-outline" label="Send" onPress={onSend} />
+        <WaveXButton icon="arrow-down-outline" label="Receive" onPress={onReceive} variant="secondary" />
+        <WaveXButton icon="swap-horizontal-outline" label="Swap" onPress={onSwap} variant="outline" />
+      </View>
+
+      <View style={styles.assetDetailsCard}>
+        <WaveXSectionHeader eyebrow="ASSET INFORMATION" title="Details" />
+        <View style={styles.assetDetailRow}>
+          <Text style={styles.assetDetailLabel}>Network</Text>
+          <Text style={styles.assetDetailValue}>{asset.networkId}</Text>
+        </View>
+        <View style={styles.assetDetailRow}>
+          <Text style={styles.assetDetailLabel}>Contract</Text>
+          <Text selectable style={styles.assetDetailValue}>
+            {asset.assetType === 'native' ? 'Native Asset' : asset.contractAddress ?? 'Unavailable'}
+          </Text>
+        </View>
+        <View style={styles.assetDetailRow}>
+          <Text style={styles.assetDetailLabel}>Metadata</Text>
+          <Text style={styles.assetDetailValue}>{asset.metadataStatus}</Text>
+        </View>
+        <View style={styles.assetDetailRow}>
+          <Text style={styles.assetDetailLabel}>Verification</Text>
+          <Text style={styles.assetDetailValue}>{asset.verificationStatus}</Text>
+        </View>
+      </View>
+
+      {explorerUrl ? (
+        <WaveXButton
+          icon="open-outline"
+          label={`View on ${network.explorer.name ?? 'Explorer'}`}
+          onPress={() => void Linking.openURL(explorerUrl)}
+          variant="outline"
+        />
+      ) : null}
+    </ScrollView>
+  );
+}
+
 function AssetStatusPanel({
   state,
   errorMessage,
@@ -748,18 +869,15 @@ function AssetStatusPanel({
   if (state === 'loading') {
     return (
       <View accessibilityLabel="Loading assets" style={styles.assetsLoadingCard}>
-        <View style={styles.assetsLoadingHeader}>
-          <View style={[styles.skeletonLine, styles.skeletonSmall]} />
-          <View style={[styles.skeletonLine, styles.skeletonCount]} />
-        </View>
+        <WaveXSkeleton width={112} height={11} />
         {[0, 1, 2].map((item) => (
           <View key={item} style={styles.assetsSkeletonRow}>
-            <View style={styles.skeletonCircle} />
+            <WaveXSkeleton width={40} height={40} />
             <View style={styles.skeletonAssetCopy}>
-              <View style={[styles.skeletonLine, styles.skeletonAssetTitle]} />
-              <View style={[styles.skeletonLine, styles.skeletonAssetSubtitle]} />
+              <WaveXSkeleton width={100} height={12} />
+              <WaveXSkeleton width={140} height={10} />
             </View>
-            <View style={[styles.skeletonLine, styles.skeletonBalance]} />
+            <WaveXSkeleton width={56} height={12} />
           </View>
         ))}
       </View>
@@ -770,32 +888,48 @@ function AssetStatusPanel({
     const isError = state === 'error';
     return (
       <View style={[styles.assetsStateCard, isError && styles.errorCard]}>
-        <View style={[styles.stateIcon, isError && styles.errorStateIcon]}>
-          <Ionicons
-            name={isError ? 'alert-circle-outline' : 'cloud-offline-outline'}
-            size={22}
-            color={isError ? theme.colors.destructive : theme.states.warning}
-          />
-        </View>
-        <Text style={styles.portfolioTitle}>
-          {isError ? 'Could not load your assets' : 'Blockchain data unavailable'}
-        </Text>
-        <Text style={styles.portfolioBody}>
-          {isError
-            ? errorMessage
-            : networkConfigured
-              ? 'Blockchain data is currently unavailable. No balance is being shown as zero.'
-              : 'This network is not configured yet. No balance is being shown as zero.'}
-        </Text>
+        <WaveXErrorState
+          body={
+            networkConfigured
+              ? 'Check your connection and try again.'
+              : 'This network is not configured yet. Choose another network or try again.'
+          }
+          onAction={onRefresh}
+          actionLabel="Retry"
+          title="Couldn't load your assets."
+        />
         {diagnosticEnabled && errorMessage ? (
           <Text style={styles.refreshNotice}>Preview diagnostic: {errorMessage}</Text>
         ) : null}
-        <RefreshButton onPress={onRefresh} refreshing={refreshing} />
+        {refreshing ? <WaveXLoadingState label="Refreshing assets" /> : null}
       </View>
     );
   }
 
   return null;
+}
+
+function AssetsBalanceSummary({
+  model,
+  state,
+}: {
+  model: PortfolioReadModel | null;
+  state: PortfolioState;
+}) {
+  const balance = getHomeBalancePresentation(state, model);
+  return (
+    <View style={styles.assetsBalanceCard}>
+      <Text style={styles.cardEyebrow}>PORTFOLIO VALUE</Text>
+      <Text accessibilityLabel={`Portfolio value ${balance.value}`} style={styles.assetsBalanceValue}>
+        {balance.value}
+      </Text>
+      <WaveXStatusIndicator
+        label={balance.detail}
+        tone={balance.zero ? 'neutral' : balance.available ? 'info' : 'warning'}
+      />
+      <Text style={styles.assetsBalanceBody}>{balance.supporting}</Text>
+    </View>
+  );
 }
 
 function AssetsScreen({
@@ -864,58 +998,35 @@ function AssetsScreen({
           refreshing={refreshing}
         />
       </View>
-      <Text style={styles.assetsIntro}>
-        Public balances for {network.displayName}. No price or fiat estimates are shown.
-      </Text>
-      <View style={styles.searchField}>
-        <Ionicons name="search-outline" size={17} color={theme.colors.mutedForeground} />
-        <TextInput
-          accessibilityLabel="Search assets"
-          autoCapitalize="none"
-          autoCorrect={false}
-          onChangeText={setSearchQuery}
-          placeholder="Search assets..."
-          placeholderTextColor={theme.colors.mutedForeground}
-          style={styles.searchInput}
-          value={searchQuery}
-        />
+      <AssetsBalanceSummary model={model} state={state} />
+      <View style={styles.assetsSearchRow}>
+        <View style={styles.assetsSearchInputWrap}>
+          <WaveXSearchInput
+            onChangeText={setSearchQuery}
+            placeholder="Search assets..."
+            value={searchQuery}
+          />
+        </View>
         {searchQuery.length > 0 ? (
           <Pressable
             accessibilityLabel="Clear asset search"
             accessibilityRole="button"
             onPress={() => setSearchQuery('')}
-            style={styles.searchClear}
+            style={({ pressed }) => [styles.searchClear, pressed && styles.pressed]}
           >
             <Ionicons name="close-circle" size={17} color={theme.colors.mutedForeground} />
           </Pressable>
         ) : null}
       </View>
-      <View accessibilityRole="tablist" style={styles.filterRow}>
-        {(['all', 'visible', 'hidden'] as const).map((item) => {
-          const selected = filter === item;
-          return (
-            <Pressable
-              accessibilityLabel={`${item[0].toUpperCase()}${item.slice(1)} assets filter`}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              key={item}
-              onPress={() => setFilter(item)}
-              style={({ pressed }) => [
-                styles.filterChip,
-                selected && styles.filterChipSelected,
-                pressed && styles.pressed,
-              ]}
-            >
-              <Text style={[styles.filterChipText, selected && styles.filterChipTextSelected]}>
-                {item[0].toUpperCase() + item.slice(1)}
-              </Text>
-              <Text style={[styles.filterChipCount, selected && styles.filterChipTextSelected]}>
-                {counts[item]}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <WaveXSegmentedControl
+        options={[
+          { value: 'all', label: `All ${counts.all}` },
+          { value: 'visible', label: `Visible ${counts.visible}` },
+          { value: 'hidden', label: `Hidden ${counts.hidden}` },
+        ]}
+        onChange={(value) => setFilter(value as AssetFilter)}
+        value={filter}
+      />
       <AssetStatusPanel
         diagnosticEnabled={previewMode}
         errorMessage={errorMessage}
@@ -930,21 +1041,22 @@ function AssetsScreen({
       {state !== 'loading' && state !== 'unavailable' && state !== 'error' ? (
         filteredAssets.length === 0 ? (
           <View style={styles.emptyCard}>
-            <Ionicons name="layers-outline" size={26} color={theme.colors.mutedForeground} />
-            <Text style={styles.emptyTitle}>
-              {assets.length === 0
-                ? 'No assets yet'
-                : searchQuery.length > 0
-                  ? 'No matching assets'
-                  : filter === 'hidden'
-                    ? 'No hidden assets'
-                    : 'No visible assets'}
-            </Text>
-            <Text style={styles.emptyBody}>
-              {assets.length === 0
-                ? 'Assets will appear here when a configured network returns public balance data.'
-                : 'Try another search or visibility filter.'}
-            </Text>
+            <WaveXEmptyState
+              body={
+                assets.length === 0
+                  ? 'Assets will appear here when a configured network returns public balance data.'
+                  : 'Try another search or visibility filter.'
+              }
+              title={
+                assets.length === 0
+                  ? 'No assets yet'
+                  : searchQuery.length > 0
+                    ? 'No matching assets'
+                    : filter === 'hidden'
+                      ? 'No hidden assets'
+                      : 'No visible assets'
+              }
+            />
           </View>
         ) : (
           <View style={styles.assetList}>
@@ -969,7 +1081,7 @@ function PlaceholderDestination({
   destination,
   onBack,
 }: {
-  destination: Exclude<Destination, 'home' | 'assets' | 'receive' | 'send' | 'dapps'>;
+  destination: Exclude<Destination, 'home' | 'assets' | 'asset-details' | 'receive' | 'send' | 'dapps'>;
   onBack: () => void;
 }) {
   const details = {
@@ -1078,6 +1190,7 @@ export function WalletHomeShell({
   const [swapApproval, setSwapApproval] = useState<SwapReviewApproval | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [sendAssetKey, setSendAssetKey] = useState<string | null>(null);
+  const [assetDetailsOrigin, setAssetDetailsOrigin] = useState<'home' | 'assets'>('assets');
   const portfolioRequestRef = useRef(0);
   const account = wallet.accounts[0];
   const previewDiagnosticsEnabled =
@@ -1302,6 +1415,8 @@ export function WalletHomeShell({
                   ? 'activity'
                   : destination === 'dapps'
                     ? 'dapps'
+                  : destination === 'asset-details'
+                    ? 'asset-details'
                   : null
           }
           onAccountPress={() => setAccountPanelVisible(true)}
@@ -1376,17 +1491,32 @@ export function WalletHomeShell({
               model={portfolio}
               onAssetPress={(asset) => {
                 setSendAssetKey(assetIdentityKey(asset.identity));
+                setAssetDetailsOrigin('home');
                 setReviewDraft(null);
-                setDestination('send');
+                setDestination('asset-details');
               }}
               onViewAll={() => setDestination('assets')}
               state={portfolioState}
             />
           </ScrollView>
+        ) : destination === 'asset-details' ? (
+          <AssetDetailsScreen
+            asset={
+              portfolio?.assets.find(
+                (asset) => assetIdentityKey(asset.identity) === sendAssetKey,
+              ) ?? null
+            }
+            network={network}
+            onBack={() => setDestination(assetDetailsOrigin)}
+            onReceive={() => setDestination('receive')}
+            onSend={() => setDestination('send')}
+            onSwap={() => setDestination('swap')}
+          />
         ) : destination === 'receive' ? (
           <ReceiveScreen
             network={network}
             onBack={() => setDestination('home')}
+            onNetworkPress={() => setNetworkSelectorVisible(true)}
             wallet={wallet}
           />
         ) : destination === 'send' ? (
@@ -1431,7 +1561,8 @@ export function WalletHomeShell({
             network={network}
             onAssetPress={(asset) => {
               setSendAssetKey(assetIdentityKey(asset.identity));
-              setDestination('send');
+              setAssetDetailsOrigin('assets');
+              setDestination('asset-details');
             }}
             onBack={() => setDestination('home')}
             onRefresh={refreshPortfolio}
@@ -1687,6 +1818,11 @@ const styles = StyleSheet.create({
   assetsTopBarCopy: { flex: 1, gap: 2 },
   assetsTitle: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 28, lineHeight: 34 },
   assetsIntro: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 13, lineHeight: 20 },
+  assetsBalanceCard: { padding: theme.spacing.lg, gap: theme.spacing.sm, borderRadius: theme.radius.lg, backgroundColor: 'rgba(18, 29, 56, 0.9)', borderWidth: 1, borderColor: 'rgba(80, 217, 255, 0.24)', ...theme.shadows.panel },
+  assetsBalanceValue: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 38, lineHeight: 44, letterSpacing: -1.1 },
+  assetsBalanceBody: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 12, lineHeight: 18 },
+  assetsSearchRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
+  assetsSearchInputWrap: { flex: 1 },
   searchField: { minHeight: 48, paddingHorizontal: theme.spacing.md, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: 'rgba(18, 29, 56, 0.82)', borderWidth: 1, borderColor: theme.colors.border },
   searchInput: { flex: 1, minWidth: 0, paddingVertical: 0, color: theme.colors.foreground, fontFamily: theme.typography.body.fontFamily, fontSize: 13 },
   searchClear: { width: 28, height: 28, alignItems: 'center', justifyContent: 'center' },
@@ -1715,6 +1851,21 @@ const styles = StyleSheet.create({
   skeletonAssetCopy: { flex: 1, gap: 8 },
   skeletonAssetTitle: { width: '45%', height: 11 },
   skeletonAssetSubtitle: { width: '26%', height: 9 },
+  assetDetailsContent: { paddingHorizontal: theme.spacing.lg, paddingBottom: 112, gap: theme.spacing.md },
+  assetDetailsMissing: { flex: 1, paddingHorizontal: theme.spacing.lg, justifyContent: 'center', gap: theme.spacing.md },
+  assetDetailsTopBar: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
+  assetDetailsTopBarCopy: { flex: 1, gap: 2 },
+  assetDetailsTopBarTitle: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 19 },
+  assetDetailsHero: { paddingVertical: theme.spacing.lg, alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.lg, backgroundColor: 'rgba(18, 29, 56, 0.84)', borderWidth: 1, borderColor: theme.colors.border },
+  assetDetailsName: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 24, lineHeight: 30 },
+  assetDetailsSymbol: { color: theme.colors.mutedForeground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13 },
+  assetDetailsBalance: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 34, lineHeight: 40, marginTop: theme.spacing.sm },
+  assetDetailsFiat: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 12 },
+  assetDetailsActions: { flexDirection: 'row', gap: theme.spacing.sm },
+  assetDetailsCard: { padding: theme.spacing.md, gap: theme.spacing.xs, borderRadius: theme.radius.lg, backgroundColor: 'rgba(18, 29, 56, 0.84)', borderWidth: 1, borderColor: theme.colors.border },
+  assetDetailRow: { minHeight: 42, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.md, borderBottomWidth: 1, borderBottomColor: 'rgba(126, 145, 191, 0.14)' },
+  assetDetailLabel: { color: theme.colors.mutedForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 10, letterSpacing: 0.8 },
+  assetDetailValue: { flex: 1, color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 12, textAlign: 'right' },
   lockButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   lockButtonText: { color: theme.colors.mutedForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
   placeholderScreen: { flex: 1, paddingHorizontal: theme.spacing.lg, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.md },

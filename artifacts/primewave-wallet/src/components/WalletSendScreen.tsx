@@ -1,7 +1,6 @@
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import {
-  Modal,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -12,6 +11,15 @@ import {
   View,
 } from 'react-native';
 import { theme } from '@/src/theme';
+import {
+  WaveXAssetIcon,
+  WaveXAssetRow,
+  WaveXBottomSheet,
+  WaveXButton,
+  WaveXNetworkBadge,
+  WaveXSearchInput,
+  WaveXStatusIndicator,
+} from '@/src/design-system';
 import type { EvmNetwork } from '@/src/core/networks';
 import type { PortfolioAssetViewModel, PortfolioReadModel } from '@/src/core/portfolio';
 import type { Wallet } from '@/src/core/wallet/models';
@@ -26,18 +34,27 @@ import {
   validateRecipient,
   type PublicSendDraft,
 } from './WalletSendScreen.logic';
+import {
+  assetDisplayName,
+  assetDisplaySubtitle,
+  assetMatchesSearch,
+  assetStateLabel,
+  shortPublicAddress,
+} from './WalletHomeShell.logic';
 
 type PortfolioState = 'loading' | 'available' | 'empty' | 'unavailable' | 'error';
 
 function AssetIcon({ asset }: { asset: PortfolioAssetViewModel }) {
+  const imageUri =
+    asset.icon.status === 'available' && typeof asset.icon.reference === 'string'
+      ? asset.icon.reference
+      : null;
   return (
-    <View style={styles.assetIcon}>
-      <Text style={styles.assetInitials}>
-        {(asset.symbol ?? asset.name ?? (asset.assetType === 'native' ? 'N' : 'T'))
-          .slice(0, 3)
-          .toUpperCase()}
-      </Text>
-    </View>
+    <WaveXAssetIcon
+      imageUri={imageUri}
+      initials={asset.icon.fallback.initials}
+      label={`${assetDisplayName(asset)} icon`}
+    />
   );
 }
 
@@ -51,6 +68,11 @@ function AssetPicker({
   onSelect: (next: PortfolioAssetViewModel) => void;
 }) {
   const [visible, setVisible] = useState(false);
+  const [query, setQuery] = useState('');
+  const filteredAssets = useMemo(
+    () => assets.filter((item) => assetMatchesSearch(item, query)),
+    [assets, query],
+  );
   return (
     <>
       <Pressable
@@ -67,45 +89,56 @@ function AssetPicker({
         </View>
         <Ionicons name="chevron-down" size={18} color={theme.colors.accent} />
       </Pressable>
-      <Modal animationType="slide" onRequestClose={() => setVisible(false)} transparent visible={visible}>
-        <View style={styles.modalRoot}>
-          <Pressable accessibilityLabel="Close asset selector" accessibilityRole="button" onPress={() => setVisible(false)} style={styles.modalBackdrop} />
-          <View accessibilityViewIsModal style={styles.assetSheet}>
-            <View style={styles.sheetHandle} />
-            <View style={styles.sheetHeader}>
-              <View>
-                <Text style={styles.cardEyebrow}>SEND ASSET</Text>
-                <Text style={styles.sheetTitle}>Select asset</Text>
-              </View>
-              <Pressable accessibilityLabel="Close asset selector" accessibilityRole="button" onPress={() => setVisible(false)} style={styles.closeButton}>
-                <Ionicons name="close" size={20} color={theme.colors.foreground} />
-              </Pressable>
-            </View>
-            {assets.length === 0 ? (
-              <Text style={styles.sheetBody}>No native or ERC-20 assets are available for this network.</Text>
-            ) : (
-              assets.map((item) => (
-                <Pressable
-                  accessibilityLabel={`Select ${item.symbol ?? item.name ?? 'asset'}`}
-                  accessibilityRole="button"
-                  key={assetIdentityKey(item.identity)}
-                  onPress={() => { onSelect(item); setVisible(false); }}
-                  style={({ pressed }) => [styles.assetOption, pressed && styles.pressed]}
-                >
-                  <AssetIcon asset={item} />
-                  <View style={styles.assetSelectorCopy}>
-                    <Text style={styles.assetOptionTitle}>{item.name ?? item.symbol ?? 'Asset'}</Text>
-                    <Text style={styles.assetSelectorSubtitle}>{item.symbol ?? 'Unknown symbol'} • {item.formattedBalance ?? 'Balance unavailable'}</Text>
-                  </View>
-                  {assetIdentityKey(item.identity) === assetIdentityKey(asset?.identity ?? { networkId: '', assetType: 'native', assetId: 'native' }) ? (
-                    <Ionicons name="checkmark-circle" size={20} color={theme.colors.accent} />
-                  ) : null}
-                </Pressable>
-              ))
-            )}
-          </View>
-        </View>
-      </Modal>
+      <WaveXBottomSheet onClose={() => setVisible(false)} title="Select Token" visible={visible}>
+        <WaveXSearchInput
+          onChangeText={setQuery}
+          placeholder="Search tokens..."
+          value={query}
+        />
+        {filteredAssets.length === 0 ? (
+          <Text style={styles.sheetBody}>
+            {assets.length === 0
+              ? 'No native or ERC-20 assets are available for this network.'
+              : 'No matching tokens.'}
+          </Text>
+        ) : (
+          filteredAssets.map((item) => {
+            const selected = assetIdentityKey(item.identity) === assetIdentityKey(
+              asset?.identity ?? { networkId: '', assetType: 'native', assetId: 'native' },
+            );
+            return (
+              <WaveXAssetRow
+                amount={item.formattedBalance ?? 'Unavailable'}
+                initials={item.icon.fallback.initials}
+                imageUri={
+                  item.icon.status === 'available' && typeof item.icon.reference === 'string'
+                    ? item.icon.reference
+                    : null
+                }
+                key={assetIdentityKey(item.identity)}
+                onPress={() => {
+                  onSelect(item);
+                  setVisible(false);
+                  setQuery('');
+                }}
+                status={selected ? `Selected • ${assetStateLabel(item)}` : assetStateLabel(item)}
+                subtitle={`${assetDisplaySubtitle(item)} • ${item.networkId}`}
+                title={assetDisplayName(item)}
+                trailing={
+                  selected ? (
+                    <Ionicons
+                      accessibilityLabel="Selected token"
+                      name="checkmark-circle"
+                      size={18}
+                      color={theme.colors.accent}
+                    />
+                  ) : null
+                }
+              />
+            );
+          })
+        )}
+      </WaveXBottomSheet>
     </>
   );
 }
@@ -207,12 +240,26 @@ export function WalletSendScreen({
         <Pressable accessibilityLabel={`Selected network ${network.displayName}`} accessibilityRole="button" onPress={onNetworkPress} style={({ pressed }) => [styles.networkContext, pressed && styles.pressed]}>
           <View style={styles.networkIcon}><Ionicons name="globe-outline" size={20} color={networkAvailable ? theme.colors.accent : theme.states.warning} /></View>
           <View style={styles.networkCopy}>
-            <Text style={styles.cardEyebrow}>SELECTED NETWORK</Text>
-            <Text style={styles.networkName}>{network.displayName}</Text>
-            <Text style={styles.networkMeta}>{network.nativeCurrency.symbol} • {networkAvailable ? 'Configured' : 'Unavailable'}</Text>
+          <Text style={styles.cardEyebrow}>NETWORK</Text>
+          <WaveXNetworkBadge name={network.displayName} symbol={network.nativeCurrency.symbol} />
+          <Text style={styles.networkMeta}>{networkAvailable ? 'Configured' : 'Unavailable'}</Text>
           </View>
           <Ionicons name={networkAvailable ? 'checkmark-circle-outline' : 'warning-outline'} size={20} color={networkAvailable ? theme.states.success : theme.states.warning} />
         </Pressable>
+        <View style={styles.fromCard}>
+          <View style={styles.fromIcon}>
+            <Ionicons name="person-outline" size={18} color={theme.colors.accent} />
+          </View>
+          <View style={styles.networkCopy}>
+            <Text style={styles.cardEyebrow}>FROM</Text>
+            <Text style={styles.networkName}>
+              {account ? `Account ${account.index + 1}` : 'Account unavailable'}
+            </Text>
+            <Text style={styles.networkMeta}>
+              {account ? shortPublicAddress(account.address) : 'Public address unavailable'}
+            </Text>
+          </View>
+        </View>
         <AssetPicker asset={selectedAsset} assets={sendableAssets} onSelect={(next) => { setSelectedAssetKey(assetIdentityKey(next.identity)); setRecipient(''); setAmount(''); }} />
         <View style={styles.balanceCard}>
           <View>
@@ -223,7 +270,19 @@ export function WalletSendScreen({
           {selectedAsset?.assetType === 'native' ? <Text style={styles.balanceNote}>Current balance. Maximum spendable after gas may be lower.</Text> : null}
         </View>
         <View style={styles.fieldGroup}>
-          <View style={styles.fieldHeader}><Text style={styles.fieldLabel}>Recipient Address</Text><Text style={styles.stateLabel}>{recipientState.state.toUpperCase()}</Text></View>
+          <View style={styles.fieldHeader}>
+            <Text style={styles.fieldLabel}>TO</Text>
+            <WaveXStatusIndicator
+              label={recipientState.state === 'empty' ? 'Required' : recipientState.state}
+              tone={
+                recipientState.state === 'invalid'
+                  ? 'error'
+                  : recipientState.state === 'valid' || recipientState.state === 'normalized'
+                    ? 'success'
+                    : 'neutral'
+              }
+            />
+          </View>
           <View style={[styles.inputShell, recipientState.state === 'invalid' && styles.inputError, recipientState.state === 'valid' || recipientState.state === 'normalized' ? styles.inputValid : null]}>
             <TextInput
               accessibilityLabel="Recipient Address"
@@ -262,10 +321,12 @@ export function WalletSendScreen({
         {portfolioState === 'empty' ? <Text style={styles.warningText}>No portfolio assets are available on this network.</Text> : null}
         {!networkAvailable || (selectedAsset && selectedAsset.availabilityState !== 'available') ? <Text accessibilityRole="alert" style={styles.warningText}>{validation.message ?? 'Sending is unavailable until public network data is available.'}</Text> : null}
         {validation.message && networkAvailable && selectedAsset?.availabilityState === 'available' && recipient.length > 0 && validation.recipient.state !== 'invalid' && validation.amount.state !== 'invalid' ? <Text accessibilityRole="alert" style={styles.errorText}>{validation.message}</Text> : null}
-        <Pressable accessibilityLabel="Review Transaction" accessibilityRole="button" disabled={!validation.canReview} onPress={handleReview} style={({ pressed }) => [styles.primaryButton, !validation.canReview && styles.disabledButton, pressed && validation.canReview && styles.pressed]}>
-          <Text style={styles.primaryButtonText}>Review Transaction</Text>
-          <Ionicons name="arrow-forward-outline" size={18} color={theme.colors.primaryForeground} />
-        </Pressable>
+        <WaveXButton
+          disabled={!validation.canReview}
+          icon="arrow-forward-outline"
+          label="Review Transaction"
+          onPress={handleReview}
+        />
         <Pressable accessibilityLabel="Back to Home" accessibilityRole="button" onPress={onBack} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
           <Ionicons name="arrow-back-outline" size={18} color={theme.colors.accent} />
           <Text style={styles.secondaryButtonText}>Back to Home</Text>
@@ -288,6 +349,8 @@ const styles = StyleSheet.create({
   networkCopy: { flex: 1, gap: 3 },
   networkName: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 15 },
   networkMeta: { color: theme.colors.mutedForeground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 12 },
+  fromCard: { padding: theme.spacing.md, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: theme.colors.border },
+  fromIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.sm, backgroundColor: theme.colors.secondary },
   assetSelector: { minHeight: 76, padding: theme.spacing.md, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.lg, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: 'rgba(80, 217, 255, 0.28)' },
   assetIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: 'rgba(124, 140, 255, 0.2)' },
   assetInitials: { color: theme.colors.foreground, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },

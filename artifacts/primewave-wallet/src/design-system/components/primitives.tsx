@@ -322,6 +322,7 @@ export function WaveXAssetRow({
   imageUri,
   initials,
   onPress,
+  trailing,
 }: {
   readonly title: string;
   readonly subtitle: string;
@@ -330,6 +331,7 @@ export function WaveXAssetRow({
   readonly imageUri?: string | null;
   readonly initials: string;
   readonly onPress?: () => void;
+  readonly trailing?: React.ReactNode;
 }) {
   const content = (
     <>
@@ -342,6 +344,7 @@ export function WaveXAssetRow({
         <Text numberOfLines={1} style={styles.amount}>{amount}</Text>
         {status ? <Text style={styles.status}>{status}</Text> : null}
       </View>
+      {trailing}
       {onPress ? <Ionicons name={icons.forward} size={16} color={colors.textMuted} /> : null}
     </>
   );
