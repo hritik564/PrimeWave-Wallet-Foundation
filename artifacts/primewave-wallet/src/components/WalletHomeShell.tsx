@@ -15,6 +15,17 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/src/theme';
+import {
+  WaveXAssetRow,
+  WaveXBadge,
+  WaveXBottomNavigation,
+  WaveXBottomSheet,
+  WaveXErrorState,
+  WaveXEmptyState,
+  WaveXLoadingState,
+  WaveXSkeleton,
+  WaveXStatusIndicator,
+} from '@/src/design-system';
 import type { EvmNetwork, NetworkRegistry } from '@/src/core/networks';
 import { secureLogger } from '@/src/core/security/logging';
 import {
@@ -58,6 +69,7 @@ import {
   assetStateLabel,
   filterPortfolioAssets,
   type AssetFilter,
+  getHomeBalancePresentation,
   getPortfolioState,
   homeNavigationLabels,
   safePortfolioDiagnostic,
@@ -183,11 +195,13 @@ function AccountPanel({
   wallet,
   onClose,
   onLock,
+  onComingSoon,
 }: {
   visible: boolean;
   wallet: Wallet;
   onClose: () => void;
   onLock: () => void;
+  onComingSoon: (label: string) => void;
 }) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const account = wallet.accounts[0];
@@ -208,87 +222,98 @@ function AccountPanel({
   };
 
   return (
-    <Modal
-      animationType="slide"
-      onRequestClose={onClose}
-      transparent
-      visible={visible}
-    >
-      <View style={styles.modalRoot}>
-        <Pressable
-          accessibilityLabel="Close account panel"
-          accessibilityRole="button"
-          onPress={onClose}
-          style={styles.modalBackdrop}
-        />
-        <View accessibilityViewIsModal style={styles.accountSheet}>
-          <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <View>
-              <Text style={styles.cardEyebrow}>PUBLIC ACCOUNT</Text>
-              <Text style={styles.sheetTitle}>{accountLabel}</Text>
-            </View>
+    <WaveXBottomSheet onClose={onClose} title="Accounts" visible={visible}>
+      <Text style={styles.sheetIntro}>
+        Choose a public account without exposing secret material.
+      </Text>
+      <View style={styles.accountList}>
+        {wallet.accounts.map((candidate) => {
+          const selected = candidate.accountId === account?.accountId;
+          return (
             <Pressable
-              accessibilityLabel="Close account panel"
-              accessibilityRole="button"
-              onPress={onClose}
-              style={({ pressed }) => [styles.sheetClose, pressed && styles.pressed]}
+              accessibilityLabel={`${candidate.index === 0 ? 'Account 1' : `Account ${candidate.index + 1}`}, ${shortPublicAddress(candidate.address)}${selected ? ', selected' : ''}`}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: selected }}
+              key={candidate.accountId}
+              onPress={() => {
+                if (!selected) {
+                  onComingSoon('Account switching is not available yet.');
+                }
+              }}
+              style={({ pressed }) => [
+                styles.accountOption,
+                selected && styles.accountOptionSelected,
+                pressed && styles.pressed,
+              ]}
             >
-              <Ionicons name="close" size={20} color={theme.colors.foreground} />
+              <View style={styles.accountOptionIcon}>
+                <Ionicons name="person-outline" size={17} color={theme.colors.accent} />
+              </View>
+              <View style={styles.accountOptionCopy}>
+                <Text style={styles.accountOptionTitle}>
+                  Account {candidate.index + 1}
+                </Text>
+                <Text style={styles.accountOptionAddress}>
+                  {shortPublicAddress(candidate.address)}
+                </Text>
+              </View>
+              {selected ? (
+                <Ionicons name="checkmark-circle" size={18} color={theme.colors.accent} />
+              ) : (
+                <Ionicons name="chevron-forward" size={17} color={theme.colors.mutedForeground} />
+              )}
             </Pressable>
-          </View>
-          <View style={styles.accountStatusCard}>
-            <View style={styles.accountStatusIcon}>
-              <Ionicons name="person-outline" size={22} color={theme.colors.accent} />
-            </View>
-            <View style={styles.accountStatusCopy}>
-              <Text style={styles.accountStatusTitle}>Unlocked public account</Text>
-              <Text style={styles.accountStatusBody}>
-                Only public identity information is shown here.
-              </Text>
-            </View>
-          </View>
-          <Text style={styles.cardEyebrow}>FULL PUBLIC ADDRESS</Text>
-          <View style={styles.fullAddressCard}>
-            <Text selectable style={styles.fullAddressText}>
-              {account?.address ?? 'Unavailable'}
-            </Text>
-            <Pressable
-              accessibilityLabel="Copy public address"
-              accessibilityRole="button"
-              disabled={!account}
-              onPress={() => void copyAddress()}
-              style={({ pressed }) => [styles.copyButton, pressed && styles.pressed]}
-            >
-              <Ionicons
-                name={copyState === 'copied' ? 'checkmark' : 'copy-outline'}
-                size={17}
-                color={copyState === 'copied' ? theme.states.success : theme.colors.accent}
-              />
-              <Text style={styles.copyButtonText}>
-                {copyState === 'copied' ? 'Copied' : 'Copy'}
-              </Text>
-            </Pressable>
-          </View>
-          {copyState === 'error' ? (
-            <Text style={styles.copyError}>Could not copy the public address. Try again.</Text>
-          ) : null}
-          <View style={styles.accountDetailRow}>
-            <Text style={styles.accountDetailLabel}>ACCOUNT INDEX</Text>
-            <Text style={styles.accountDetailValue}>{account ? account.index : 'Unavailable'}</Text>
-          </View>
-          <Pressable
-            accessibilityLabel="Lock wallet"
-            accessibilityRole="button"
-            onPress={onLock}
-            style={({ pressed }) => [styles.sheetLockButton, pressed && styles.pressed]}
-          >
-              <Ionicons name="lock-closed-outline" size={18} color={theme.states.warning} />
-            <Text style={styles.sheetLockText}>Lock wallet</Text>
-          </Pressable>
-        </View>
+          );
+        })}
       </View>
-    </Modal>
+      <View style={styles.accountActions}>
+        {[
+          ['add-circle-outline', 'Add account'],
+          ['download-outline', 'Import account'],
+          ['settings-outline', 'Manage accounts'],
+        ].map(([icon, label]) => (
+          <Pressable
+            accessibilityLabel={`${label}. Not available`}
+            accessibilityRole="button"
+            key={label}
+            onPress={() => onComingSoon(`${label} is not available yet.`)}
+            style={({ pressed }) => [styles.accountAction, pressed && styles.pressed]}
+          >
+            <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={18} color={theme.colors.accent} />
+            <Text style={styles.accountActionText}>{label}</Text>
+            <WaveXBadge label="Unavailable" tone="neutral" />
+          </Pressable>
+        ))}
+      </View>
+      <Pressable
+        accessibilityLabel="Copy public address"
+        accessibilityRole="button"
+        disabled={!account}
+        onPress={() => void copyAddress()}
+        style={({ pressed }) => [styles.copyButton, pressed && styles.pressed]}
+      >
+        <Ionicons
+          name={copyState === 'copied' ? 'checkmark' : 'copy-outline'}
+          size={17}
+          color={copyState === 'copied' ? theme.states.success : theme.colors.accent}
+        />
+        <Text style={styles.copyButtonText}>
+          {copyState === 'copied' ? 'Copied public address' : 'Copy public address'}
+        </Text>
+      </Pressable>
+      {copyState === 'error' ? (
+        <Text style={styles.copyError}>Could not copy the public address. Try again.</Text>
+      ) : null}
+      <Pressable
+        accessibilityLabel="Lock wallet"
+        accessibilityRole="button"
+        onPress={onLock}
+        style={({ pressed }) => [styles.sheetLockButton, pressed && styles.pressed]}
+      >
+        <Ionicons name="lock-closed-outline" size={18} color={theme.states.warning} />
+        <Text style={styles.sheetLockText}>Lock wallet</Text>
+      </Pressable>
+    </WaveXBottomSheet>
   );
 }
 
@@ -322,104 +347,69 @@ function NetworkSelector({
   };
 
   return (
-    <Modal
-      animationType="slide"
-      onRequestClose={onClose}
-      transparent
-      visible={visible}
-    >
-      <View style={styles.modalRoot}>
-        <Pressable
-          accessibilityLabel="Close network selector"
-          accessibilityRole="button"
-          onPress={onClose}
-          style={styles.modalBackdrop}
-        />
-        <View accessibilityViewIsModal style={styles.networkSheet}>
-          <View style={styles.sheetHandle} />
-          <View style={styles.sheetHeader}>
-            <View>
-              <Text style={styles.cardEyebrow}>NETWORK CONTEXT</Text>
-              <Text style={styles.sheetTitle}>Select network</Text>
-            </View>
-            <Pressable
-              accessibilityLabel="Close network selector"
-              accessibilityRole="button"
-              onPress={onClose}
-              style={({ pressed }) => [styles.sheetClose, pressed && styles.pressed]}
-            >
-              <Ionicons name="close" size={20} color={theme.colors.foreground} />
-            </Pressable>
-          </View>
-          <Text style={styles.sheetIntro}>
-            Network changes are explicit and refresh the account-scoped portfolio.
-          </Text>
-          {selectionMessage ? (
-            <View accessibilityRole="alert" style={styles.selectionMessage}>
-              <Ionicons name="information-circle-outline" size={18} color={theme.states.warning} />
-              <Text style={styles.selectionMessageText}>{selectionMessage}</Text>
-            </View>
-          ) : null}
-          <ScrollView
-            contentContainerStyle={styles.networkList}
-            showsVerticalScrollIndicator={false}
-          >
-            {networks.map((network) => {
-              const selected = selectedNetwork.id === network.id;
-              const configured = network.configurationStatus === 'configured';
-              const status = !network.enabled
-                ? 'Disabled'
-                : configured
-                  ? 'Configured'
-                  : 'Not configured';
-              return (
-                <Pressable
-                  accessibilityLabel={`${network.displayName}, ${status}${selected ? ', selected' : ''}`}
-                  accessibilityRole="radio"
-                  accessibilityState={{ checked: selected, disabled: !network.enabled }}
-                  key={network.id}
-                  onPress={() => selectNetwork(network)}
-                  style={({ pressed }) => [
-                    styles.networkOption,
-                    selected && styles.networkOptionSelected,
-                    pressed && styles.pressed,
-                  ]}
-                >
-                  <View style={[styles.networkOptionIcon, selected && styles.networkOptionIconSelected]}>
-                    <Text style={styles.networkOptionInitial}>
-                      {network.displayName.slice(0, 1).toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.networkOptionCopy}>
-                    <View style={styles.networkOptionTitleRow}>
-                      <Text numberOfLines={1} style={styles.networkOptionName}>
-                        {network.displayName}
-                      </Text>
-                      {selected ? (
-                        <Ionicons name="checkmark-circle" size={16} color={theme.colors.accent} />
-                      ) : null}
-                    </View>
-                    <Text style={styles.networkOptionMeta}>
-                      {network.chainId === null ? 'Chain ID unavailable' : `Chain ID ${network.chainId}`}
-                      {' • '}
-                      {network.nativeCurrency.symbol}
-                    </Text>
-                    <Text style={styles.networkOptionEnvironment}>
-                      {network.environment.toUpperCase()} • {status}
-                    </Text>
-                  </View>
-                  <Ionicons
-                    name={configured && network.enabled ? 'chevron-forward' : 'lock-closed-outline'}
-                    size={16}
-                    color={configured && network.enabled ? theme.colors.mutedForeground : theme.states.warning}
-                  />
-                </Pressable>
-              );
-            })}
-          </ScrollView>
+    <WaveXBottomSheet onClose={onClose} title="Select network" visible={visible}>
+      <Text style={styles.sheetIntro}>
+        Network changes are explicit and refresh your account-scoped portfolio.
+      </Text>
+      {selectionMessage ? (
+        <View accessibilityRole="alert" style={styles.selectionMessage}>
+          <Ionicons name="information-circle-outline" size={18} color={theme.states.warning} />
+          <Text style={styles.selectionMessageText}>{selectionMessage}</Text>
         </View>
+      ) : null}
+      <View style={styles.networkList}>
+        {networks.map((candidate) => {
+          const selected = selectedNetwork.id === candidate.id;
+          const configured = candidate.configurationStatus === 'configured';
+          const status = !candidate.enabled
+            ? 'Disabled'
+            : configured
+              ? 'Connected'
+              : 'Not configured';
+          return (
+            <Pressable
+              accessibilityLabel={`${candidate.displayName}, ${status}${selected ? ', selected' : ''}`}
+              accessibilityRole="radio"
+              accessibilityState={{ checked: selected, disabled: !candidate.enabled }}
+              key={candidate.id}
+              onPress={() => selectNetwork(candidate)}
+              style={({ pressed }) => [
+                styles.networkOption,
+                selected && styles.networkOptionSelected,
+                !candidate.enabled && styles.networkOptionDisabled,
+                pressed && styles.pressed,
+              ]}
+            >
+              <View style={[styles.networkOptionIcon, selected && styles.networkOptionIconSelected]}>
+                <Text style={styles.networkOptionInitial}>
+                  {candidate.displayName.slice(0, 1).toUpperCase()}
+                </Text>
+              </View>
+              <View style={styles.networkOptionCopy}>
+                <View style={styles.networkOptionTitleRow}>
+                  <Text numberOfLines={1} style={styles.networkOptionName}>
+                    {candidate.displayName}
+                  </Text>
+                  {selected ? (
+                    <Ionicons name="checkmark-circle" size={16} color={theme.colors.accent} />
+                  ) : null}
+                </View>
+                <Text style={styles.networkOptionMeta}>
+                  {candidate.nativeCurrency.symbol} • {candidate.environment.toUpperCase()}
+                </Text>
+                <WaveXStatusIndicator
+                  label={status}
+                  tone={!candidate.enabled ? 'warning' : configured ? 'success' : 'neutral'}
+                />
+              </View>
+              {!candidate.enabled ? (
+                <Ionicons name="lock-closed-outline" size={16} color={theme.states.warning} />
+              ) : null}
+            </Pressable>
+          );
+        })}
       </View>
-    </Modal>
+    </WaveXBottomSheet>
   );
 }
 
@@ -477,24 +467,43 @@ function ActionButton({
   label,
   icon,
   comingSoon = true,
+  available = true,
   onPress,
 }: {
   label: string;
   icon: keyof typeof Ionicons.glyphMap;
   comingSoon?: boolean;
+  available?: boolean;
   onPress: () => void;
 }) {
   return (
     <Pressable
-      accessibilityLabel={comingSoon ? `${label}. Coming soon` : label}
+      accessibilityLabel={
+        !available
+          ? `${label}. Unavailable`
+          : comingSoon
+            ? `${label}. Coming soon`
+            : label
+      }
       accessibilityRole="button"
+      accessibilityState={{ disabled: !available }}
+      disabled={!available}
       onPress={onPress}
-      style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
+      style={({ pressed }) => [
+        styles.actionButton,
+        !available && styles.actionButtonDisabled,
+        pressed && styles.pressed,
+      ]}
     >
       <View style={styles.actionIcon}>
-        <Ionicons name={icon} size={20} color={theme.colors.accent} />
+        <Ionicons
+          name={icon}
+          size={20}
+          color={available ? theme.colors.accent : theme.colors.mutedForeground}
+        />
       </View>
       <Text style={styles.actionLabel}>{label}</Text>
+      {!available ? <Text style={styles.actionUnavailable}>Unavailable</Text> : null}
     </Pressable>
   );
 }
@@ -502,14 +511,14 @@ function ActionButton({
 function PortfolioSkeleton() {
   return (
     <View accessibilityLabel="Loading portfolio" style={styles.portfolioCard}>
-      <View style={[styles.skeletonLine, styles.skeletonSmall]} />
-      <View style={[styles.skeletonLine, styles.skeletonLarge]} />
-      <View style={[styles.skeletonLine, styles.skeletonMedium]} />
+      <WaveXSkeleton width={112} height={10} />
+      <WaveXSkeleton width={176} height={42} />
+      <WaveXSkeleton width={142} height={12} />
       <View style={styles.skeletonAssetRow}>
-        <View style={styles.skeletonCircle} />
+        <WaveXSkeleton width={42} height={42} />
         <View style={styles.skeletonAssetCopy}>
-          <View style={[styles.skeletonLine, styles.skeletonAssetTitle]} />
-          <View style={[styles.skeletonLine, styles.skeletonAssetSubtitle]} />
+          <WaveXSkeleton width={96} height={12} />
+          <WaveXSkeleton width={132} height={10} />
         </View>
       </View>
     </View>
@@ -538,19 +547,20 @@ function PortfolioSummary({
   if (state === 'unavailable') {
     return (
       <View style={[styles.portfolioCard, styles.unavailableCard]}>
-        <View style={styles.stateIcon}>
-          <Ionicons name="cloud-offline-outline" size={22} color={theme.states.warning} />
-        </View>
-        <Text style={styles.portfolioTitle}>Blockchain data unavailable</Text>
-        <Text style={styles.portfolioBody}>
-          {networkConfigured
-            ? 'Blockchain data is currently unavailable. No balance is being shown as zero.'
-            : 'This network is not configured yet. No balance is being shown as zero.'}
-        </Text>
+        <WaveXErrorState
+          body={
+            networkConfigured
+              ? 'Check your connection and try again.'
+              : 'This network is not configured yet. Choose another network or try again.'
+          }
+          onAction={onRefresh}
+          actionLabel="Retry"
+          title="Couldn't load your balance."
+        />
         {diagnosticEnabled && errorMessage ? (
           <Text style={styles.refreshNotice}>Preview diagnostic: {errorMessage}</Text>
         ) : null}
-        <RefreshButton onPress={onRefresh} refreshing={refreshing} />
+        {refreshing ? <WaveXLoadingState label="Refreshing portfolio" /> : null}
       </View>
     );
   }
@@ -558,33 +568,43 @@ function PortfolioSummary({
   if (state === 'error') {
     return (
       <View style={[styles.portfolioCard, styles.errorCard]}>
-        <View style={styles.stateIcon}>
-          <Ionicons name="alert-circle-outline" size={22} color={theme.colors.destructive} />
-        </View>
-        <Text style={styles.portfolioTitle}>Could not load your assets</Text>
-        <Text style={styles.portfolioBody}>{errorMessage}</Text>
-        <RefreshButton onPress={onRefresh} refreshing={refreshing} />
+        <WaveXErrorState
+          body="Check your connection and try again."
+          onAction={onRefresh}
+          actionLabel="Retry"
+          title="Couldn't load your balance."
+        />
+        {diagnosticEnabled && errorMessage ? (
+          <Text style={styles.refreshNotice}>Preview diagnostic: {errorMessage}</Text>
+        ) : null}
+        {refreshing ? <WaveXLoadingState label="Refreshing portfolio" /> : null}
       </View>
     );
   }
 
-  const count = model?.visibleAssetCount ?? 0;
+  const balance = getHomeBalancePresentation(state, model);
   return (
     <View style={styles.portfolioCard}>
       <View style={styles.portfolioCardHeader}>
         <View>
-          <Text style={styles.cardEyebrow}>PORTFOLIO</Text>
-          <Text style={styles.portfolioTitle}>Your assets</Text>
+          <Text style={styles.cardEyebrow}>TOTAL BALANCE</Text>
+          <Text style={styles.portfolioTitle}>Your wallet</Text>
         </View>
         <RefreshButton onPress={onRefresh} refreshing={refreshing} compact />
       </View>
-      <View style={styles.assetCountRow}>
-        <Text style={styles.assetCount}>{count}</Text>
-        <Text style={styles.assetCountLabel}>{count === 1 ? 'visible asset' : 'visible assets'}</Text>
-      </View>
-      <Text style={styles.portfolioBody}>
-        Native balances and token amounts are shown without price or fiat estimates.
+      <Text
+        accessibilityLabel={`Portfolio balance ${balance.value}`}
+        style={styles.balanceValue}
+      >
+        {balance.value}
       </Text>
+      <View style={styles.balanceDetailRow}>
+        <WaveXStatusIndicator
+          label={balance.detail}
+          tone={balance.zero ? 'neutral' : 'info'}
+        />
+      </View>
+      <Text style={styles.portfolioBody}>{balance.supporting}</Text>
       {errorMessage ? (
         <Text style={styles.refreshNotice}>Refresh note: {errorMessage}</Text>
       ) : null}
@@ -632,53 +652,28 @@ function AssetRow({
   onPress?: () => void;
 }) {
   const amount = asset.formattedBalance ?? 'Unavailable';
-  const color = stateColor(asset);
-  const content = (
-    <>
-      <AssetIconView asset={asset} />
-      <View style={styles.assetCopy}>
-        <Text numberOfLines={1} style={styles.assetName}>{assetDisplayName(asset)}</Text>
-        <Text style={styles.assetSymbol}>{assetDisplaySubtitle(asset)}</Text>
-      </View>
-      <View style={styles.assetBalance}>
-        <Text numberOfLines={1} style={styles.assetAmount}>{amount}</Text>
-        <View style={styles.assetStateRow}>
-          {asset.verificationStatus === 'verified' ? (
-            <Ionicons
-              accessibilityLabel="Verified asset"
-              name="checkmark-circle"
-              size={12}
-              color={theme.states.success}
-            />
-          ) : null}
-          <Text style={[styles.assetState, { color }]}>{assetStateLabel(asset)}</Text>
-        </View>
-        {asset.metadataStatus !== 'complete' ? (
-          <Text style={styles.assetMetadataState}>
-            {asset.metadataStatus.toUpperCase()} METADATA
-          </Text>
-        ) : null}
-      </View>
-      {onPress ? (
-        <Ionicons
-          accessibilityElementsHidden
-          name="chevron-forward"
-          size={16}
-          color={theme.colors.mutedForeground}
-        />
-      ) : null}
-    </>
-  );
+  const subtitle = [
+    assetDisplaySubtitle(asset),
+    asset.networkId,
+    asset.verificationStatus === 'verified' ? 'Verified' : null,
+  ]
+    .filter(Boolean)
+    .join(' • ');
+  const imageUri =
+    asset.icon.status === 'available' && typeof asset.icon.reference === 'string'
+      ? asset.icon.reference
+      : null;
 
   return (
-    <Pressable
-      accessibilityLabel={`${assetDisplayName(asset)} ${assetDisplaySubtitle(asset)} balance ${amount}, ${assetStateLabel(asset)}`}
-      accessibilityRole={onPress ? 'button' : undefined}
+    <WaveXAssetRow
+      amount={amount}
+      imageUri={imageUri}
+      initials={asset.icon.fallback.initials}
       onPress={onPress}
-      style={styles.assetRow}
-    >
-      {content}
-    </Pressable>
+      status={assetStateLabel(asset)}
+      subtitle={subtitle}
+      title={assetDisplayName(asset)}
+    />
   );
 }
 
@@ -715,11 +710,10 @@ function AssetPreview({
       </View>
       {assets.length === 0 ? (
         <View style={styles.emptyCard}>
-          <Ionicons name="layers-outline" size={24} color={theme.colors.mutedForeground} />
-          <Text style={styles.emptyTitle}>No assets yet</Text>
-          <Text style={styles.emptyBody}>
-            Assets will appear here when a configured network returns public balance data.
-          </Text>
+          <WaveXEmptyState
+            body="Assets will appear here when a configured network returns public balance data."
+            title="No assets yet"
+          />
         </View>
       ) : (
         <View style={styles.assetList}>
@@ -1330,15 +1324,6 @@ export function WalletHomeShell({
             }
             showsVerticalScrollIndicator={false}
           >
-            <View style={styles.greeting}>
-              <Text style={styles.eyebrow}>{previewMode ? 'DEVELOPMENT • PREVIEW TEST MODE' : 'WALLET HOME'}</Text>
-              <Text style={styles.heroTitle}>Good to see you.</Text>
-              <Text style={styles.body}>
-                {previewMode
-                  ? 'A safe public preview of the WaveX wallet shell.'
-                  : 'Your public wallet overview, without price estimates or hidden assumptions.'}
-              </Text>
-            </View>
             <NetworkCard
               network={network}
               onPress={() => setNetworkSelectorVisible(true)}
@@ -1356,7 +1341,6 @@ export function WalletHomeShell({
               state={portfolioState}
             />
             <View style={styles.actionsSection}>
-              <Text style={styles.cardEyebrow}>QUICK ACTIONS</Text>
               <View style={styles.actionsRow}>
                 <ActionButton
                   icon="arrow-up-outline"
@@ -1373,7 +1357,19 @@ export function WalletHomeShell({
                   label="Receive"
                   onPress={() => setDestination('receive')}
                 />
-                <ActionButton icon="scan-outline" label="Scan" onPress={() => onComingSoon('QR scanning is coming soon.')} />
+                <ActionButton
+                  comingSoon={false}
+                  icon="swap-horizontal-outline"
+                  label="Swap"
+                  onPress={() => setDestination('swap')}
+                />
+                <ActionButton
+                  available={false}
+                  comingSoon={false}
+                  icon="card-outline"
+                  label="Buy"
+                  onPress={() => undefined}
+                />
               </View>
             </View>
             <AssetPreview
@@ -1386,36 +1382,6 @@ export function WalletHomeShell({
               onViewAll={() => setDestination('assets')}
               state={portfolioState}
             />
-            <Pressable
-              accessibilityLabel="Open Connected DApps"
-              accessibilityRole="button"
-              onPress={() => setDestination('dapps')}
-              style={({ pressed }) => [styles.dappEntryCard, pressed && styles.pressed]}
-            >
-              <View style={styles.dappEntryIcon}>
-                <Ionicons name="link-outline" size={21} color={theme.colors.accent} />
-              </View>
-              <View style={styles.dappEntryCopy}>
-                <Text style={styles.dappEntryTitle}>Connected DApps</Text>
-                <Text style={styles.dappEntryBody}>
-                  {dappAvailable
-                    ? dappSessions.length === 0
-                      ? 'Review and manage public wallet connections.'
-                      : `${dappSessions.length} connected session${dappSessions.length === 1 ? '' : 's'}`
-                    : 'Native provider connections are unavailable in Preview.'}
-                </Text>
-              </View>
-              <Ionicons name="chevron-forward" size={18} color={theme.colors.mutedForeground} />
-            </Pressable>
-            <Pressable
-              accessibilityLabel="Lock wallet"
-              accessibilityRole="button"
-              onPress={onLock}
-              style={({ pressed }) => [styles.lockButton, pressed && styles.pressed]}
-            >
-              <Ionicons name="lock-closed-outline" size={16} color={theme.colors.mutedForeground} />
-              <Text style={styles.lockButtonText}>Lock wallet</Text>
-            </Pressable>
           </ScrollView>
         ) : destination === 'receive' ? (
           <ReceiveScreen
@@ -1559,35 +1525,19 @@ export function WalletHomeShell({
           <PlaceholderDestination destination={destination} onBack={() => setDestination('home')} />
         )}
       </View>
-      <View style={[styles.bottomNav, { paddingBottom: Math.max(insets.bottom, 10) }]}>
-        {navigationItems.map((item) => {
-          const selected = destination === item.key;
-          return (
-            <Pressable
-              accessibilityLabel={item.label}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
-              key={item.key}
-              onPress={() => {
-                setReviewDraft(null);
-                setSwapReviewQuote(null);
-                setDestination(item.key);
-              }}
-              style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}
-            >
-              <Ionicons
-                name={selected ? item.icon.replace('-outline', '') as keyof typeof Ionicons.glyphMap : item.icon}
-                size={20}
-                color={selected ? theme.colors.accent : theme.colors.mutedForeground}
-              />
-              <Text style={[styles.navLabel, selected && styles.navLabelSelected]}>{item.label}</Text>
-            </Pressable>
-          );
-        })}
-      </View>
+      <WaveXBottomNavigation
+        items={navigationItems}
+        selectedKey={destination}
+        onSelect={(key) => {
+          setReviewDraft(null);
+          setSwapReviewQuote(null);
+          setDestination(key as Destination);
+        }}
+      />
       <AccountPanel
         onClose={() => setAccountPanelVisible(false)}
         onLock={onLock}
+        onComingSoon={onComingSoon}
         visible={accountPanelVisible}
         wallet={wallet}
       />
@@ -1620,6 +1570,16 @@ const styles = StyleSheet.create({
   accountButtonLabel: { color: theme.colors.foreground, fontFamily: theme.typography.label.fontFamily, fontSize: 11, textAlign: 'right' },
   accountButtonAddress: { color: theme.colors.mutedForeground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 11, textAlign: 'right', marginTop: 2 },
   headerIconButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.secondary, borderWidth: 1, borderColor: theme.colors.border },
+  accountList: { gap: theme.spacing.sm },
+  accountOption: { minHeight: 64, padding: theme.spacing.sm, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: theme.colors.muted, borderWidth: 1, borderColor: theme.colors.border },
+  accountOptionSelected: { backgroundColor: 'rgba(80, 217, 255, 0.1)', borderColor: theme.colors.borderActive },
+  accountOptionIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.sm, backgroundColor: theme.colors.secondary },
+  accountOptionCopy: { flex: 1, gap: 2 },
+  accountOptionTitle: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14 },
+  accountOptionAddress: { color: theme.colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily, fontSize: 11 },
+  accountActions: { gap: theme.spacing.xs },
+  accountAction: { minHeight: 48, paddingHorizontal: theme.spacing.sm, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.sm, backgroundColor: theme.colors.muted },
+  accountActionText: { flex: 1, color: theme.colors.textSecondary, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13 },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   modalBackdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(3, 6, 16, 0.72)' },
   accountSheet: { maxHeight: '88%', padding: theme.spacing.lg, gap: theme.spacing.md, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: '#0d152b', borderWidth: 1, borderColor: 'rgba(80, 217, 255, 0.28)', ...theme.shadows.panel },
@@ -1649,6 +1609,7 @@ const styles = StyleSheet.create({
   networkList: { gap: theme.spacing.sm, paddingBottom: theme.spacing.sm },
   networkOption: { minHeight: 76, padding: theme.spacing.sm, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: 'rgba(18, 29, 56, 0.72)', borderWidth: 1, borderColor: theme.colors.border },
   networkOptionSelected: { backgroundColor: 'rgba(80, 217, 255, 0.1)', borderColor: 'rgba(80, 217, 255, 0.55)' },
+  networkOptionDisabled: { opacity: theme.states.disabledOpacity },
   networkOptionIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: 'rgba(124, 140, 255, 0.16)', borderWidth: 1, borderColor: 'rgba(124, 140, 255, 0.28)' },
   networkOptionIconSelected: { backgroundColor: 'rgba(80, 217, 255, 0.16)', borderColor: 'rgba(80, 217, 255, 0.46)' },
   networkOptionInitial: { color: theme.colors.foreground, fontFamily: theme.typography.label.fontFamily, fontSize: 14 },
@@ -1683,6 +1644,8 @@ const styles = StyleSheet.create({
   portfolioTitle: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 22, lineHeight: 28, marginTop: 4 },
   portfolioBody: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 12, lineHeight: 18 },
   refreshNotice: { color: theme.states.warning, fontFamily: theme.typography.body.fontFamily, fontSize: 11, lineHeight: 17 },
+  balanceValue: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 52, lineHeight: 58, letterSpacing: -1.5, marginTop: theme.spacing.sm },
+  balanceDetailRow: { flexDirection: 'row', alignItems: 'center' },
   assetCountRow: { flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing.sm, marginTop: theme.spacing.sm },
   assetCount: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 48, lineHeight: 54, letterSpacing: -1.5 },
   assetCountLabel: { color: theme.colors.accent, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13 },
@@ -1694,9 +1657,11 @@ const styles = StyleSheet.create({
   refreshText: { color: theme.colors.foreground, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
   actionsSection: { gap: theme.spacing.sm },
   actionsRow: { flexDirection: 'row', gap: theme.spacing.sm },
-  actionButton: { flex: 1, minHeight: 88, paddingVertical: theme.spacing.sm, alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: theme.radius.md, backgroundColor: 'rgba(18, 29, 56, 0.72)', borderWidth: 1, borderColor: theme.colors.border },
+  actionButton: { flex: 1, minHeight: 88, paddingVertical: theme.spacing.sm, alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: theme.radius.pill, backgroundColor: 'rgba(18, 29, 56, 0.72)', borderWidth: 1, borderColor: theme.colors.border },
+  actionButtonDisabled: { opacity: theme.states.disabledOpacity },
   actionIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(80, 217, 255, 0.1)' },
   actionLabel: { color: theme.colors.foreground, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
+  actionUnavailable: { color: theme.colors.mutedForeground, fontFamily: theme.typography.micro.fontFamily, fontSize: 9 },
   assetSection: { gap: theme.spacing.sm },
   sectionHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
   sectionTitle: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 22, lineHeight: 28, marginTop: 4 },

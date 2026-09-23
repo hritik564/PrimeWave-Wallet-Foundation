@@ -1,6 +1,7 @@
 import {
   PortfolioReadModelError,
   type PortfolioAssetViewModel,
+  type PortfolioReadModel,
 } from '@/src/core/portfolio';
 
 export type AssetFilter = 'all' | 'visible' | 'hidden';
@@ -19,6 +20,88 @@ export type HomePortfolioState =
   | 'empty'
   | 'unavailable'
   | 'error';
+
+export interface HomeBalancePresentation {
+  readonly value: string;
+  readonly detail: string;
+  readonly supporting: string;
+  readonly available: boolean;
+  readonly zero: boolean;
+}
+
+export function getHomeBalancePresentation(
+  state: HomePortfolioState,
+  model: PortfolioReadModel | null,
+): HomeBalancePresentation {
+  if (state === 'loading') {
+    return {
+      value: '—',
+      detail: 'Loading portfolio',
+      supporting: 'Reading public balances',
+      available: false,
+      zero: false,
+    };
+  }
+
+  if (state === 'unavailable') {
+    return {
+      value: '—',
+      detail: 'Balance unavailable',
+      supporting: 'Check your connection and try again',
+      available: false,
+      zero: false,
+    };
+  }
+
+  if (state === 'error') {
+    return {
+      value: '—',
+      detail: 'Could not load your balance',
+      supporting: 'Check your connection and try again',
+      available: false,
+      zero: false,
+    };
+  }
+
+  const visibleAssets = model?.assets.filter((asset) => asset.visibility === 'visible') ?? [];
+  const hasUnavailableAsset = visibleAssets.some(
+    (asset) => asset.availabilityState !== 'available',
+  );
+
+  if (hasUnavailableAsset) {
+    return {
+      value: '—',
+      detail: 'Balance partially unavailable',
+      supporting: 'Some asset balances could not be read',
+      available: false,
+      zero: false,
+    };
+  }
+
+  const hasPositiveBalance = visibleAssets.some(
+    (asset) =>
+      asset.availabilityState === 'available' &&
+      asset.balanceState === 'positive',
+  );
+
+  if (!hasPositiveBalance) {
+    return {
+      value: '0',
+      detail: 'Available balance',
+      supporting: 'No assets on this network yet',
+      available: true,
+      zero: true,
+    };
+  }
+
+  return {
+    value: '—',
+    detail: 'Fiat value unavailable',
+    supporting: 'Native balances are shown below',
+    available: true,
+    zero: false,
+  };
+}
 
 export function shortPublicAddress(address: string): string {
   const normalized = address.trim();

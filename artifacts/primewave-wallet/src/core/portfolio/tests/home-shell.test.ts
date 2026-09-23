@@ -5,6 +5,7 @@ import {
   assetDisplaySubtitle,
   assetStateLabel,
   filterPortfolioAssets,
+  getHomeBalancePresentation,
   getPortfolioState,
   homeNavigationLabels,
   safePortfolioDiagnostic,
@@ -78,6 +79,28 @@ test('derives honest portfolio and asset presentation states', () => {
   assert.equal(assetStateLabel(asset({ availabilityState: 'stale' })), 'STALE');
   assert.equal(assetStateLabel(asset({ availabilityState: 'invalid' })), 'INVALID');
   assert.equal(assetStateLabel(asset({ verificationStatus: 'verified' })), 'VERIFIED');
+});
+
+test('keeps Home balance presentation honest when fiat values are unavailable', () => {
+  assert.deepEqual(getHomeBalancePresentation('empty', null), {
+    value: '0',
+    detail: 'Available balance',
+    supporting: 'No assets on this network yet',
+    available: true,
+    zero: true,
+  });
+  assert.equal(getHomeBalancePresentation('loading', null).available, false);
+  assert.equal(getHomeBalancePresentation('unavailable', null).detail, 'Balance unavailable');
+});
+
+test('does not collapse unavailable asset reads into an available zero balance', () => {
+  const model = {
+    assets: [asset({ availabilityState: 'unavailable', balanceState: 'unavailable' })],
+  } as unknown as Parameters<typeof getHomeBalancePresentation>[1];
+  const presentation = getHomeBalancePresentation('available', model);
+  assert.equal(presentation.value, '—');
+  assert.equal(presentation.zero, false);
+  assert.equal(presentation.detail, 'Balance partially unavailable');
 });
 
 test('uses metadata fallbacks without inferring trust', () => {

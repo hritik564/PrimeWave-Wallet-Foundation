@@ -21,3 +21,4 @@
 - [Preview wallet render stability](preview-wallet-render-stability.md) — memoize the development wallet object so Home portfolio effects do not invalidate on unrelated parent renders.
 - [Browser fetch binding](browser-fetch-binding.md) — bind globalThis.fetch before storing it as a transport callback or browser requests fail with Illegal invocation.
 - [Design-system test boundary](design-system-test-boundary.md) — Node contract tests should import runtime-neutral token/manifest modules, not the React Native JSX barrel.
+- [Home balance honesty](home-balance-presentation.md) — the current portfolio read model has no fiat aggregate; never synthesize one or turn partial reads into zero.
