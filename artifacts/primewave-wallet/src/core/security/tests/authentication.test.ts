@@ -42,6 +42,7 @@ class MockBiometrics implements BiometricProvider {
   enrolled = true;
   types = [2];
   response: { success: boolean; error?: string } = { success: true };
+  promptMessage = '';
 
   async isHardwareEnrolledAsync(): Promise<boolean> {
     return this.enrolled;
@@ -51,7 +52,8 @@ class MockBiometrics implements BiometricProvider {
     return this.types;
   }
 
-  async authenticateAsync(): Promise<{ success: boolean; error?: string }> {
+  async authenticateAsync(options: { promptMessage: string }): Promise<{ success: boolean; error?: string }> {
+    this.promptMessage = options.promptMessage;
     return this.response;
   }
 }
@@ -174,6 +176,7 @@ test('uses platform biometrics only after they are enabled', async () => {
     authenticated: true,
     reason: 'success',
   });
+  assert.equal(biometrics.promptMessage, 'Unlock WaveX');
 });
 
 test('cancelled and unavailable biometrics remain locked for PIN fallback', async () => {

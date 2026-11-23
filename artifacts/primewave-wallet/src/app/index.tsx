@@ -16,7 +16,8 @@ import {
   createPreviewPortfolioReadModelService,
 } from '@/src/core/development';
 import {
-  createAppPortfolioReadModelService,
+  createAppPortfolioRuntime,
+  type AppPortfolioRuntime,
 } from '@/src/core/portfolio';
 import {
   ActivityReadModelService,
@@ -638,12 +639,14 @@ export default function FoundationScreen() {
     [previewMode],
   );
   const previewTestMode = useMemo(() => new PreviewTestMode(), []);
+  const [runtimeGeneration, setRuntimeGeneration] = useState(0);
+  const portfolioRuntime = useMemo<AppPortfolioRuntime | null>(
+    () => previewMode ? null : createAppPortfolioRuntime(),
+    [previewMode, runtimeGeneration],
+  );
   const portfolioReadModelService = useMemo(
-    () =>
-      previewMode
-        ? createPreviewPortfolioReadModelService()
-        : createAppPortfolioReadModelService(),
-    [previewMode],
+    () => previewMode ? createPreviewPortfolioReadModelService() : portfolioRuntime?.readModel ?? null,
+    [previewMode, portfolioRuntime],
   );
   const swapQuoteService = useMemo(() => {
     try {
@@ -1596,6 +1599,7 @@ export default function FoundationScreen() {
       await nativeAccess().resetLocalWallet();
     }
     activityService?.getRepository().clear();
+    setRuntimeGeneration(generation => generation + 1);
     setSettings({ biometricEnabled: false, autoLockPolicy: 0, pinConfigured: false });
     setPin('');
     setConfirmPin('');
@@ -1659,7 +1663,7 @@ export default function FoundationScreen() {
     await dappTransport.disconnect(sessionId);
     setDappSessions((current) => current.filter((session) => session.sessionId !== sessionId));
     if (dappSession?.sessionId === sessionId) setDappSession(null);
-  }} onSecurity={() => { setError(''); setView('security'); }} previewMode={previewMode} wallet={currentWallet} network={selectedNetwork} networkRegistry={defaultNetworkRegistry} readModelService={portfolioReadModelService} swapQuoteService={swapQuoteService} onNetworkSelect={handleNetworkSelect} onComingSoon={(message) => setError(message)} onLock={() => void run(async () => {
+  }} onSecurity={() => { setError(''); setView('security'); }} previewMode={previewMode} wallet={currentWallet} network={selectedNetwork} networkRegistry={defaultNetworkRegistry} readModelService={portfolioReadModelService!} swapQuoteService={swapQuoteService} onNetworkSelect={handleNetworkSelect} onComingSoon={(message) => setError(message)} onAddToken={portfolioRuntime ? (request) => portfolioRuntime.registerToken(request) : undefined} onLock={() => void run(async () => {
     if (previewMode) {
       previewTestMode.lockPreviewWallet();
     } else {

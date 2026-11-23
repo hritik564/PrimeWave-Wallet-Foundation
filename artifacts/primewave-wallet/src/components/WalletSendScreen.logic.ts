@@ -36,7 +36,7 @@ export function isSendableAsset(
   return (
     asset.networkId === network.id &&
     asset.identity.networkId === network.id &&
-    (asset.assetType === 'native' || asset.assetType === 'fungible_token')
+    asset.assetType === 'native'
   );
 }
 

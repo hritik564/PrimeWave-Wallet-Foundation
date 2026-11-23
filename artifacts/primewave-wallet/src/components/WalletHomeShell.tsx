@@ -14,6 +14,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -65,6 +66,7 @@ import { WalletActivityScreen } from './WalletActivityScreen';
 import { WalletSwapScreen } from './WalletSwapScreen';
 import { WalletSwapReviewScreen } from './WalletSwapReviewScreen';
 import { WalletSwapExecutionScreen } from './WalletSwapExecutionScreen';
+import type { ERC20Token, UserAddedTokenRequest } from '@/src/core/assets';
 import { assetIdentityKey, type PublicSendDraft } from './WalletSendScreen.logic';
 import { copyPublicAddress } from './public-address-actions';
 import { DAppSessionsScreen } from './dapp/DAppSessionsScreen';
@@ -884,6 +886,7 @@ function AssetsBalanceSummary({
 }
 
 function AssetsScreen({
+  onAddToken,
   previewMode,
   state,
   model,
@@ -902,6 +905,7 @@ function AssetsScreen({
   onBack: () => void;
   onRefresh: () => void;
   onAssetPress: (asset: PortfolioAssetViewModel) => void;
+  onAddToken?: () => void;
   refreshing: boolean;
 }) {
   const [searchQuery, setSearchQuery] = useState('');
@@ -943,6 +947,12 @@ function AssetsScreen({
           <Text style={styles.cardEyebrow}>PORTFOLIO</Text>
           <Text style={styles.assetsTitle}>Assets</Text>
         </View>
+        {onAddToken ? (
+          <Pressable accessibilityRole="button" accessibilityLabel="Add token" onPress={onAddToken} style={styles.addTokenButton}>
+            <Ionicons name="add" size={18} color={theme.colors.primaryForeground} />
+            <Text style={styles.addTokenText}>Add</Text>
+          </Pressable>
+        ) : null}
         <RefreshButton
           compact
           onPress={onRefresh}
@@ -1028,6 +1038,102 @@ function AssetsScreen({
   );
 }
 
+function AddTokenModal({
+  network,
+  networkRegistry,
+  onClose,
+  onRegister,
+  isCurrentNetwork,
+  onRegistered,
+  onError,
+  message,
+}: {
+  network: EvmNetwork;
+  networkRegistry: NetworkRegistry;
+  onClose: () => void;
+  onRegister: (request: UserAddedTokenRequest) => Promise<unknown>;
+  isCurrentNetwork: () => boolean;
+  onRegistered: () => void;
+  onError: (message: string) => void;
+  message: string | null;
+}) {
+  const [address, setAddress] = useState('');
+  const [preview, setPreview] = useState<ERC20Token | null>(null);
+  const [busy, setBusy] = useState(false);
+  const validate = async () => {
+    setBusy(true);
+    onError('');
+    setPreview(null);
+    try {
+      if (!isCurrentNetwork()) throw new Error('The active network changed.');
+      if (network.configurationStatus !== 'configured' || network.chainId === null) {
+        throw new Error('This network is not configured for token reads.');
+      }
+      if (!/^0x[a-fA-F0-9]{40}$/.test(address.trim())) {
+        throw new Error('Enter a valid 20-byte contract address.');
+      }
+      const { createEvmRpcProvider } = await import('@/src/core/blockchain/rpc');
+      const { EvmAccountStateService } = await import('@/src/core/blockchain/account-state');
+      const { ERC20TokenService, AssetRegistry } = await import('@/src/core/assets');
+      const { TokenRegistry } = await import('@/src/core/assets/token/registry');
+      const provider = await createEvmRpcProvider(networkRegistry);
+      const accountState = new EvmAccountStateService(networkRegistry, provider);
+      const assets = new AssetRegistry(networkRegistry);
+      const service = new ERC20TokenService(assets, [{ accountState, provider }], {}, new TokenRegistry(assets));
+      const token = await service.getTokenMetadata({ networkId: network.id, contractAddress: address.trim() });
+      if (!isCurrentNetwork()) throw new Error('The active network changed.');
+      if (token.chainId !== network.chainId) throw new Error('The token contract resolved to another network.');
+      if (token.metadataStatus === 'invalid' || token.decimals === null) {
+        throw new Error('Token metadata or decimals are invalid or unavailable.');
+      }
+      setPreview(token);
+    } catch {
+      onError('Could not validate this contract on the selected network. Check the address and network.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  const add = async () => {
+    if (!preview || busy) return;
+    if (!isCurrentNetwork()) {
+      setPreview(null);
+      onError('The active network changed. Check this contract on the selected network.');
+      return;
+    }
+    setBusy(true);
+    try {
+      await onRegister({ networkId: network.id, contractAddress: preview.contractAddress });
+      onRegistered();
+    } catch {
+      onError('This token could not be added. It may already be registered or its contract is unavailable.');
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <View style={styles.tokenModalBackdrop}>
+      <View accessibilityViewIsModal style={styles.tokenModal}>
+        <Text accessibilityRole="header" style={styles.assetsTitle}>Add token</Text>
+        <Text style={styles.assetsIntro}>Network: {network.displayName}</Text>
+        <Text style={styles.assetDetailLabel}>ERC-20 contract address</Text>
+        <TextInput accessibilityLabel="ERC-20 contract address" autoCapitalize="none" autoCorrect={false} value={address} onChangeText={setAddress} placeholder="0x…" placeholderTextColor={theme.colors.mutedForeground} style={styles.input} />
+        <WaveXButton label={busy ? 'Checking…' : 'Check contract'} onPress={() => void validate()} disabled={busy} />
+        {preview ? (
+          <View style={styles.assetDetailsCard}>
+            <Text style={styles.assetDetailsName}>{preview.name ?? 'Unknown token'}</Text>
+            <Text style={styles.assetDetailsSymbol}>{preview.symbol ?? 'Unknown symbol'} · {preview.decimals} decimals</Text>
+            <Text style={styles.assetDetailValue}>{preview.contractAddress}</Text>
+            <Text style={styles.assetWarning}>Unverified token. Contract metadata does not prove legitimacy.</Text>
+            <WaveXButton label="Add this token" onPress={() => void add()} disabled={busy} />
+          </View>
+        ) : null}
+        {message ? <Text accessibilityRole="alert" style={styles.assetWarning}>{message}</Text> : null}
+        <WaveXButton label="Cancel" onPress={onClose} variant="outline" />
+      </View>
+    </View>
+  );
+}
+
 function PlaceholderDestination({
   destination,
   onBack,
@@ -1107,6 +1213,7 @@ type ShellProps = {
   onSecurity?: () => void;
   onLock: () => void;
   onComingSoon: (label: string) => void;
+  onAddToken?: (request: UserAddedTokenRequest) => Promise<unknown>;
 };
 
 export function WalletHomeShell(props: ShellProps) {
@@ -1140,9 +1247,13 @@ function AccountHome({
   onSecurity,
   onLock,
   onComingSoon,
+  onAddToken,
 }: ShellProps & { onSelectAccount: (accountId: string) => void }) {
   const insets = useSafeAreaInsets();
   const [destination, setDestination] = useState<Destination>('home');
+  const [tokenModalVisible, setTokenModalVisible] = useState(false);
+  const [tokenMessage, setTokenMessage] = useState<string | null>(null);
+  const [tokenNetwork, setTokenNetwork] = useState<EvmNetwork>(network);
   const [accountPanelVisible, setAccountPanelVisible] = useState(false);
   const [networkSelectorVisible, setNetworkSelectorVisible] = useState(false);
   const [loadedState, setPortfolioState] = useState<PortfolioState>('loading');
@@ -1471,7 +1582,7 @@ function AccountHome({
             network={network}
             onBack={() => setDestination(assetDetailsOrigin)}
             onReceive={() => setDestination('receive')}
-            onSend={() => setDestination('send')}
+            onSend={() => { if (portfolio?.assets.find(asset => assetIdentityKey(asset.identity) === sendAssetKey)?.assetType === 'fungible_token') onComingSoon('ERC-20 sending is not available until token transfer construction and gas validation are supported.'); else setDestination('send'); }}
             onSwap={() => setDestination('swap')}
           />
         ) : destination === 'receive' ? (
@@ -1505,13 +1616,14 @@ function AccountHome({
                 setSendAssetKey(assetIdentityKey(draft.selectedAssetIdentity));
                 setReviewDraft(draft);
               }}
-              portfolio={portfolio}
+              portfolio={portfolio ? { ...portfolio, assets: portfolio.assets.filter(asset => asset.assetType === 'native') } : null}
               portfolioState={portfolioState}
               wallet={wallet}
             />
           )
         ) : destination === 'assets' ? (
           <AssetsScreen
+            onAddToken={onAddToken ? () => { setTokenNetwork(network); setTokenMessage(null); setTokenModalVisible(true); } : undefined}
             errorMessage={portfolioError}
             model={portfolio}
             network={network}
@@ -1623,6 +1735,16 @@ function AccountHome({
         }}
       />
       </View>}
+      {tokenModalVisible && onAddToken ? <AddTokenModal
+        network={tokenNetwork}
+        networkRegistry={networkRegistry}
+        onClose={() => setTokenModalVisible(false)}
+        onRegistered={() => { setTokenModalVisible(false); setTokenMessage('Token added. Refreshing its public balance.'); void loadPortfolio(true); }}
+        onRegister={onAddToken}
+        isCurrentNetwork={() => network.id === tokenNetwork.id}
+        onError={setTokenMessage}
+        message={tokenMessage}
+      /> : null}
       <AccountPanel
         onClose={() => setAccountPanelVisible(false)}
         onLock={onLock}
@@ -1839,4 +1961,11 @@ const styles = StyleSheet.create({
   navLabel: { color: theme.colors.mutedForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 10 },
   navLabelSelected: { color: theme.colors.accent },
   pressed: { opacity: theme.states.pressedOpacity },
+  addTokenButton: { minHeight: 42, paddingHorizontal: 12, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: theme.colors.accent },
+  addTokenText: { color: theme.colors.primaryForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 13 },
+  tokenModalBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, zIndex: 30, justifyContent: 'center', padding: theme.spacing.lg, backgroundColor: 'rgba(0,0,0,0.78)' },
+  tokenModal: { gap: theme.spacing.md, padding: theme.spacing.lg, borderRadius: theme.radius.lg, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
+  assetWarning: { color: theme.states.warning, fontFamily: theme.typography.body.fontFamily, fontSize: 13, lineHeight: 19 },
+  input: { minHeight: 48, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.sm, color: theme.colors.foreground, backgroundColor: theme.colors.input, borderWidth: 1, borderColor: theme.colors.border },
+
 });

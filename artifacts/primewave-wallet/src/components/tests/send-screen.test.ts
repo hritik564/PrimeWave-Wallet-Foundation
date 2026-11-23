@@ -70,7 +70,7 @@ test('Send screen logic starts with network-scoped native asset', () => {
     formattedBalance: '1.2',
   });
   assert.equal(selectDefaultSendAsset([token, native], network), native);
-  assert.deepEqual(getSendableAssets([native, token], network), [native, token]);
+  assert.deepEqual(getSendableAssets([native, token], network), [native]);
   assert.equal(assetIdentityKey(token.identity), `${network.id}:fungible_token:0xtoken`);
 });
 

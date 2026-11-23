@@ -506,7 +506,7 @@ export class AuthenticationManager implements WalletAuthenticator {
         (async () => {
           const provider = await this.biometricPromise;
           return provider.authenticateAsync({
-            promptMessage: 'Unlock PrimeWave Wallet',
+            promptMessage: 'Unlock WaveX',
             cancelLabel: 'Use PIN',
             disableDeviceFallback: true,
           });
