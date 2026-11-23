@@ -1,3 +1,4 @@
+import { walletHomeColors as palette } from '@/src/design-system/tokens/wallet-home';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -70,6 +71,7 @@ import {
   assetDisplaySubtitle,
   assetStateLabel,
   filterPortfolioAssets,
+  filterRegisteredNetworks,
   type AssetFilter,
   getHomeBalancePresentation,
   getPortfolioState,
@@ -114,9 +116,9 @@ function stateColor(asset: PortfolioAssetViewModel): string {
   if (asset.availabilityState === 'available' && asset.balanceState === 'positive') {
     return theme.states.success;
   }
-  if (asset.availabilityState === 'available') return theme.colors.accent;
+  if (asset.availabilityState === 'available') return palette.cyan;
   if (asset.availabilityState === 'stale') return theme.states.warning;
-  return theme.colors.mutedForeground;
+  return palette.secondaryText;
 }
 
 function Header({
@@ -136,7 +138,7 @@ function Header({
   const accountLabel = account ? `Account ${account.index + 1}` : 'Account';
   return (
     <View style={styles.homeHeader}>
-      <View style={styles.brandLockup}>
+      {detailMode && <View style={styles.brandLockup}>
         <View style={styles.brandMark}>
           <Image source={iconSource} style={styles.brandIcon} />
         </View>
@@ -144,7 +146,7 @@ function Header({
           <Text style={styles.brandName}>WAVEX</Text>
           <Text style={styles.brandProduct}>{detailMode ? detailMode.toUpperCase() : 'WALLET'}</Text>
         </View>
-      </View>
+      </View>}
       {detailMode ? (
         <Pressable
           accessibilityLabel="Back to Home"
@@ -152,7 +154,7 @@ function Header({
           onPress={onBack}
           style={({ pressed }) => [styles.receiveHeaderBack, pressed && styles.pressed]}
         >
-          <Ionicons name="arrow-back-outline" size={18} color={theme.colors.accent} />
+          <Ionicons name="arrow-back-outline" size={18} color={palette.cyan} />
           <Text style={styles.receiveHeaderBackText}>Back</Text>
         </Pressable>
       ) : (
@@ -163,10 +165,14 @@ function Header({
             onPress={onAccountPress}
             style={({ pressed }) => [styles.accountButton, pressed && styles.pressed]}
           >
+            <Image accessibilityLabel="WaveX" source={iconSource} style={styles.headerLogo} />
+            <View>
             <Text style={styles.accountButtonLabel}>{accountLabel}</Text>
             <Text style={styles.accountButtonAddress}>
               {account ? shortPublicAddress(account.address) : 'Unavailable'}
             </Text>
+            </View>
+            <Ionicons name="chevron-down" size={14} color={palette.secondaryText} />
           </Pressable>
           <Pressable
             accessibilityLabel="Open settings"
@@ -174,7 +180,7 @@ function Header({
             onPress={onSettingsPress}
             style={({ pressed }) => [styles.headerIconButton, pressed && styles.pressed]}
           >
-            <Ionicons name="settings-outline" size={19} color={theme.colors.foreground} />
+            <Ionicons name="settings-outline" size={19} color={palette.text} />
           </Pressable>
         </View>
       )}
@@ -227,12 +233,12 @@ function AccountPanel({
               onPress={() => { onSelect(candidate.accountId); onClose(); }}
               style={({ pressed }) => [
                 styles.accountOption,
-                selected && styles.accountOptionSelected,
+
                 pressed && styles.pressed,
               ]}
             >
               <View style={styles.accountOptionIcon}>
-                <Ionicons name="person-outline" size={17} color={theme.colors.accent} />
+                <Ionicons name="person-outline" size={17} color={palette.cyan} />
               </View>
               <View style={styles.accountOptionCopy}>
                 <Text style={styles.accountOptionTitle}>
@@ -243,9 +249,9 @@ function AccountPanel({
                 </Text>
               </View>
               {selected ? (
-                <Ionicons name="checkmark-circle" size={18} color={theme.colors.accent} />
+                <Ionicons name="checkmark-circle" size={18} color={palette.cyan} />
               ) : (
-                <Ionicons name="chevron-forward" size={17} color={theme.colors.mutedForeground} />
+                <Ionicons name="chevron-forward" size={17} color={palette.secondaryText} />
               )}
             </Pressable>
           );
@@ -261,7 +267,7 @@ function AccountPanel({
         <Ionicons
           name={copyState === 'copied' ? 'checkmark' : 'copy-outline'}
           size={17}
-          color={copyState === 'copied' ? theme.states.success : theme.colors.accent}
+          color={copyState === 'copied' ? theme.states.success : palette.cyan}
         />
         <Text style={styles.copyButtonText}>
           {copyState === 'copied' ? 'Copied public address' : 'Copy public address'}
@@ -297,10 +303,14 @@ function NetworkSelector({
   onSelect: (networkId: string) => NetworkSelectionResult;
 }) {
   const [selectionMessage, setSelectionMessage] = useState<string | null>(null);
-  const networks = registry.listNetworks();
+  const [search, setSearch] = useState('');
+  const networks = filterRegisteredNetworks(registry.listNetworks(), search);
 
   useEffect(() => {
-    if (visible) setSelectionMessage(null);
+    if (visible) {
+      setSelectionMessage(null);
+      setSearch('');
+    }
   }, [visible]);
 
   const selectNetwork = (network: EvmNetwork) => {
@@ -314,9 +324,8 @@ function NetworkSelector({
 
   return (
     <WaveXBottomSheet onClose={onClose} title="Select network" visible={visible}>
-      <Text style={styles.sheetIntro}>
-        Choose where to view your balances.
-      </Text>
+      <WaveXSearchInput placeholder="Search networks" value={search} onChangeText={setSearch} />
+      {networks.length === 0 && <Text style={styles.sheetIntro}>No matching networks</Text>}
       {selectionMessage ? (
         <View accessibilityRole="alert" style={styles.selectionMessage}>
           <Ionicons name="information-circle-outline" size={18} color={theme.states.warning} />
@@ -340,12 +349,12 @@ function NetworkSelector({
               onPress={() => selectNetwork(candidate)}
               style={({ pressed }) => [
                 styles.networkOption,
-                selected && styles.networkOptionSelected,
-                !candidate.enabled && styles.networkOptionDisabled,
+
+
                 pressed && styles.pressed,
               ]}
             >
-              <View style={[styles.networkOptionIcon, selected && styles.networkOptionIconSelected]}>
+              <View style={[styles.networkOptionIcon, selected && available && styles.networkOptionIconSelected]}>
                 <Text style={styles.networkOptionInitial}>
                   {candidate.displayName.slice(0, 1).toUpperCase()}
                 </Text>
@@ -356,16 +365,10 @@ function NetworkSelector({
                     {candidate.displayName}
                   </Text>
                   {selected && available ? (
-                    <Ionicons name="checkmark-circle" size={16} color={theme.colors.accent} />
+                    <Ionicons name="checkmark-circle" size={16} color={palette.cyan} />
                   ) : null}
                 </View>
-                <Text style={styles.networkOptionMeta}>
-                  {configured ? candidate.nativeCurrency.symbol : 'Awaiting network configuration'}
-                </Text>
-                <WaveXStatusIndicator
-                  label={status}
-                  tone={!candidate.enabled ? 'warning' : configured ? 'success' : 'neutral'}
-                />
+                <Text style={styles.networkOptionMeta}>{status}</Text>
               </View>
               {!available ? (
                 <Ionicons name="lock-closed-outline" size={16} color={theme.states.warning} />
@@ -410,18 +413,16 @@ function NetworkCard({
       style={({ pressed }) => [styles.networkCard, pressed && styles.pressed]}
     >
       <View style={styles.networkIcon}>
-        <Ionicons name="globe-outline" size={20} color={configured ? theme.colors.accent : theme.states.warning} />
+        <Ionicons name="globe-outline" size={20} color={configured ? palette.cyan : theme.states.warning} />
       </View>
       <View style={styles.networkCopy}>
         <Text style={styles.networkName}>{network.displayName}</Text>
-        <Text style={styles.networkStatus}>
-          {configured
-            ? network.environment.toUpperCase()
-            : 'Planned · Unavailable'}
-        </Text>
+        {!configured && <Text style={styles.networkStatus}>
+          Planned · Unavailable
+        </Text>}
       </View>
       <View style={styles.networkChevron}>
-        <Ionicons name="chevron-down" size={17} color={theme.colors.mutedForeground} />
+        <Ionicons name="chevron-down" size={17} color={palette.secondaryText} />
       </View>
     </Pressable>
   );
@@ -459,11 +460,11 @@ function ActionButton({
         pressed && styles.pressed,
       ]}
     >
-      <View style={[styles.actionIcon, label === 'Swap' && { backgroundColor: '#302746' }]}>
+      <View style={[styles.actionIcon]}>
         <Ionicons
           name={icon}
           size={20}
-          color={available ? theme.colors.accent : theme.colors.mutedForeground}
+          color={available ? (label === 'Send' ? palette.cyan : palette.text) : palette.secondaryText}
         />
       </View>
       <Text style={styles.actionLabel}>{label}</Text>
@@ -557,16 +558,9 @@ function PortfolioSummary({
         </View>
         <RefreshButton onPress={onRefresh} refreshing={refreshing} compact />
       </View>
-      <Text
-        accessibilityLabel={`Portfolio balance ${balance.value}`}
-        style={styles.balanceValue}
-      >
-        {balance.value}
+      <Text accessibilityLabel={`Portfolio balance ${balance.value} ${balance.detail}`} style={styles.balanceValue}>
+        {balance.value} <Text style={styles.balanceUnit}>{balance.detail}</Text>
       </Text>
-      <View style={styles.balanceDetailRow}>
-        <Text style={styles.networkName}>{balance.detail}</Text>
-      </View>
-
       {errorMessage ? (
         <Text style={styles.refreshNotice}>Refresh note: {errorMessage}</Text>
       ) : null}
@@ -595,10 +589,10 @@ function RefreshButton({
       ]}
     >
       {refreshing ? (
-        <ActivityIndicator color={theme.colors.accent} size="small" />
+        <ActivityIndicator color={palette.cyan} size="small" />
       ) : (
         <>
-          <Ionicons name="refresh-outline" size={16} color={theme.colors.accent} />
+          <Ionicons name="refresh-outline" size={16} color={palette.cyan} />
           {!compact ? <Text style={styles.refreshText}>Refresh</Text> : null}
         </>
       )}
@@ -632,7 +626,7 @@ function AssetRow({
       imageUri={imageUri}
       initials={asset.icon.fallback.initials}
       onPress={onPress}
-      status={assetStateLabel(asset)}
+      status={asset.balanceState === 'positive' && asset.availabilityState === 'available' ? undefined : assetStateLabel(asset)}
       subtitle={subtitle}
       title={assetDisplayName(asset)}
     />
@@ -666,7 +660,7 @@ function AssetPreview({
           style={({ pressed }) => [styles.viewAllButton, pressed && styles.pressed]}
         >
           <Text style={styles.viewAllText}>View all</Text>
-          <Ionicons name="chevron-forward" size={14} color={theme.colors.accent} />
+          <Ionicons name="chevron-forward" size={14} color={palette.cyan} />
         </Pressable>
       </View>
       {assets.length === 0 ? (
@@ -1405,10 +1399,10 @@ function AccountHome({
             ]}
             refreshControl={
               <RefreshControl
-                colors={[theme.colors.accent]}
+                colors={[palette.cyan]}
                 onRefresh={refreshPortfolio}
                 refreshing={refreshing}
-                tintColor={theme.colors.accent}
+                tintColor={palette.cyan}
               />
             }
             showsVerticalScrollIndicator={false}
@@ -1655,7 +1649,9 @@ function AccountHome({
 }
 
 const styles = StyleSheet.create({
-  shell: { flex: 1, backgroundColor: '#0a1122' },
+  shell: { flex: 1, backgroundColor: palette.background },
+  headerLogo: { width: 32, height: 32, borderRadius: 9 },
+  balanceUnit: { fontSize: 19, color: palette.secondaryText },
   shellContent: { flex: 1 },
   orbTop: { position: 'absolute', top: -150, right: -125, width: 320, height: 320, borderRadius: 160, backgroundColor: 'rgba(80, 217, 255, 0.07)' },
   orbBottom: { position: 'absolute', bottom: -170, left: -160, width: 380, height: 380, borderRadius: 190, backgroundColor: 'rgba(124, 140, 255, 0.07)' },
@@ -1663,22 +1659,22 @@ const styles = StyleSheet.create({
   brandLockup: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
   brandMark: { width: 48, height: 48, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(124, 140, 255, 0.55)' },
   brandIcon: { width: '100%', height: '100%' },
-  brandName: { color: theme.colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 13, letterSpacing: 2 },
-  brandProduct: { color: theme.colors.accent, fontFamily: 'Inter_600SemiBold', fontSize: 10, letterSpacing: 2.8, marginTop: 2 },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
+  brandName: { color: palette.text, fontFamily: 'Inter_700Bold', fontSize: 13, letterSpacing: 2 },
+  brandProduct: { color: palette.cyan, fontFamily: 'Inter_600SemiBold', fontSize: 10, letterSpacing: 2.8, marginTop: 2 },
+  headerActions: { flex: 1, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   receiveHeaderBack: { minHeight: 42, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: theme.radius.md, backgroundColor: 'rgba(80, 217, 255, 0.08)', borderWidth: 1, borderColor: 'rgba(80, 217, 255, 0.25)' },
-  receiveHeaderBackText: { color: theme.colors.accent, fontFamily: theme.typography.label.fontFamily, fontSize: 11 },
-  accountButton: { minHeight: 42, paddingHorizontal: 10, justifyContent: 'center', borderRadius: theme.radius.md, backgroundColor: 'rgba(18, 29, 56, 0.88)', borderWidth: 1, borderColor: theme.colors.border },
-  accountButtonLabel: { color: theme.colors.foreground, fontFamily: theme.typography.label.fontFamily, fontSize: 11, textAlign: 'right' },
-  accountButtonAddress: { color: theme.colors.mutedForeground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 11, textAlign: 'right', marginTop: 2 },
-  headerIconButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.secondary, borderWidth: 1, borderColor: theme.colors.border },
-  accountList: { gap: theme.spacing.sm },
-  accountOption: { minHeight: 64, padding: theme.spacing.sm, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: theme.colors.muted, borderWidth: 1, borderColor: theme.colors.border },
+  receiveHeaderBackText: { color: palette.cyan, fontFamily: theme.typography.label.fontFamily, fontSize: 11 },
+  accountButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  accountButtonLabel: { color: palette.text, fontFamily: theme.typography.title.fontFamily, fontSize: 17 },
+  accountButtonAddress: { color: palette.secondaryText, fontSize: 12 },
+  headerIconButton: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center' },
+  accountList: { gap: 0 },
+  accountOption: { minHeight: 54, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.divider },
   accountOptionSelected: { backgroundColor: 'rgba(80, 217, 255, 0.1)', borderColor: theme.colors.borderActive },
-  accountOptionIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.sm, backgroundColor: theme.colors.secondary },
+  accountOptionIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.background },
   accountOptionCopy: { flex: 1, gap: 2 },
-  accountOptionTitle: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14 },
-  accountOptionAddress: { color: theme.colors.mutedForeground, fontFamily: theme.typography.caption.fontFamily, fontSize: 11 },
+  accountOptionTitle: { color: palette.text, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14 },
+  accountOptionAddress: { color: palette.secondaryText, fontFamily: theme.typography.caption.fontFamily, fontSize: 11 },
   accountActions: { gap: theme.spacing.xs },
   accountAction: { minHeight: 48, paddingHorizontal: theme.spacing.sm, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.sm, backgroundColor: theme.colors.muted },
   accountActionText: { flex: 1, color: theme.colors.textSecondary, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13 },
@@ -1688,88 +1684,88 @@ const styles = StyleSheet.create({
   networkSheet: { maxHeight: '88%', padding: theme.spacing.lg, gap: theme.spacing.md, borderTopLeftRadius: 28, borderTopRightRadius: 28, backgroundColor: '#0d152b', borderWidth: 1, borderColor: 'rgba(80, 217, 255, 0.28)', ...theme.shadows.panel },
   sheetHandle: { alignSelf: 'center', width: 42, height: 4, borderRadius: 2, backgroundColor: 'rgba(126, 145, 191, 0.45)' },
   sheetHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  sheetTitle: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 25, lineHeight: 31, marginTop: 4 },
+  sheetTitle: { color: palette.text, fontFamily: theme.typography.title.fontFamily, fontSize: 25, lineHeight: 31, marginTop: 4 },
   sheetClose: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: theme.colors.secondary, borderWidth: 1, borderColor: theme.colors.border },
-  sheetIntro: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 13, lineHeight: 20 },
+  sheetIntro: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 13, lineHeight: 20 },
   accountStatusCard: { padding: theme.spacing.md, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: 'rgba(80, 217, 255, 0.08)', borderWidth: 1, borderColor: 'rgba(80, 217, 255, 0.22)' },
   accountStatusIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: 'rgba(80, 217, 255, 0.12)' },
   accountStatusCopy: { flex: 1, gap: 3 },
-  accountStatusTitle: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14 },
-  accountStatusBody: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 11, lineHeight: 16 },
+  accountStatusTitle: { color: palette.text, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14 },
+  accountStatusBody: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 11, lineHeight: 16 },
   fullAddressCard: { minHeight: 62, paddingHorizontal: theme.spacing.md, paddingVertical: 10, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: 'rgba(18, 29, 56, 0.88)', borderWidth: 1, borderColor: theme.colors.border },
-  fullAddressText: { flex: 1, color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 12, lineHeight: 18 },
-  copyButton: { minHeight: 38, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: theme.radius.sm, backgroundColor: 'rgba(80, 217, 255, 0.1)' },
-  copyButtonText: { color: theme.colors.accent, fontFamily: theme.typography.label.fontFamily, fontSize: 11 },
+  fullAddressText: { flex: 1, color: palette.text, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 12, lineHeight: 18 },
+  copyButton: { minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  copyButtonText: { color: palette.cyan, fontFamily: theme.typography.label.fontFamily, fontSize: 11 },
   copyError: { color: theme.colors.destructive, fontFamily: theme.typography.body.fontFamily, fontSize: 11 },
   accountDetailRow: { minHeight: 42, paddingHorizontal: theme.spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderBottomWidth: 1, borderBottomColor: 'rgba(126, 145, 191, 0.14)' },
-  accountDetailLabel: { color: theme.colors.mutedForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 10, letterSpacing: 0.9 },
-  accountDetailValue: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13 },
-  sheetLockButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: 'rgba(244, 200, 107, 0.1)', borderWidth: 1, borderColor: 'rgba(244, 200, 107, 0.28)' },
+  accountDetailLabel: { color: palette.secondaryText, fontFamily: theme.typography.label.fontFamily, fontSize: 10, letterSpacing: 0.9 },
+  accountDetailValue: { color: palette.text, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13 },
+  sheetLockButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 8 },
   sheetLockText: { color: theme.states.warning, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
   selectionMessage: { padding: theme.spacing.sm, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.sm, backgroundColor: 'rgba(244, 200, 107, 0.08)', borderWidth: 1, borderColor: 'rgba(244, 200, 107, 0.3)' },
   selectionMessageText: { flex: 1, color: theme.states.warning, fontFamily: theme.typography.body.fontFamily, fontSize: 12, lineHeight: 17 },
-  networkList: { gap: theme.spacing.sm, paddingBottom: theme.spacing.sm },
-  networkOption: { minHeight: 76, padding: theme.spacing.sm, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: 'rgba(18, 29, 56, 0.72)', borderWidth: 1, borderColor: theme.colors.border },
+  networkList: { gap: 0 },
+  networkOption: { minHeight: 50, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: palette.divider },
   networkOptionSelected: { backgroundColor: 'rgba(80, 217, 255, 0.1)', borderColor: 'rgba(80, 217, 255, 0.55)' },
   networkOptionDisabled: { opacity: theme.states.disabledOpacity },
-  networkOptionIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 13, backgroundColor: 'rgba(124, 140, 255, 0.16)', borderWidth: 1, borderColor: 'rgba(124, 140, 255, 0.28)' },
-  networkOptionIconSelected: { backgroundColor: 'rgba(80, 217, 255, 0.16)', borderColor: 'rgba(80, 217, 255, 0.46)' },
-  networkOptionInitial: { color: theme.colors.foreground, fontFamily: theme.typography.label.fontFamily, fontSize: 14 },
+  networkOptionIcon: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: palette.background },
+  networkOptionIconSelected: { backgroundColor: palette.background },
+  networkOptionInitial: { color: palette.secondaryText, fontSize: 14 },
   networkOptionCopy: { flex: 1, minWidth: 0, gap: 3 },
   networkOptionTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  networkOptionName: { flex: 1, color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14 },
-  networkOptionMeta: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 11 },
-  networkOptionEnvironment: { color: theme.colors.accent, fontFamily: theme.typography.label.fontFamily, fontSize: 9, letterSpacing: 0.6 },
+  networkOptionName: { flex: 1, color: palette.text, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14 },
+  networkOptionMeta: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 11 },
+  networkOptionEnvironment: { color: palette.cyan, fontFamily: theme.typography.label.fontFamily, fontSize: 9, letterSpacing: 0.6 },
   previewBanner: { marginHorizontal: theme.spacing.lg, marginTop: theme.spacing.md, padding: theme.spacing.md, flexDirection: 'row', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: 'rgba(244, 200, 107, 0.08)', borderWidth: 1, borderColor: 'rgba(244, 200, 107, 0.35)' },
   previewBannerCopy: { flex: 1, gap: 3 },
   previewBannerTitle: { color: theme.states.warning, fontFamily: theme.typography.label.fontFamily, fontSize: 10, letterSpacing: 1.1 },
-  previewBannerBody: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 12, lineHeight: 17 },
-  homeScrollContent: { paddingHorizontal: theme.spacing.lg, gap: theme.spacing.lg },
+  previewBannerBody: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 12, lineHeight: 17 },
+  homeScrollContent: { paddingHorizontal: 20, gap: 12 },
   dappEntryCard: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md, padding: theme.spacing.md, borderRadius: theme.radius.lg, backgroundColor: 'rgba(80, 217, 255, 0.08)', borderWidth: 1, borderColor: 'rgba(80, 217, 255, 0.25)' },
   dappEntryIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: 'rgba(80, 217, 255, 0.12)' },
   dappEntryCopy: { flex: 1, gap: 3 },
-  dappEntryTitle: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14 },
-  dappEntryBody: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 11, lineHeight: 17 },
+  dappEntryTitle: { color: palette.text, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14 },
+  dappEntryBody: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 11, lineHeight: 17 },
   greeting: { marginTop: theme.spacing.lg, gap: theme.spacing.sm },
-  eyebrow: { color: theme.colors.accent, fontFamily: theme.typography.eyebrow.fontFamily, fontSize: theme.typography.eyebrow.fontSize, letterSpacing: theme.typography.eyebrow.letterSpacing, lineHeight: theme.typography.eyebrow.lineHeight },
-  heroTitle: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 34, lineHeight: 40, letterSpacing: -1.2 },
-  body: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 14, lineHeight: 21 },
-  networkCard: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  networkIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(80, 217, 255, 0.1)' },
-  networkCopy: { flex: 1, gap: 2 },
-  cardEyebrow: { color: theme.colors.accent, fontFamily: theme.typography.eyebrow.fontFamily, fontSize: 10, letterSpacing: 1.25 },
-  networkName: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 15 },
-  networkStatus: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 11 },
+  eyebrow: { color: palette.cyan, fontFamily: theme.typography.eyebrow.fontFamily, fontSize: theme.typography.eyebrow.fontSize, letterSpacing: theme.typography.eyebrow.letterSpacing, lineHeight: theme.typography.eyebrow.lineHeight },
+  heroTitle: { color: palette.text, fontFamily: theme.typography.title.fontFamily, fontSize: 34, lineHeight: 40, letterSpacing: -1.2 },
+  body: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 14, lineHeight: 21 },
+  networkCard: { alignSelf: 'flex-start', minHeight: 44, flexDirection: 'row', alignItems: 'center', gap: 6 },
+  networkIcon: { alignItems: 'center', justifyContent: 'center', width: 24 },
+  networkCopy: { gap: 1 },
+  cardEyebrow: { color: palette.secondaryText, fontSize: 11, letterSpacing: 1 },
+  networkName: { color: palette.secondaryText, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14 },
+  networkStatus: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 11 },
   networkChevron: { width: 28, alignItems: 'center' },
-  portfolioCard: { padding: theme.spacing.lg, gap: 8, borderRadius: 22, backgroundColor: '#131e36' },
-  portfolioCardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
-  portfolioTitle: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 22, lineHeight: 28, marginTop: 4 },
-  portfolioBody: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 12, lineHeight: 18 },
+  portfolioCard: { paddingHorizontal: 16, paddingVertical: 12, gap: 1, borderRadius: 14, backgroundColor: palette.surface },
+  portfolioCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  portfolioTitle: { color: palette.text, fontFamily: theme.typography.title.fontFamily, fontSize: 22, lineHeight: 28, marginTop: 4 },
+  portfolioBody: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 12, lineHeight: 18 },
   refreshNotice: { color: theme.states.warning, fontFamily: theme.typography.body.fontFamily, fontSize: 11, lineHeight: 17 },
-  balanceValue: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 36, lineHeight: 44, letterSpacing: -1 },
+  balanceValue: { color: palette.text, fontFamily: theme.typography.title.fontFamily, fontSize: 36, lineHeight: 44, letterSpacing: -1 },
   balanceDetailRow: { flexDirection: 'row', alignItems: 'center' },
   assetCountRow: { flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing.sm, marginTop: theme.spacing.sm },
-  assetCount: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 48, lineHeight: 54, letterSpacing: -1.5 },
-  assetCountLabel: { color: theme.colors.accent, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13 },
+  assetCount: { color: palette.text, fontFamily: theme.typography.title.fontFamily, fontSize: 48, lineHeight: 54, letterSpacing: -1.5 },
+  assetCountLabel: { color: palette.cyan, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13 },
   unavailableCard: { borderColor: 'rgba(244, 200, 107, 0.35)' },
   errorCard: { borderColor: 'rgba(255, 101, 132, 0.38)' },
   stateIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(244, 200, 107, 0.1)' },
   refreshButton: { minHeight: 42, paddingHorizontal: theme.spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: theme.radius.md, backgroundColor: theme.colors.secondary, borderWidth: 1, borderColor: theme.colors.border },
-  refreshButtonCompact: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: theme.colors.secondary, borderWidth: 1, borderColor: theme.colors.border },
-  refreshText: { color: theme.colors.foreground, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
+  refreshButtonCompact: { width: 44, height: 44, alignItems: 'center', justifyContent: 'center' },
+  refreshText: { color: palette.text, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
   actionsSection: { gap: theme.spacing.sm },
   actionsRow: { flexDirection: 'row', gap: theme.spacing.sm },
-  actionButton: { flex: 1, minHeight: 72, alignItems: 'center', justifyContent: 'center', gap: 8 },
+  actionButton: { flex: 1, alignItems: 'center', justifyContent: 'center', minHeight: 60, gap: 4 },
   actionButtonDisabled: { opacity: theme.states.disabledOpacity },
-  actionIcon: { width: 48, height: 48, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#202c49' },
-  actionLabel: { color: theme.colors.foreground, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
-  actionUnavailable: { color: theme.colors.mutedForeground, fontFamily: theme.typography.micro.fontFamily, fontSize: 9 },
+  actionIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: 20, backgroundColor: palette.surface },
+  actionLabel: { color: palette.text, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
+  actionUnavailable: { color: palette.secondaryText, fontFamily: theme.typography.micro.fontFamily, fontSize: 9 },
   assetSection: { gap: theme.spacing.sm },
   sectionHeader: { flexDirection: 'row', alignItems: 'flex-end', justifyContent: 'space-between' },
-  sectionTitle: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 22, lineHeight: 28, marginTop: 4 },
-  sectionCount: { color: theme.colors.mutedForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
+  sectionTitle: { color: palette.text, fontFamily: theme.typography.title.fontFamily, fontSize: 18 },
+  sectionCount: { color: palette.secondaryText, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
   viewAllButton: { minHeight: 36, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', gap: 3 },
-  viewAllText: { color: theme.colors.accent, fontFamily: theme.typography.label.fontFamily, fontSize: 11 },
+  viewAllText: { color: palette.cyan, fontFamily: theme.typography.label.fontFamily, fontSize: 11 },
   assetList: { paddingHorizontal: 4 },
   assetRow: { minHeight: 76, paddingHorizontal: theme.spacing.md, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderBottomWidth: 1, borderBottomColor: 'rgba(126, 145, 191, 0.14)' },
   assetIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(124, 140, 255, 0.16)', borderWidth: 1, borderColor: 'rgba(124, 140, 255, 0.28)' },

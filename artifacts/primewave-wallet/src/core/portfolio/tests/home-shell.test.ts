@@ -1,3 +1,4 @@
+import { supportedNetworks } from '@/src/core/networks';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {
@@ -5,6 +6,7 @@ import {
   assetDisplaySubtitle,
   assetStateLabel,
   filterPortfolioAssets,
+  filterRegisteredNetworks,
   getHomeBalancePresentation,
   getPortfolioState,
   homeNavigationLabels,
@@ -165,4 +167,14 @@ test('sanitizes application errors before they reach the Home UI', () => {
     safePortfolioDiagnostic(new Error('private RPC URL and stack')),
     null,
   );
+});
+
+test('searches the registry by name, symbol and chain ID, including planned networks', () => {
+  const matches = (term: string) => filterRegisteredNetworks(supportedNetworks, term).map(n => n.id);
+  assert.deepEqual(matches('  PRIMEwave '), ['primewave']);
+  assert.ok(matches('eth').includes('ethereum'));
+  assert.ok(matches('56').includes('bnb-smart-chain'));
+  assert.deepEqual(matches('unknown network'), []);
+  assert.deepEqual(matches(''), supportedNetworks.map(n => n.id));
+  assert.deepEqual(matches('TBD'), []);
 });

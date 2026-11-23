@@ -1,3 +1,4 @@
+import { walletHomeColors as palette } from '../tokens/wallet-home';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
 import {
@@ -450,7 +451,7 @@ export function WaveXBottomSheet({
             <Text style={styles.sheetTitle}>{title}</Text>
             <WaveXIconButton icon={icons.close} label={`Close ${title}`} onPress={onClose} />
           </View>
-          <ScrollView contentContainerStyle={styles.sheetContent}>{children}</ScrollView>
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={styles.sheetContent}>{children}</ScrollView>
         </View>
       </View>
     </Modal>
@@ -595,9 +596,9 @@ export function WaveXBottomNavigation({
             accessibilityState={{ selected }}
             key={item.key}
             onPress={() => onSelect(item.key)}
-            style={({ pressed }) => [styles.navItem, selected && styles.navSelected, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}
           >
-            <Ionicons name={item.icon} size={19} color={selected ? colors.accent : colors.textMuted} />
+            <Ionicons name={item.icon} size={19} color={selected ? palette.cyan : palette.secondaryText} />
             <Text style={[styles.navLabel, selected && styles.navLabelSelected]}>{item.label}</Text>
           </Pressable>
         );
@@ -667,11 +668,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
     borderRadius: radius.md,
-    backgroundColor: colors.muted,
+    backgroundColor: palette.background,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: palette.divider,
   },
-  searchText: { flex: 1, color: colors.textPrimary, ...typography.body, paddingVertical: 0 },
+  searchText: { flex: 1, color: palette.text, ...typography.body, paddingVertical: 0 },
   segmented: {
     padding: 3,
     flexDirection: 'row',
@@ -715,16 +716,16 @@ const styles = StyleSheet.create({
   accountBadgeCopy: { flex: 1, gap: 1 },
   accountBadgeLabel: { ...typography.caption, color: colors.textPrimary },
   accountBadgeAddress: { ...typography.micro, letterSpacing: 0.2, color: colors.textMuted },
-  assetIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: colors.secondary, borderWidth: 1, borderColor: colors.border },
+  assetIcon: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center', borderRadius: radius.pill, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.divider },
   assetImage: { width: 30, height: 30 },
   assetInitials: { ...typography.label, color: colors.textPrimary },
-  assetRow: { minHeight: 72, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.borderSubtle },
+  assetRow: { minHeight: 56, paddingVertical: spacing.sm, flexDirection: 'row', alignItems: 'center', gap: spacing.sm, borderBottomWidth: 1, borderBottomColor: palette.divider },
   rowCopy: { flex: 1, minWidth: 0, gap: 2 },
-  rowTitle: { ...typography.cardTitle, color: colors.textPrimary },
-  rowSubtitle: { ...typography.caption, color: colors.textMuted },
+  rowTitle: { ...typography.cardTitle, color: palette.text },
+  rowSubtitle: { ...typography.caption, color: palette.secondaryText },
   rowAmount: { maxWidth: '35%', alignItems: 'flex-end', gap: 2 },
-  amount: { ...typography.label, color: colors.textPrimary },
-  status: { ...typography.micro, letterSpacing: 0.4, color: colors.success },
+  amount: { ...typography.label, color: palette.text },
+  status: { ...typography.micro, letterSpacing: 0.4, color: palette.secondaryText },
   transactionIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: radius.sm, backgroundColor: colors.secondary },
   sectionHeader: { minHeight: 40, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   eyebrow: { ...typography.micro, color: colors.accent },
@@ -733,8 +734,8 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.borderSubtle },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0, 0, 0, 0.62)' },
-  sheet: { maxHeight: '86%', paddingTop: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, gap: spacing.sm, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, backgroundColor: colors.surface, ...shadows.panel },
-  sheetHandle: { alignSelf: 'center', width: 44, height: 4, borderRadius: radius.pill, backgroundColor: colors.border },
+  sheet: { maxHeight: '86%', paddingTop: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, gap: spacing.sm, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, backgroundColor: palette.surface, ...shadows.panel },
+  sheetHandle: { alignSelf: 'center', width: 44, height: 4, borderRadius: radius.pill, backgroundColor: palette.divider },
   sheetHeader: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   sheetTitle: { ...typography.cardTitle, color: colors.textPrimary },
   sheetContent: { paddingBottom: spacing.xl, gap: spacing.sm },
@@ -757,9 +758,8 @@ const styles = StyleSheet.create({
   statusDot_error: { backgroundColor: colors.error },
   statusDot_info: { backgroundColor: colors.info },
   statusIndicatorText: { ...typography.caption, color: colors.textSecondary },
-  bottomNavigation: { minHeight: 64, paddingHorizontal: spacing.sm, paddingBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, },
-  navSelected: { backgroundColor: colors.secondary },
+  bottomNavigation: { minHeight: 64, paddingHorizontal: spacing.sm, paddingBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: palette.surface, borderTopWidth: 1, borderTopColor: palette.divider, },
   navItem: { flex: 1, minWidth: 0, minHeight: 54, alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: radius.sm },
-  navLabel: { ...typography.micro, letterSpacing: 0.2, color: colors.textMuted },
-  navLabelSelected: { color: colors.accent },
+  navLabel: { ...typography.micro, letterSpacing: 0.2, color: palette.secondaryText },
+  navLabelSelected: { color: palette.cyan },
 });

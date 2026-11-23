@@ -1,3 +1,4 @@
+import type { EvmNetwork } from '@/src/core/networks';
 import {
   PortfolioReadModelError,
   type PortfolioAssetViewModel,
@@ -181,4 +182,13 @@ export function filterPortfolioAssets(
       (filter === 'hidden' && asset.visibility === 'hidden');
     return visibilityMatches && assetMatchesSearch(asset, query);
   });
+}
+
+export function filterRegisteredNetworks(networks: readonly EvmNetwork[], search: string) {
+  const query = search.trim().toLowerCase();
+  return networks.filter(network => [
+    network.displayName, network.id,
+    network.configurationStatus === 'configured' ? network.nativeCurrency.symbol : '',
+    network.chainId?.toString() ?? '',
+  ].some(value => value.toLowerCase().includes(query)));
 }
