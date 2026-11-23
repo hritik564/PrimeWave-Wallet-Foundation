@@ -71,6 +71,7 @@ import { assetIdentityKey, type PublicSendDraft } from './WalletSendScreen.logic
 import { copyPublicAddress } from './public-address-actions';
 import { DAppSessionsScreen } from './dapp/DAppSessionsScreen';
 import { WalletSettingsScreen } from './WalletSettingsScreen';
+import { AddTokenValidationController } from './add-token-validation';
 import {
   assetDisplayName,
   assetDisplaySubtitle,
@@ -1044,34 +1045,38 @@ function AddTokenModal({
   onClose,
   onRegister,
   isCurrentNetwork,
+  isCurrentRevision,
   onRegistered,
-  onError,
-  message,
 }: {
   network: EvmNetwork;
   networkRegistry: NetworkRegistry;
   onClose: () => void;
   onRegister: (request: UserAddedTokenRequest) => Promise<unknown>;
   isCurrentNetwork: () => boolean;
+  isCurrentRevision: (revision: number) => boolean;
   onRegistered: () => void;
-  onError: (message: string) => void;
-  message: string | null;
 }) {
-  const [address, setAddress] = useState('');
-  const [preview, setPreview] = useState<ERC20Token | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [controller] = useState(() => new AddTokenValidationController(
+    (_candidate, revision) => isCurrentRevision(revision),
+  ));
+  const [state, setState] = useState(controller.getSnapshot());
+  useEffect(() => {
+    const unsubscribe = controller.subscribe(setState);
+    return () => {
+      unsubscribe();
+      controller.dispose();
+    };
+  }, [controller]);
+  const revision = networkRegistry.getSelectionRevision();
+  useEffect(() => {
+    if (!isCurrentNetwork() || !isCurrentRevision(revision)) {
+      controller.invalidate('The active network changed. Check this contract on the selected network.');
+    }
+  }, [controller, network.id, revision]);
+  const previewCurrent = controller.isPreviewCurrent(network, revision) && isCurrentNetwork();
   const validate = async () => {
-    setBusy(true);
-    onError('');
-    setPreview(null);
-    try {
-      if (!isCurrentNetwork()) throw new Error('The active network changed.');
-      if (network.configurationStatus !== 'configured' || network.chainId === null) {
-        throw new Error('This network is not configured for token reads.');
-      }
-      if (!/^0x[a-fA-F0-9]{40}$/.test(address.trim())) {
-        throw new Error('Enter a valid 20-byte contract address.');
-      }
+    await controller.validate(network, revision, async (selectedNetwork, contractAddress) => {
+      if (!isCurrentNetwork()) throw new Error('Network changed');
       const { createEvmRpcProvider } = await import('@/src/core/blockchain/rpc');
       const { EvmAccountStateService } = await import('@/src/core/blockchain/account-state');
       const { ERC20TokenService, AssetRegistry } = await import('@/src/core/assets');
@@ -1080,35 +1085,17 @@ function AddTokenModal({
       const accountState = new EvmAccountStateService(networkRegistry, provider);
       const assets = new AssetRegistry(networkRegistry);
       const service = new ERC20TokenService(assets, [{ accountState, provider }], {}, new TokenRegistry(assets));
-      const token = await service.getTokenMetadata({ networkId: network.id, contractAddress: address.trim() });
-      if (!isCurrentNetwork()) throw new Error('The active network changed.');
-      if (token.chainId !== network.chainId) throw new Error('The token contract resolved to another network.');
-      if (token.metadataStatus === 'invalid' || token.decimals === null) {
-        throw new Error('Token metadata or decimals are invalid or unavailable.');
-      }
-      setPreview(token);
-    } catch {
-      onError('Could not validate this contract on the selected network. Check the address and network.');
-    } finally {
-      setBusy(false);
-    }
+      const token = await service.getTokenMetadata({ networkId: selectedNetwork.id, contractAddress });
+      if (!isCurrentNetwork()) throw new Error('Network changed');
+      return token;
+    });
   };
   const add = async () => {
-    if (!preview || busy) return;
-    if (!isCurrentNetwork()) {
-      setPreview(null);
-      onError('The active network changed. Check this contract on the selected network.');
-      return;
-    }
-    setBusy(true);
-    try {
-      await onRegister({ networkId: network.id, contractAddress: preview.contractAddress });
-      onRegistered();
-    } catch {
-      onError('This token could not be added. It may already be registered or its contract is unavailable.');
-    } finally {
-      setBusy(false);
-    }
+    if (!previewCurrent || !isCurrentRevision(revision) || !isCurrentNetwork()) return;
+    await controller.register(network, revision, async (request) => {
+      if (!isCurrentRevision(revision) || !isCurrentNetwork()) throw new Error('Selection changed');
+      return onRegister(request);
+    }, onRegistered);
   };
   return (
     <View style={styles.tokenModalBackdrop}>
@@ -1116,19 +1103,19 @@ function AddTokenModal({
         <Text accessibilityRole="header" style={styles.assetsTitle}>Add token</Text>
         <Text style={styles.assetsIntro}>Network: {network.displayName}</Text>
         <Text style={styles.assetDetailLabel}>ERC-20 contract address</Text>
-        <TextInput accessibilityLabel="ERC-20 contract address" autoCapitalize="none" autoCorrect={false} value={address} onChangeText={setAddress} placeholder="0x…" placeholderTextColor={theme.colors.mutedForeground} style={styles.input} />
-        <WaveXButton label={busy ? 'Checking…' : 'Check contract'} onPress={() => void validate()} disabled={busy} />
-        {preview ? (
+        <TextInput accessibilityLabel="ERC-20 contract address" autoCapitalize="none" autoCorrect={false} value={state.input} onChangeText={(value) => controller.setInput(value)} placeholder="0x…" placeholderTextColor={theme.colors.mutedForeground} style={styles.input} />
+        <WaveXButton label={state.busy ? 'Checking…' : 'Check contract'} onPress={() => void validate()} disabled={state.busy} />
+        {state.preview && previewCurrent ? (
           <View style={styles.assetDetailsCard}>
-            <Text style={styles.assetDetailsName}>{preview.name ?? 'Unknown token'}</Text>
-            <Text style={styles.assetDetailsSymbol}>{preview.symbol ?? 'Unknown symbol'} · {preview.decimals} decimals</Text>
-            <Text style={styles.assetDetailValue}>{preview.contractAddress}</Text>
+            <Text style={styles.assetDetailsName}>{state.preview.token.name ?? 'Unknown token'}</Text>
+            <Text style={styles.assetDetailsSymbol}>{state.preview.token.symbol ?? 'Unknown symbol'} · {state.preview.token.decimals} decimals</Text>
+            <Text style={styles.assetDetailValue}>{state.preview.contractAddress}</Text>
             <Text style={styles.assetWarning}>Unverified token. Contract metadata does not prove legitimacy.</Text>
-            <WaveXButton label="Add this token" onPress={() => void add()} disabled={busy} />
+            <WaveXButton label="Add this token" onPress={() => void add()} disabled={state.busy || !previewCurrent} />
           </View>
         ) : null}
-        {message ? <Text accessibilityRole="alert" style={styles.assetWarning}>{message}</Text> : null}
-        <WaveXButton label="Cancel" onPress={onClose} variant="outline" />
+        {state.message ? <Text accessibilityRole="alert" style={styles.assetWarning}>{state.message}</Text> : null}
+        <WaveXButton label="Cancel" onPress={() => { controller.dispose(); onClose(); }} variant="outline" />
       </View>
     </View>
   );
@@ -1252,7 +1239,6 @@ function AccountHome({
   const insets = useSafeAreaInsets();
   const [destination, setDestination] = useState<Destination>('home');
   const [tokenModalVisible, setTokenModalVisible] = useState(false);
-  const [tokenMessage, setTokenMessage] = useState<string | null>(null);
   const [tokenNetwork, setTokenNetwork] = useState<EvmNetwork>(network);
   const [accountPanelVisible, setAccountPanelVisible] = useState(false);
   const [networkSelectorVisible, setNetworkSelectorVisible] = useState(false);
@@ -1623,7 +1609,7 @@ function AccountHome({
           )
         ) : destination === 'assets' ? (
           <AssetsScreen
-            onAddToken={onAddToken ? () => { setTokenNetwork(network); setTokenMessage(null); setTokenModalVisible(true); } : undefined}
+            onAddToken={onAddToken ? () => { setTokenNetwork(network); setTokenModalVisible(true); } : undefined}
             errorMessage={portfolioError}
             model={portfolio}
             network={network}
@@ -1739,11 +1725,10 @@ function AccountHome({
         network={tokenNetwork}
         networkRegistry={networkRegistry}
         onClose={() => setTokenModalVisible(false)}
-        onRegistered={() => { setTokenModalVisible(false); setTokenMessage('Token added. Refreshing its public balance.'); void loadPortfolio(true); }}
+        onRegistered={() => { setTokenModalVisible(false); void loadPortfolio(true); }}
         onRegister={onAddToken}
         isCurrentNetwork={() => network.id === tokenNetwork.id}
-        onError={setTokenMessage}
-        message={tokenMessage}
+        isCurrentRevision={(revision) => networkRegistry.getSelectionRevision() === revision}
       /> : null}
       <AccountPanel
         onClose={() => setAccountPanelVisible(false)}
