@@ -171,7 +171,9 @@ The native application uses the wallet-partitioned `PersistentActivityRepository
 over the existing React Native AsyncStorage dependency. It retains validated
 public transaction metadata across restarts with exact bigint quantities,
 account/network/chain isolation, alternating recovery snapshots, and bounded
-retention. It does not store wallet secrets or signing capabilities.
+retention. Pending and unknown transactions are retained even if they exceed
+the 500-record soft capacity; the repository reports that overflow and evicts
+terminal records first. It does not store wallet secrets or signing capabilities.
 `ActivityReadModelService` provides deterministic bounded presentation data
 with provenance and explorer availability. This local store persists only
 transactions WaveX already recorded or reconciled; it does not discover or

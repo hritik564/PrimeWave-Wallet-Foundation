@@ -1017,6 +1017,16 @@ export default function FoundationScreen() {
     });
     return () => { current = false; };
   }, [activityService, currentWallet?.walletId]);
+  useEffect(() => {
+    if (!activityService || !currentWallet) return;
+    return activityService.subscribePersistenceState((state) => {
+      if (state === 'write-failed' || state === 'unavailable') {
+        setActivityUnavailableWalletId(currentWallet.walletId);
+      } else if (state === 'ready' || state === 'recovered') {
+        setActivityUnavailableWalletId((previous) => previous === currentWallet.walletId ? null : previous);
+      }
+    });
+  }, [activityService, currentWallet?.walletId]);
   walletRef.current = currentWallet;
   selectedNetworkRef.current = selectedNetwork;
 

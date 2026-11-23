@@ -5,6 +5,7 @@ import { ActivityError } from './errors';
 import {
   InMemoryActivityRepository,
   type ActivityRepository,
+  type ActivityIntegrityState,
 } from './repository';
 import type {
   ActivityConfirmation,
@@ -111,6 +112,14 @@ export class ActivityService {
 
   async flush(): Promise<void> {
     await this.repository.flush?.();
+  }
+
+  getIntegrityState(): ActivityIntegrityState {
+    return this.repository.getIntegrityState?.() ?? 'ready';
+  }
+
+  subscribePersistenceState(listener: (state: ActivityIntegrityState) => void): () => void {
+    return this.repository.subscribeIntegrityState?.(listener) ?? (() => undefined);
   }
 
   async clear(): Promise<void> {

@@ -23,11 +23,18 @@ an explicit future reconciliation updates the record.
 app uses `PersistentActivityRepository`, backed by the already-installed
 React Native AsyncStorage package. It partitions snapshots by wallet ID and
 validates each record against account, network, and exact chain scope before
-exposing it. Bigints are encoded losslessly. Two alternating complete snapshot
-slots retain the prior valid generation if the newest write is interrupted or
-corrupt. Writes are serialized, can be flushed, and wallet reset removes the
-wallet's snapshots. Terminal records older than one year are pruned and the
-store is capped at 500 records, removing the oldest terminal entries first.
+exposing it. Bigints are encoded losslessly. New snapshots carry a SHA-256
+integrity checksum; valid C3.3A version-1 snapshots without checksums remain
+readable after full record validation. The loader chooses the newest fully
+usable snapshot, falls back to an older usable snapshot, and repairs the bad
+slot before accepting further mutations. If nonempty data has no usable
+snapshot, Activity is marked unavailable and writes stay disabled. Writes are
+serialized by accepted/persisted revisions, `flush()` waits for all accepted
+mutations, and wallet reset retires the repository, waits for in-flight writes,
+then removes both snapshots. Terminal records older than one year are pruned.
+The 500-record capacity evicts oldest terminal records first; unresolved
+pending/unknown records are never dropped. If those alone exceed capacity, all
+are retained and `getRetentionState()` reports pending overflow.
 Only public transaction metadata is stored; wallet credentials and signing
 capabilities are outside this repository.
 

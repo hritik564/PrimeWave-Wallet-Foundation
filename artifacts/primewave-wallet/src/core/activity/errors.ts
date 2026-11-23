@@ -6,7 +6,9 @@ export type ActivityErrorCode =
   | 'SCOPE_MISMATCH'
   | 'IDENTITY_CONFLICT'
   | 'INVALID_STATUS_TRANSITION'
-  | 'LIFECYCLE_MISMATCH';
+  | 'LIFECYCLE_MISMATCH'
+  | 'PERSISTENCE_CORRUPT'
+  | 'PERSISTENCE_CLEARED';
 
 const MESSAGES: Record<ActivityErrorCode, string> = {
   INVALID_RECORD: 'The activity record is invalid.',
@@ -17,6 +19,8 @@ const MESSAGES: Record<ActivityErrorCode, string> = {
   IDENTITY_CONFLICT: 'The activity record identity conflicts with an existing record.',
   INVALID_STATUS_TRANSITION: 'The transaction activity state transition is not allowed.',
   LIFECYCLE_MISMATCH: 'The lifecycle result does not match the activity record.',
+  PERSISTENCE_CORRUPT: 'Local Activity storage needs recovery and is unavailable.',
+  PERSISTENCE_CLEARED: 'This wallet Activity store has been cleared.',
 };
 
 export class ActivityError extends Error {

@@ -1,7 +1,10 @@
 export { ActivityError } from './errors';
 export { InMemoryActivityRepository } from './repository';
 export { PersistentActivityRepository } from './persistent-repository';
-export type { ActivityKeyValueStorage } from './persistent-repository';
+export type {
+  ActivityKeyValueStorage,
+} from './persistent-repository';
+export type { ActivityIntegrityState, ActivityRetentionState } from './repository';
 export {
   ActivityService,
   activityDirection,

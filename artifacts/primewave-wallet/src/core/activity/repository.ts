@@ -234,6 +234,15 @@ function sortRecords(left: ActivityRecord, right: ActivityRecord): number {
   return leftIdentity < rightIdentity ? -1 : leftIdentity > rightIdentity ? 1 : 0;
 }
 
+export type ActivityIntegrityState = 'loading' | 'ready' | 'recovered' | 'write-failed' | 'unavailable' | 'cleared';
+export interface ActivityRetentionState {
+  readonly capacity: number;
+  readonly recordCount: number;
+  readonly pendingCount: number;
+  readonly overflowCount: number;
+  readonly status: 'within-capacity' | 'pending-overflow';
+}
+
 export interface ActivityRepository {
   add(input: ActivityRecordInput): ActivityRecord;
   upsert(input: ActivityRecordInput): ActivityRecord;
@@ -255,6 +264,9 @@ export interface ActivityRepository {
   flush?(): Promise<void>;
   clearDurable?(): Promise<void>;
   listAll?(): readonly ActivityRecord[];
+  getIntegrityState?(): ActivityIntegrityState;
+  getRetentionState?(): ActivityRetentionState;
+  subscribeIntegrityState?(listener: (state: ActivityIntegrityState) => void): () => void;
 }
 
 export class InMemoryActivityRepository implements ActivityRepository {
