@@ -12,7 +12,11 @@
       "bundleIdentifier": "com.wavex.app"
     },
     "android": {
-      "package": "com.wavex.app"
+      "package": "com.wavex.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/images/adaptive-foreground.png",
+        "backgroundColor": "#090B0E"
+      }
     },
     "web": {
       "favicon": "./assets/images/icon.png"
@@ -25,6 +29,15 @@
         "expo-local-authentication",
         {
           "faceIDPermission": "Use Face ID to unlock your PrimeWave Wallet."
+        }
+      ],
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#090B0E",
+          "image": "./assets/images/mark.png",
+          "imageWidth": 152,
+          "resizeMode": "contain"
         }
       ]
     ],

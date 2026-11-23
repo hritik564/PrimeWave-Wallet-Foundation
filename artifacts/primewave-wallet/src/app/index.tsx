@@ -81,7 +81,7 @@ import { DAppTransactionReviewScreen } from '@/src/components/dapp/DAppTransacti
 import type { DAppTypedDataDocument } from '@/src/core/dapp/signing';
 import type { WalletConnectDAppTransport } from '@/src/core/dapp/providers/walletconnect';
 
-const iconSource = require('../../assets/images/icon.png');
+const iconSource = require('../../assets/images/lockup.png');
 const confirmationPositions = [4, 9, 12];
 
 type ViewName =
@@ -202,15 +202,7 @@ function Field({
 function Header({ onBack }: { onBack?: () => void }) {
   return (
     <View style={styles.header}>
-      <View style={styles.brandLockup}>
-        <View style={styles.brandMark}>
-          <Image source={iconSource} style={styles.brandIcon} />
-        </View>
-        <View>
-          <Text style={styles.brandName}>WAVEX</Text>
-          <Text style={styles.brandProduct}>WALLET</Text>
-        </View>
-      </View>
+      <Image accessibilityLabel="WaveX Wallet" contentFit="contain" source={iconSource} style={{width: 120, height: 32}} />
       {onBack ? (
         <Pressable accessibilityLabel="Go back" accessibilityRole="button" onPress={onBack} style={styles.iconButton}>
           <Ionicons name="arrow-back" size={20} color={theme.colors.foreground} />

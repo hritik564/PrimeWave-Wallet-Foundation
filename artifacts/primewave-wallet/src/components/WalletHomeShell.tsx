@@ -82,7 +82,7 @@ import {
   shortPublicAddress,
 } from './WalletHomeShell.logic';
 
-const iconSource = require('../../assets/images/icon.png');
+const iconSource = require('../../assets/images/mark.png');
 
 type Destination =
   | 'home'
@@ -140,7 +140,7 @@ function Header({
     <View style={styles.homeHeader}>
       {detailMode && <View style={styles.brandLockup}>
         <View style={styles.brandMark}>
-          <Image source={iconSource} style={styles.brandIcon} />
+          <Image contentFit="contain" source={iconSource} style={styles.brandIcon} />
         </View>
         <View>
           <Text style={styles.brandName}>WAVEX</Text>
@@ -165,7 +165,7 @@ function Header({
             onPress={onAccountPress}
             style={({ pressed }) => [styles.accountButton, pressed && styles.pressed]}
           >
-            <Image accessibilityLabel="WaveX" source={iconSource} style={styles.headerLogo} />
+            <Image contentFit="contain" accessibilityLabel="WaveX" source={iconSource} style={styles.headerLogo} />
             <View>
             <Text style={styles.accountButtonLabel}>{accountLabel}</Text>
             <Text style={styles.accountButtonAddress}>
