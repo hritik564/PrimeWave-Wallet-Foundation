@@ -250,6 +250,11 @@ export interface ActivityRepository {
   ): ActivityRecord;
   remove(localTransactionId: string, scope: ActivityScope): boolean;
   clear(): void;
+  /** Optional durability hooks implemented by persistent repositories. */
+  ready?(): Promise<void>;
+  flush?(): Promise<void>;
+  clearDurable?(): Promise<void>;
+  listAll?(): readonly ActivityRecord[];
 }
 
 export class InMemoryActivityRepository implements ActivityRepository {
@@ -409,6 +414,14 @@ export class InMemoryActivityRepository implements ActivityRepository {
 
   clear(): void {
     this.records.clear();
+  }
+
+  listAll(): readonly ActivityRecord[] {
+    return Object.freeze([...this.records.values()].sort(sortRecords).map(cloneRecord));
+  }
+
+  prune(records: readonly ActivityRecord[]): void {
+    for (const record of records) this.deleteRecord(record);
   }
 
   private findMatching(record: ActivityRecord): ActivityRecord | null {

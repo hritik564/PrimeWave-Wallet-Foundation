@@ -167,12 +167,15 @@ creates a second broadcaster, receipt poller, signer, or reconciliation loop.
 Unknown outcomes remain unknown until a future explicit reconciliation updates
 the record.
 
-`InMemoryActivityRepository` is the Phase 5.1 persistence decision. It is
-bounded, session-only, and enforces account/network/chain isolation. It does
-not use AsyncStorage, localStorage, SecureStore, a database, backend
-persistence, analytics, or external indexers. `ActivityReadModelService`
-provides deterministic bounded presentation data with provenance and explorer
-availability while preserving exact bigint quantities.
+The native application uses the wallet-partitioned `PersistentActivityRepository`
+over the existing React Native AsyncStorage dependency. It retains validated
+public transaction metadata across restarts with exact bigint quantities,
+account/network/chain isolation, alternating recovery snapshots, and bounded
+retention. It does not store wallet secrets or signing capabilities.
+`ActivityReadModelService` provides deterministic bounded presentation data
+with provenance and explorer availability. This local store persists only
+transactions WaveX already recorded or reconciled; it does not discover or
+reconstruct all historical blockchain activity.
 
 Phase 5.1 does not implement Activity UI, transaction detail UI, external
 indexing, backend history, notifications, Swap, DApps, WalletConnect,

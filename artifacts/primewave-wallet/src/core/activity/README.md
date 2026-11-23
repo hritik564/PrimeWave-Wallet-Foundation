@@ -19,10 +19,21 @@ confirmation results; it does not broadcast, poll receipts, access secrets,
 or create a second transaction engine. Unknown outcomes remain unknown until
 an explicit future reconciliation updates the record.
 
-`InMemoryActivityRepository` is the approved Phase 5.1 persistence decision.
-It keeps public financial metadata in the current session only. It does not
-use AsyncStorage, localStorage, SecureStore, a database, a backend, or an
-analytics service.
+`InMemoryActivityRepository` remains available for isolated tests. The native
+app uses `PersistentActivityRepository`, backed by the already-installed
+React Native AsyncStorage package. It partitions snapshots by wallet ID and
+validates each record against account, network, and exact chain scope before
+exposing it. Bigints are encoded losslessly. Two alternating complete snapshot
+slots retain the prior valid generation if the newest write is interrupted or
+corrupt. Writes are serialized, can be flushed, and wallet reset removes the
+wallet's snapshots. Terminal records older than one year are pruned and the
+store is capped at 500 records, removing the oldest terminal entries first.
+Only public transaction metadata is stored; wallet credentials and signing
+capabilities are outside this repository.
+
+This local Activity store persists transactions that WaveX already recorded
+or later reconciled. It does not discover all incoming and outgoing history
+from the blockchain and cannot reconstruct entries that were never recorded.
 
 Reads are bounded to a maximum of 100 records and use deterministic
 newest-first ordering. Records with known block context sort ahead of

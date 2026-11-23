@@ -5,6 +5,7 @@ import { Image } from 'expo-image';
 import { AppState, BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { theme } from '@/src/theme';
 import {
   WalletHomeShell,
@@ -22,6 +23,7 @@ import {
 import {
   ActivityReadModelService,
   ActivityService,
+  PersistentActivityRepository,
 } from '@/src/core/activity';
 import {
   defaultNetworkRegistry,
@@ -620,6 +622,10 @@ function Loading() {
   return <Screen sensitive={false}><View style={styles.loading}><Ionicons name="shield-checkmark-outline" size={34} color={theme.colors.accent} /><Text style={styles.title}>Preparing local vault</Text><Text style={styles.body}>Checking platform-secure storage.</Text></View></Screen>;
 }
 
+function ActivityRestoring() {
+  return <Screen sensitive={false}><View style={styles.loading}><Ionicons name="time-outline" size={34} color={theme.colors.accent} /><Text style={styles.title}>Restoring Activity</Text><Text style={styles.body}>Loading this wallet’s saved transaction records.</Text></View></Screen>;
+}
+
 function Unavailable() {
   return (
     <Screen sensitive={false}>
@@ -658,19 +664,6 @@ export default function FoundationScreen() {
       return null;
     }
   }, []);
-  const activityService = useMemo(
-    () => (previewMode ? null : new ActivityService()),
-    [previewMode],
-  );
-  const activityReadModelService = useMemo(
-    () =>
-      activityService
-        ? new ActivityReadModelService(activityService.getRepository(), {
-            networkRegistry: defaultNetworkRegistry,
-          })
-        : null,
-    [activityService],
-  );
   const createConstructionEngine = useCallback(
     async (wallet: Wallet, networkId: string): Promise<TransactionConstructionDependency | null> => {
       const activeNetwork = defaultNetworkRegistry.getActiveNetwork();
@@ -852,9 +845,12 @@ export default function FoundationScreen() {
   const dappRequestRef = useRef<DAppRequest | null>(null);
   const dappTransactionResponseSentRef = useRef(false);
   const [accessRevision, setAccessRevision] = useState(0);
+  const [activityReadyWalletId, setActivityReadyWalletId] = useState<string | null>(null);
+  const [activityUnavailableWalletId, setActivityUnavailableWalletId] = useState<string | null>(null);
   const appState = useRef(AppState.currentState);
   const walletRef = useRef<Wallet | null>(null);
   const selectedNetworkRef = useRef(selectedNetwork);
+  const activityServiceRef = useRef<ActivityService | null>(null);
 
   useEffect(() => {
     if (!access) return;
@@ -910,6 +906,7 @@ export default function FoundationScreen() {
       const wasBackground = appState.current !== 'active';
       appState.current = nextState;
       if (nextState === 'background' || nextState === 'inactive') {
+        void activityServiceRef.current?.flush().catch(() => undefined);
         navigation.invalidate();
         setBackgrounded(true);
         setPin('');
@@ -981,6 +978,45 @@ export default function FoundationScreen() {
     },
     [access, accessRevision, previewMode, previewTestMode],
   );
+  const activityService = useMemo(
+    () => previewMode || !currentWallet ? null : new ActivityService({
+      repository: new PersistentActivityRepository(currentWallet.walletId, AsyncStorage),
+    }),
+    [currentWallet?.walletId, previewMode],
+  );
+  const activityReadModelService = useMemo(
+    () => activityService
+      ? new ActivityReadModelService(activityService.getRepository(), {
+          networkRegistry: defaultNetworkRegistry,
+        })
+      : null,
+    [activityService],
+  );
+  const activityReady = previewMode || (!!currentWallet && activityReadyWalletId === currentWallet.walletId);
+  const activityUnavailable = !!currentWallet && activityUnavailableWalletId === currentWallet.walletId;
+  activityServiceRef.current = activityService;
+  useEffect(() => {
+    if (!activityService || !currentWallet) {
+      setActivityReadyWalletId(null);
+      setActivityUnavailableWalletId(null);
+      return;
+    }
+    let current = true;
+    setActivityReadyWalletId(null);
+    setActivityUnavailableWalletId(null);
+    void activityService.ready().then(() => {
+      if (current) {
+        setActivityUnavailableWalletId(null);
+        setActivityReadyWalletId(currentWallet.walletId);
+      }
+    }).catch(() => {
+      if (current) {
+        setActivityUnavailableWalletId(currentWallet.walletId);
+        setActivityReadyWalletId(currentWallet.walletId);
+      }
+    });
+    return () => { current = false; };
+  }, [activityService, currentWallet?.walletId]);
   walletRef.current = currentWallet;
   selectedNetworkRef.current = selectedNetwork;
 
@@ -1592,13 +1628,13 @@ export default function FoundationScreen() {
     if (!result.authenticated) { setError(result.reason === 'cancelled' ? 'Biometric authentication was cancelled. Use your PIN.' : 'Biometric authentication was not available. Use your PIN.'); return; }
     setView('wallet');
   })} onReset={() => void run(async () => {
+    try { await activityService?.clear(); } catch { /* A new wallet ID still isolates any uncleared snapshot. */ }
     if (previewMode) {
       previewTestMode.resetPreviewWallet();
     } else {
       if (!access) return;
       await nativeAccess().resetLocalWallet();
     }
-    activityService?.getRepository().clear();
     setRuntimeGeneration(generation => generation + 1);
     setSettings({ biometricEnabled: false, autoLockPolicy: 0, pinConfigured: false });
     setPin('');
@@ -1637,7 +1673,7 @@ export default function FoundationScreen() {
   else if (
     view === 'dapp-transaction' &&
     dappRequest?.requestType === 'transaction' &&
-    currentWallet
+    currentWallet && activityReady
   ) {
     content = (
       <DAppTransactionReviewScreen
@@ -1658,7 +1694,7 @@ export default function FoundationScreen() {
       />
     );
   }
-  else if (view === 'wallet' && currentWallet) content = <WalletHomeShell activityService={activityService} activityReadModelService={activityReadModelService} authenticationSettings={settings} biometricAvailability={biometricAvailability} createConstructionEngine={createConstructionEngine} createSigningDependency={createSigningDependency} createBroadcastDependency={createBroadcastDependency} dappAvailable={dappTransport !== null && !previewMode} dappSessions={dappSessions} onDAppDisconnect={async (sessionId) => {
+  else if (view === 'wallet' && currentWallet) content = activityReady ? <WalletHomeShell activityService={activityService} activityReadModelService={activityUnavailable ? null : activityReadModelService} authenticationSettings={settings} biometricAvailability={biometricAvailability} createConstructionEngine={createConstructionEngine} createSigningDependency={createSigningDependency} createBroadcastDependency={createBroadcastDependency} dappAvailable={dappTransport !== null && !previewMode} dappSessions={dappSessions} onDAppDisconnect={async (sessionId) => {
     if (!dappTransport) throw new Error('DApp provider transport is unavailable.');
     await dappTransport.disconnect(sessionId);
     setDappSessions((current) => current.filter((session) => session.sessionId !== sessionId));
@@ -1671,7 +1707,8 @@ export default function FoundationScreen() {
       await nativeAccess().lockWallet();
     }
     setView('locked');
-  })} />;
+  })} /> : <ActivityRestoring />;
+  else if (view === 'dapp-transaction' && currentWallet) content = <ActivityRestoring />;
   else if (view === 'security') content = <Security
     settings={settings} biometricAvailability={biometricAvailability}
     securityPin={securityPin} setSecurityPin={setSecurityPin} newPin={newPin} setNewPin={setNewPin}

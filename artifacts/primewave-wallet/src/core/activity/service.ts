@@ -98,8 +98,25 @@ export class ActivityService {
       options.createLocalTransactionId ??
       (() => {
         this.localIdCounter += 1;
-        return `wavex-local-${this.localIdCounter}`;
+        return `wavex-local-${Date.now().toString(36)}-${this.localIdCounter.toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
       });
+  }
+
+  async ready(): Promise<void> {
+    await this.repository.ready?.();
+    for (const record of this.repository.listAll?.() ?? []) {
+      if (record.localTransactionId) this.localScopes.set(record.localTransactionId, record);
+    }
+  }
+
+  async flush(): Promise<void> {
+    await this.repository.flush?.();
+  }
+
+  async clear(): Promise<void> {
+    this.localScopes.clear();
+    if (this.repository.clearDurable) await this.repository.clearDurable();
+    else this.repository.clear();
   }
 
   createDraft(input: ActivityDraftInput): ActivityRecord {
