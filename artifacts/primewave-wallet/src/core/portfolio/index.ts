@@ -4,7 +4,8 @@ export {
   PortfolioReadModelError,
   PortfolioReadModelService,
 } from './portfolio-read-model-service';
-export { createAppPortfolioReadModelService } from './runtime';
+export { createAppPortfolioReadModelService, createAppPortfolioRuntime } from './runtime';
+export type { AppPortfolioRuntime } from './runtime';
 export { PortfolioAggregationService } from './service';
 export type {
   AssetIcon,
