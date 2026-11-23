@@ -1,3 +1,4 @@
+import { walletHomeColors as palette } from '@/src/design-system/tokens/wallet-home';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
 import {
@@ -687,7 +688,7 @@ export function TransactionReviewScreen({
           onPress={() => void handleCopyHash()}
           style={({ pressed }) => [styles.hashCopyButton, pressed && styles.pressed]}
         >
-          <Ionicons name="copy-outline" size={16} color={theme.colors.accent} />
+          <Ionicons name="copy-outline" size={16} color={palette.cyan} />
           <Text style={styles.copyButtonText}>
             {hashCopyState === 'copied'
               ? 'Hash copied'
@@ -726,7 +727,7 @@ export function TransactionReviewScreen({
         </View>
         {isBroadcasting || isConfirming ? (
           <View style={styles.progressCard}>
-            <ActivityIndicator color={theme.colors.accent} />
+            <ActivityIndicator color={palette.cyan} />
             <Text style={styles.progressText}>
               {isBroadcasting ? 'Broadcasting exact signed bytes…' : 'Monitoring confirmation…'}
             </Text>
@@ -766,7 +767,7 @@ export function TransactionReviewScreen({
               pressed && broadcastDependency && broadcastResult && styles.pressed,
             ]}
           >
-            <Ionicons name="refresh-outline" size={18} color={theme.colors.accent} />
+            <Ionicons name="refresh-outline" size={18} color={palette.cyan} />
             <Text style={styles.secondaryButtonText}>Reconcile Status</Text>
           </Pressable>
         ) : null}
@@ -777,7 +778,7 @@ export function TransactionReviewScreen({
             onPress={() => void Linking.openURL(explorerUrl)}
             style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
           >
-            <Ionicons name="open-outline" size={18} color={theme.colors.accent} />
+            <Ionicons name="open-outline" size={18} color={palette.cyan} />
             <Text style={styles.secondaryButtonText}>View on Explorer</Text>
           </Pressable>
         ) : null}
@@ -787,7 +788,7 @@ export function TransactionReviewScreen({
           onPress={onBack}
           style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
         >
-          <Ionicons name="arrow-back-outline" size={18} color={theme.colors.accent} />
+          <Ionicons name="arrow-back-outline" size={18} color={palette.cyan} />
           <Text style={styles.secondaryButtonText}>Return to Send</Text>
         </Pressable>
       </ScrollView>
@@ -822,7 +823,7 @@ export function TransactionReviewScreen({
           onPress={onBack}
           style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
         >
-          <Ionicons name="arrow-back-outline" size={18} color={theme.colors.accent} />
+          <Ionicons name="arrow-back-outline" size={18} color={palette.cyan} />
           <Text style={styles.secondaryButtonText}>Return to Send</Text>
         </Pressable>
       </ScrollView>
@@ -836,10 +837,10 @@ export function TransactionReviewScreen({
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.heading}>
-        <Text style={styles.eyebrow}>SAFETY CHECKPOINT</Text>
+
         <Text style={styles.title}>Review transaction</Text>
         <Text style={styles.body}>
-          Confirm the public details and read-only fee estimate before the next secure signing phase.
+          Check the amount, recipient and network fee.
         </Text>
       </View>
 
@@ -857,18 +858,15 @@ export function TransactionReviewScreen({
         </View>
       ) : review ? (
         <>
-          <SectionCard eyebrow="NETWORK">
+          <SectionCard eyebrow="ASSET / AMOUNT">
+            <DetailRow label="Asset" value={`${review.asset.name ?? 'Asset'} (${review.asset.symbol ?? '—'})`} />
             <DetailRow label="Network" value={network.displayName} />
-            <DetailRow label="Chain ID" value={String(network.chainId)} />
-            <DetailRow label="Native fee currency" value={`${network.nativeCurrency.name} (${network.nativeCurrency.symbol})`} />
-            <Text style={styles.configuredText}>Configured and bound to the selected network</Text>
+            <DetailRow label="Exact amount" value={`${draft.amount} ${review.asset.symbol ?? ''}`} />
+            <DetailRow label="Estimated network fee" value={`${review.preview.estimatedNetworkFeeDisplay} ${review.preview.symbol}`} />
+            {review.asset.assetType === 'fungible_token' && review.asset.contractAddress ? (
+              <DetailRow label="Token contract" value={shortAddress(review.asset.contractAddress)} />
+            ) : null}
           </SectionCard>
-
-          <SectionCard eyebrow="FROM">
-            <DetailRow label={`Account ${account?.index === undefined ? '' : account.index + 1}`} value={shortAddress(draft.senderPublicAddress)} />
-            <Text selectable style={styles.fullAddress}>{draft.senderPublicAddress}</Text>
-          </SectionCard>
-
           <SectionCard eyebrow="TO">
             <View style={styles.recipientRow}>
               <View style={styles.recipientCopy}>
@@ -881,7 +879,7 @@ export function TransactionReviewScreen({
                 onPress={() => void handleCopy()}
                 style={styles.copyButton}
               >
-                <Ionicons name="copy-outline" size={16} color={theme.colors.accent} />
+                <Ionicons name="copy-outline" size={16} color={palette.cyan} />
                 <Text style={styles.copyButtonText}>{copyState === 'copied' ? 'Copied' : 'Copy'}</Text>
               </Pressable>
             </View>
@@ -889,19 +887,25 @@ export function TransactionReviewScreen({
             {copyState === 'error' ? <Text style={styles.errorText}>Could not copy the address.</Text> : null}
           </SectionCard>
 
-          <SectionCard eyebrow="ASSET / AMOUNT">
-            <DetailRow label="Asset" value={`${review.asset.name ?? 'Asset'} (${review.asset.symbol ?? '—'})`} />
-            <DetailRow label="Exact amount" value={`${draft.amount} ${review.asset.symbol ?? ''}`} />
-            {review.asset.assetType === 'fungible_token' && review.asset.contractAddress ? (
-              <DetailRow label="Token contract" value={shortAddress(review.asset.contractAddress)} />
-            ) : null}
+          <SectionCard eyebrow="NETWORK">
+            <DetailRow label="Network" value={network.displayName} />
+            <DetailRow label="Chain ID" value={String(network.chainId)} />
+            <DetailRow label="Native fee currency" value={`${network.nativeCurrency.name} (${network.nativeCurrency.symbol})`} />
+            <Text style={styles.configuredText}>Configured and bound to the selected network</Text>
           </SectionCard>
+
+          <SectionCard eyebrow="FROM">
+            <DetailRow label={`Account ${account?.index === undefined ? '' : account.index + 1}`} value={shortAddress(draft.senderPublicAddress)} />
+            <Text selectable style={styles.fullAddress}>{draft.senderPublicAddress}</Text>
+          </SectionCard>
+
+
 
           <SectionCard eyebrow="NETWORK FEE">
             <DetailRow label="Fee model" value={review.preview.feeModel === 'eip1559' ? 'EIP-1559' : 'Legacy'} />
             <DetailRow label="Gas limit" value={review.preview.gasLimit.toString()} />
             <DetailRow label="Fee per gas" value={`${displayFeePerGas(review.preview)} ${review.preview.symbol}`} />
-            <DetailRow label="Estimated network fee" value={`${review.preview.estimatedNetworkFeeDisplay} ${review.preview.symbol}`} />
+
             {review.preview.feeModel === 'eip1559' ? (
               <DetailRow label="Maximum fee per gas" value={`${formatNativeUnits(review.preview.maxFeePerGas, review.preview.decimals)} ${review.preview.symbol}`} />
             ) : null}
@@ -965,7 +969,7 @@ export function TransactionReviewScreen({
                 maxLength={6}
                 onChangeText={setPin}
                 placeholder="Six-digit PIN"
-                placeholderTextColor={theme.colors.mutedForeground}
+                placeholderTextColor={palette.secondaryText}
                 secureTextEntry
                 style={styles.pinInput}
                 value={pin}
@@ -987,7 +991,7 @@ export function TransactionReviewScreen({
                   onPress={() => void handleAuthenticateAndSign('biometric')}
                   style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
                 >
-                  <Ionicons name="finger-print-outline" size={18} color={theme.colors.accent} />
+                  <Ionicons name="finger-print-outline" size={18} color={palette.cyan} />
                   <Text style={styles.secondaryButtonText}>Use biometrics</Text>
                 </Pressable>
               ) : null}
@@ -996,14 +1000,14 @@ export function TransactionReviewScreen({
 
           {state === 'authenticating' ? (
             <View accessibilityRole="alert" style={styles.progressCard}>
-              <ActivityIndicator color={theme.colors.accent} />
+              <ActivityIndicator color={palette.cyan} />
               <Text style={styles.progressText}>Authenticating wallet…</Text>
             </View>
           ) : null}
 
           {state === 'signing' ? (
             <View accessibilityRole="alert" style={styles.progressCard}>
-              <ActivityIndicator color={theme.colors.accent} />
+              <ActivityIndicator color={palette.cyan} />
               <Text style={styles.progressText}>Signing transaction locally…</Text>
             </View>
           ) : null}
@@ -1016,7 +1020,7 @@ export function TransactionReviewScreen({
         onPress={onBack}
         style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
       >
-        <Ionicons name="arrow-back-outline" size={18} color={theme.colors.accent} />
+        <Ionicons name="arrow-back-outline" size={18} color={palette.cyan} />
         <Text style={styles.secondaryButtonText}>Back to Send</Text>
       </Pressable>
     </ScrollView>
@@ -1024,45 +1028,45 @@ export function TransactionReviewScreen({
 }
 
 const styles = StyleSheet.create({
-  content: { paddingHorizontal: theme.spacing.lg, paddingBottom: 132, gap: theme.spacing.md },
-  heading: { marginTop: theme.spacing.lg, gap: theme.spacing.sm },
-  eyebrow: { color: theme.colors.accent, fontFamily: theme.typography.eyebrow.fontFamily, fontSize: theme.typography.eyebrow.fontSize, letterSpacing: theme.typography.eyebrow.letterSpacing },
-  title: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 32, lineHeight: 39 },
-  body: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 14, lineHeight: 21 },
-  card: { padding: theme.spacing.md, gap: theme.spacing.sm, borderRadius: theme.radius.lg, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
+  content: { paddingHorizontal: 20, paddingBottom: 24, gap: 10 },
+  heading: { marginTop: 8, gap: 4 },
+  eyebrow: { color: palette.cyan, fontFamily: theme.typography.eyebrow.fontFamily, fontSize: theme.typography.eyebrow.fontSize, letterSpacing: theme.typography.eyebrow.letterSpacing },
+  title: { color: palette.text, fontFamily: theme.typography.title.fontFamily, fontSize: 27, lineHeight: 34 },
+  body: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 14, lineHeight: 21 },
+  card: { padding: theme.spacing.md, gap: theme.spacing.sm, borderRadius: theme.radius.lg, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.divider },
   warningCard: { borderColor: 'rgba(244, 200, 107, 0.42)', backgroundColor: 'rgba(244, 200, 107, 0.08)' },
-  cardEyebrow: { color: theme.colors.accent, fontFamily: theme.typography.label.fontFamily, fontSize: 10, letterSpacing: 1.15 },
-  cardBody: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 13, lineHeight: 20 },
+  cardEyebrow: { color: palette.cyan, fontFamily: theme.typography.label.fontFamily, fontSize: 10, letterSpacing: 1.15 },
+  cardBody: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 13, lineHeight: 20 },
   detailRow: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: theme.spacing.sm, borderBottomWidth: 1, borderBottomColor: 'rgba(126, 145, 191, 0.14)' },
-  detailLabel: { color: theme.colors.mutedForeground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 12 },
-  detailValue: { flex: 1, color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13, textAlign: 'right' },
+  detailLabel: { color: palette.secondaryText, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 12 },
+  detailValue: { flex: 1, color: palette.text, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13, textAlign: 'right' },
   configuredText: { color: theme.states.success, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 11 },
-  fullAddress: { color: theme.colors.mutedForeground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 11, lineHeight: 17 },
+  fullAddress: { color: palette.secondaryText, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 11, lineHeight: 17 },
   recipientRow: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
   recipientCopy: { flex: 1, gap: 4 },
-  recipientAddress: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 19 },
-  helperText: { color: theme.colors.mutedForeground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 11, lineHeight: 17 },
-  copyButton: { minHeight: 40, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: theme.radius.sm, backgroundColor: 'rgba(80, 217, 255, 0.1)' },
-  hashCopyButton: { minHeight: 40, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: theme.radius.sm, backgroundColor: 'rgba(80, 217, 255, 0.1)' },
-  copyButtonText: { color: theme.colors.accent, fontFamily: theme.typography.label.fontFamily, fontSize: 11 },
+  recipientAddress: { color: palette.text, fontFamily: theme.typography.title.fontFamily, fontSize: 19 },
+  helperText: { color: palette.secondaryText, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 11, lineHeight: 17 },
+  copyButton: { minHeight: 40, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: theme.radius.sm, backgroundColor: palette.surface },
+  hashCopyButton: { minHeight: 40, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, borderRadius: theme.radius.sm, backgroundColor: palette.surface },
+  copyButtonText: { color: palette.cyan, fontFamily: theme.typography.label.fontFamily, fontSize: 11 },
   warningRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 8 },
   warningText: { flex: 1, color: theme.states.warning, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 12, lineHeight: 18 },
   errorCard: { padding: theme.spacing.md, flexDirection: 'row', alignItems: 'flex-start', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: 'rgba(255, 103, 133, 0.1)', borderWidth: 1, borderColor: 'rgba(255, 103, 133, 0.35)' },
   errorCopy: { flex: 1, gap: 4 },
-  errorTitle: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14 },
+  errorTitle: { color: palette.text, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14 },
   errorText: { color: theme.colors.destructive, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 12, lineHeight: 18 },
   safeNotice: { padding: theme.spacing.md, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: 'rgba(101, 230, 166, 0.1)', borderWidth: 1, borderColor: 'rgba(101, 230, 166, 0.35)' },
   safeNoticeText: { flex: 1, color: theme.states.success, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 12, lineHeight: 18 },
-  pinInput: { minHeight: 50, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.background, color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 18, letterSpacing: 6, textAlign: 'center' },
-  progressCard: { minHeight: 58, padding: theme.spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: 'rgba(80, 217, 255, 0.08)', borderWidth: 1, borderColor: 'rgba(80, 217, 255, 0.3)' },
-  progressText: { color: theme.colors.accent, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13 },
-  deferredButton: { minHeight: 58, paddingHorizontal: theme.spacing.lg, alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: 'rgba(18, 29, 56, 0.65)' },
-  deferredButtonText: { color: theme.colors.mutedForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 13 },
-  deferredButtonHint: { color: theme.colors.mutedForeground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 11 },
-  primaryButton: { minHeight: 54, marginTop: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: theme.colors.accent, ...theme.shadows.glow },
+  pinInput: { minHeight: 50, paddingHorizontal: theme.spacing.md, borderRadius: theme.radius.md, borderWidth: 1, borderColor: palette.divider, backgroundColor: theme.colors.background, color: palette.text, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 18, letterSpacing: 6, textAlign: 'center' },
+  progressCard: { minHeight: 58, padding: theme.spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.divider },
+  progressText: { color: palette.cyan, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13 },
+  deferredButton: { minHeight: 58, paddingHorizontal: theme.spacing.lg, alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: theme.radius.md, borderWidth: 1, borderColor: palette.divider, backgroundColor: palette.surface },
+  deferredButtonText: { color: palette.secondaryText, fontFamily: theme.typography.label.fontFamily, fontSize: 13 },
+  deferredButtonHint: { color: palette.secondaryText, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 11 },
+  primaryButton: { minHeight: 54, marginTop: theme.spacing.sm, paddingHorizontal: theme.spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: palette.cyan, ...theme.shadows.glow },
   primaryButtonText: { color: theme.colors.primaryForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 13, letterSpacing: 0.4 },
   disabledButton: { opacity: 0.45 },
-  secondaryButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: 'rgba(18, 29, 56, 0.65)' },
-  secondaryButtonText: { color: theme.colors.accent, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
+  secondaryButton: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: theme.radius.md, borderWidth: 1, borderColor: palette.divider, backgroundColor: palette.surface },
+  secondaryButtonText: { color: palette.cyan, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
   pressed: { opacity: theme.states.pressedOpacity },
 });

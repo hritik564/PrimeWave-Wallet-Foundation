@@ -93,8 +93,9 @@ test('amount validation uses exact decimals, rejects zero, and enforces balance'
   assert.equal(validateAmount('1.26', 2, 125n).message, 'Amount exceeds the available balance.');
 });
 
-test('MAX preserves the exact available balance', () => {
-  assert.equal(formatMaxAmount(asset()), '1.25');
+test('Max reserves native fees and preserves exact token balances', () => {
+  assert.equal(formatMaxAmount(asset()), '');
+  assert.equal(formatMaxAmount(asset({ assetType: 'fungible_token' })), '1.25');
   assert.equal(formatMaxAmount(asset({ rawBalance: null, formattedBalance: null })), '');
 });
 

@@ -202,7 +202,8 @@ export function createPublicSendDraft({
 }
 
 export function formatMaxAmount(asset: PortfolioAssetViewModel | null): string {
-  if (asset?.rawBalance === null || asset?.rawBalance === undefined || asset.decimals === null) {
+  if (!asset || asset.assetType === 'native' || asset.availabilityState !== 'available' ||
+      asset.rawBalance === null || asset.rawBalance <= 0n || asset.decimals === null) {
     return '';
   }
   return formatAssetAmount(asset.rawBalance, asset.decimals);
