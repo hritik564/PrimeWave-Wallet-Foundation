@@ -37,6 +37,11 @@ export class WalletAccessManager {
   private readonly authenticator: AuthenticationManager;
   private status: WalletAccessStatus = 'loading';
   private currentWallet: Wallet | null = null;
+  private lifecycleRevision = 0;
+  private lockRevision = 0;
+  private backgrounded = false;
+  private signing = false;
+  private persisting = false;
   private readonly listeners = new Set<WalletAccessListener>();
 
   constructor(
@@ -48,6 +53,8 @@ export class WalletAccessManager {
       authenticator ??
       new AuthenticationManager({
         onLock: () => {
+          this.lockRevision++;
+          this.lifecycleRevision++;
           this.engine.discard();
           this.currentWallet = null;
           this.status = 'locked';
@@ -98,16 +105,28 @@ export class WalletAccessManager {
 
   async prepareNewWallet(): Promise<WalletSetupResult> {
     this.requireStatus('onboarding');
+    if (this.backgrounded || this.persisting) throw new Error('Wallet setup is unavailable.');
     return this.engine.prepareWallet();
   }
 
   async prepareImportWallet(recoveryPhrase: string): Promise<Wallet> {
     this.requireStatus('onboarding');
+    if (this.backgrounded || this.persisting) throw new Error('Wallet setup is unavailable.');
     return this.engine.prepareImportWallet(recoveryPhrase);
   }
 
   async persistPreparedWallet(): Promise<Wallet> {
-    const wallet = await this.engine.persistPreparedWallet();
+    this.requireStatus('onboarding');
+    if (this.backgrounded || this.persisting) throw new Error('Wallet setup is unavailable.');
+    this.persisting = true;
+    let wallet: Wallet;
+    try {
+      wallet = await this.engine.persistPreparedWallet();
+      this.engine.discard();
+    } finally {
+      this.persisting = false;
+      if (this.backgrounded) this.engine.discard();
+    }
     this.currentWallet = wallet;
     this.status = 'authentication-setup';
     this.notifyStateChange();
@@ -115,10 +134,16 @@ export class WalletAccessManager {
   }
 
   async configurePin(pin: string): Promise<void> {
+    this.requireStatus('authentication-setup');
+    const revision = this.lifecycleRevision;
     await this.authenticator.configurePinAuthentication(pin);
     const wallet = await this.engine.loadWallet();
     if (!wallet) {
       throw new Error('The wallet could not be restored.');
+    }
+    if (this.backgrounded || revision !== this.lifecycleRevision) {
+      await this.lockWallet();
+      return;
     }
     this.currentWallet = wallet;
     this.status = 'unlocked';
@@ -178,20 +203,61 @@ export class WalletAccessManager {
     return this.authenticator.determineBiometricAvailability();
   }
 
-  async signTransaction(
-    registry: NetworkRegistry,
-    transaction: UnsignedTransaction,
-    authorization: TransactionSigningAuthorization,
-  ): Promise<SignedTransaction> {
-    if (this.status !== 'unlocked' || !this.currentWallet) {
-      throw new Error('Wallet authentication is required before signing.');
-    }
+  createSigningSession(registry: NetworkRegistry, wallet: Wallet, networkId: string, isReviewCurrent: () => boolean) {
+    const selected = wallet.accounts[0];
+    const network = registry.getActiveNetwork();
+    if (!selected || network?.id !== networkId || network.configurationStatus !== 'configured' ||
+        network.chainId === null || this.currentWallet?.walletId !== wallet.walletId ||
+        !this.currentWallet.accounts.some(account => account.accountId === selected.accountId && account.address === selected.address) ||
+        this.status !== 'unlocked' || this.backgrounded) return null;
 
-    const signingEngine = new TransactionSigningEngine(registry, this.engine, {
-      authenticator: this.authenticator,
-      accounts: this.currentWallet.accounts,
-    });
-    return signingEngine.sign(transaction, authorization);
+    const revision = this.lifecycleRevision;
+    const selectionRevision = registry.getSelectionRevision();
+    const current = () => selectionRevision === registry.getSelectionRevision() && revision === this.lifecycleRevision && !this.backgrounded &&
+      this.status === 'unlocked' && isReviewCurrent() && registry.getActiveNetwork()?.id === networkId;
+    const assertCurrent = () => {
+      if (!current()) throw new Error('Transaction review expired.');
+    };
+    let authenticated = false;
+    let authenticating = false;
+    const authenticate = async (verify: () => Promise<AuthenticationResult>): Promise<AuthenticationResult> => {
+      assertCurrent();
+      if (authenticating) return { authenticated: false, reason: 'locked' };
+      authenticated = false;
+      authenticating = true;
+      try {
+        const result = await verify();
+        assertCurrent();
+        authenticated = result.authenticated;
+        return result;
+      } finally {
+        authenticating = false;
+      }
+    };
+    const engine = new TransactionSigningEngine(registry, {
+      signWithCapability: (...args) => {
+        assertCurrent();
+        return this.engine.signWithCapability(...args);
+      },
+    }, { authenticator: this.authenticator, accounts: [selected] });
+    return {
+      getBiometricAvailability: () => this.getBiometricAvailability(),
+      authenticateWithPin: (pin: string) => authenticate(() => this.authenticator.authenticateWithPin(pin)),
+      authenticateWithBiometrics: () => authenticate(() => this.authenticator.authenticateWithBiometrics()),
+      sign: async (transaction: UnsignedTransaction, authorization: TransactionSigningAuthorization): Promise<SignedTransaction> => {
+        assertCurrent();
+        if (!authenticated || this.signing) throw new Error('Fresh signing authorization required.');
+        authenticated = false;
+        this.signing = true;
+        try {
+          const result = await engine.sign(transaction, authorization);
+          assertCurrent();
+          return result;
+        } finally {
+          this.signing = false;
+        }
+      },
+    };
   }
 
   async signDAppPersonalMessage(
@@ -240,14 +306,19 @@ export class WalletAccessManager {
   }
 
   async revealRecoveryPhrase(currentPin: string): Promise<string> {
+    this.requireStatus('unlocked');
+    if (this.backgrounded) throw new Error('Wallet is in the background.');
+    const revision = this.lifecycleRevision;
     const result = await this.authenticator.authenticateWithPin(currentPin);
-    if (!result.authenticated) {
+    if (!result.authenticated || this.backgrounded || revision !== this.lifecycleRevision || this.status !== 'unlocked') {
       throw new Error('Authentication failed.');
     }
     return this.engine.getRecoveryPhraseForAuthenticatedSession();
   }
 
   async lockWallet(): Promise<void> {
+    this.lockRevision++;
+    this.lifecycleRevision++;
     await this.authenticator.lockWallet();
     this.engine.discard();
     this.currentWallet = null;
@@ -258,6 +329,12 @@ export class WalletAccessManager {
   async handleAppStateChange(
     nextState: 'active' | 'background' | 'inactive',
   ): Promise<void> {
+    this.backgrounded = nextState !== 'active';
+    if (this.backgrounded) this.lifecycleRevision++;
+    if (this.status === 'onboarding' || this.status === 'authentication-setup') {
+      if (this.backgrounded && !this.persisting) this.engine.discard();
+      return;
+    }
     await this.authenticator.handleAppStateChange(nextState);
     if (nextState !== 'active' && this.authenticator.getLockState() === 'LOCKED') {
       this.engine.discard();
@@ -280,7 +357,8 @@ export class WalletAccessManager {
   private async unlock(
     authenticate: () => Promise<AuthenticationResult>,
   ): Promise<AuthenticationResult> {
-    if (!this.authenticator.beginUnlockTransaction()) {
+    const lockRevision = this.lockRevision;
+    if (this.backgrounded || !this.authenticator.beginUnlockTransaction()) {
       return { authenticated: false, reason: 'locked' };
     }
 
@@ -292,6 +370,11 @@ export class WalletAccessManager {
       }
 
       const wallet = await this.restoreUnlockedWallet();
+      if (lockRevision !== this.lockRevision) {
+        this.authenticator.cancelUnlockTransaction();
+        await this.lockWallet();
+        return { authenticated: false, reason: 'locked' };
+      }
       const exposed = await this.authenticator.finishUnlockTransaction(() => {
         this.currentWallet = wallet;
         this.status = 'unlocked';

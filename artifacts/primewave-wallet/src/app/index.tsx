@@ -81,27 +81,10 @@ import { DAppTransactionReviewScreen } from '@/src/components/dapp/DAppTransacti
 import type { DAppTypedDataDocument } from '@/src/core/dapp/signing';
 import type { WalletConnectDAppTransport } from '@/src/core/dapp/providers/walletconnect';
 
-const iconSource = require('../../assets/images/lockup.png');
-const confirmationPositions = [4, 9, 12];
+import { SensitiveNavigation, type ViewName } from '@/src/components/sensitive-navigation';
+import { confirmationPositions, confirmsBackup } from '@/src/core/wallet/backup-confirmation';
 
-type ViewName =
-  | 'loading'
-  | 'unavailable'
-  | 'welcome'
-  | 'warning'
-  | 'phrase'
-  | 'phrase-confirm'
-  | 'import'
-  | 'import-confirm'
-  | 'pin'
-  | 'biometric'
-  | 'locked'
-  | 'wallet'
-  | 'dapp-approval'
-  | 'dapp-signing'
-  | 'dapp-transaction'
-  | 'security'
-  | 'recovery';
+const iconSource = require('../../assets/images/lockup.png');
 
 function safeMessage(error: unknown): string {
   if (error instanceof AuthenticationError && error.code === 'INVALID_PIN') {
@@ -713,29 +696,9 @@ export default function FoundationScreen() {
     [],
   );
   const createSigningDependency = useCallback(
-    async (wallet: Wallet, networkId: string): Promise<TransactionSigningDependency | null> => {
+    async (wallet: Wallet, networkId: string, isReviewCurrent: () => boolean): Promise<TransactionSigningDependency | null> => {
       if (previewMode || !access) return null;
-      const activeNetwork = defaultNetworkRegistry.getActiveNetwork();
-      if (
-        !activeNetwork ||
-        activeNetwork.id !== networkId ||
-        activeNetwork.configurationStatus !== 'configured' ||
-        activeNetwork.chainId === null ||
-        access.getStatus() !== 'unlocked'
-      ) {
-        return null;
-      }
-      const activeAccountId = access.getWallet().accounts[0]?.accountId;
-      if (!wallet.accounts.some((account) => account.accountId === activeAccountId)) {
-        return null;
-      }
-      return {
-        getBiometricAvailability: () => access.getBiometricAvailability(),
-        authenticateWithPin: (pin) => access.unlockWithPin(pin),
-        authenticateWithBiometrics: () => access.unlockWithBiometrics(),
-        sign: (transaction, authorization) =>
-          access.signTransaction(defaultNetworkRegistry, transaction, authorization),
-      };
+      return access.createSigningSession(defaultNetworkRegistry, wallet, networkId, isReviewCurrent);
     },
     [access, previewMode],
   );
@@ -840,7 +803,24 @@ export default function FoundationScreen() {
       return primary;
     },
   );
-  const [view, setView] = useState<ViewName>('loading');
+  const [view, updateView] = useState<ViewName>('loading');
+  const navigation = useRef(new SensitiveNavigation()).current;
+  const setView = useCallback((next: ViewName) => {
+    navigation.move(next, {
+      clearSecurityPins: () => { setSecurityPin(''); setNewPin(''); },
+      clearReveal: () => setRevealedPhrase(''),
+    });
+    if (next === 'locked') {
+      setDraft(null);
+      setImportedWallet(null);
+      setImportPhrase('');
+      setConfirmWords(['', '', '']);
+      setPin('');
+      setConfirmPin('');
+      setPinForBiometric('');
+    }
+    updateView(next);
+  }, [navigation]);
   const [draft, setDraft] = useState<WalletSetupResult | null>(null);
   const [importedWallet, setImportedWallet] = useState<Wallet | null>(null);
   const [importPhrase, setImportPhrase] = useState('');
@@ -876,6 +856,7 @@ export default function FoundationScreen() {
   useEffect(() => {
     if (!access) return;
     return access.subscribe(() => {
+      if (access.getStatus() === 'locked') setView('locked');
       setAccessRevision((revision) => revision + 1);
     });
   }, [access]);
@@ -926,7 +907,22 @@ export default function FoundationScreen() {
       const wasBackground = appState.current !== 'active';
       appState.current = nextState;
       if (nextState === 'background' || nextState === 'inactive') {
+        navigation.invalidate();
         setBackgrounded(true);
+        setPin('');
+        setConfirmPin('');
+        setPinForBiometric('');
+        setSecurityPin('');
+        setNewPin('');
+        setRevealedPhrase('');
+        setDraft(null);
+        setImportPhrase('');
+        setImportedWallet(null);
+        setConfirmWords(['', '', '']);
+        const previous = navigation.view;
+        if (['warning', 'phrase', 'phrase-confirm', 'import', 'import-confirm'].includes(previous)) setView('welcome');
+        if (previous === 'recovery') setView('security');
+        if (previous === 'biometric') setView('wallet');
         void screenPrivacyController.maskSensitiveContent();
         if (previewMode) {
           if (previewTestMode.getState().phase === 'unlocked') {
@@ -940,6 +936,7 @@ export default function FoundationScreen() {
           });
         }
       } else if (nextState === 'active') {
+        if (access) void access.handleAppStateChange('active');
         setBackgrounded(false);
         void screenPrivacyController.restoreSensitiveContent();
         if (previewMode) {
@@ -949,7 +946,7 @@ export default function FoundationScreen() {
         }
       }
     });
-    return () => { mounted = false; subscription.remove(); };
+    return () => { mounted = false; navigation.invalidate(); subscription.remove(); };
   }, [access, previewMode, previewTestMode]);
 
   useEffect(() => {
@@ -960,7 +957,8 @@ export default function FoundationScreen() {
 
   const run = async (operation: () => Promise<void>) => {
     setError('');
-    try { await operation(); } catch (operationError) { setError(safeMessage(operationError)); }
+    const revision = navigation.revision;
+    try { await operation(); } catch (operationError) { if (revision === navigation.revision) setError(safeMessage(operationError)); }
   };
 
   const nativeAccess = (): WalletAccessManager => {
@@ -1533,20 +1531,25 @@ export default function FoundationScreen() {
     }
     setView('warning');
   })} onImport={() => { setError(''); setView('import'); }} />;
-  else if (view === 'warning') content = <Warning onContinue={() => void run(async () => { setDraft(await nativeAccess().prepareNewWallet()); setView('phrase'); })} />;
+  else if (view === 'warning') content = <Warning onContinue={() => void run(async () => {
+    const revision = navigation.revision;
+    const prepared = await nativeAccess().prepareNewWallet();
+    if (revision !== navigation.revision) return;
+    setDraft(prepared);
+    setView('phrase');
+  })} />;
   else if (view === 'phrase' && draft) content = <PhraseDisplay draft={draft} onContinue={() => setView('phrase-confirm')} />;
   else if (view === 'phrase-confirm' && draft) content = <PhraseConfirm draft={draft} values={confirmWords} onChange={(index, value) => setConfirmWords((current) => current.map((entry, i) => i === index ? value : entry))} onConfirm={() => void run(async () => {
-    const words = draft.recoveryPhrase.split(' ');
-    const matches = confirmationPositions.every((position, index) => words[position - 1] === confirmWords[index].trim().toLowerCase());
-    if (!matches) { setError('The selected words do not match your backup.'); return; }
+    const matches = confirmsBackup(draft.recoveryPhrase, confirmWords);
+    if (!matches) { setConfirmWords(['', '', '']); setError('The selected words do not match your backup.'); return; }
     await nativeAccess().persistPreparedWallet();
     setDraft(null); setConfirmWords(['', '', '']); setView('pin');
   })} />;
-  else if (view === 'import') content = <ImportScreen value={importPhrase} onChange={setImportPhrase} onContinue={() => void run(async () => { const wallet = await nativeAccess().prepareImportWallet(importPhrase); setImportedWallet(wallet); setImportPhrase(''); setView('import-confirm'); })} />;
+  else if (view === 'import') content = <ImportScreen value={importPhrase} onChange={setImportPhrase} onContinue={() => void run(async () => { const revision = navigation.revision; setImportPhrase(''); const wallet = await nativeAccess().prepareImportWallet(importPhrase); if (revision !== navigation.revision) return; setImportedWallet(wallet); setView('import-confirm'); })} />;
   else if (view === 'import-confirm' && importedWallet) content = <ImportConfirm wallet={importedWallet} onConfirm={() => void run(async () => { await nativeAccess().persistPreparedWallet(); setImportedWallet(null); setView('pin'); })} />;
   else if (view === 'pin') content = <PinSetup existing={!draft && !importedWallet && !previewMode} pin={pin} confirmPin={confirmPin} setPin={setPin} setConfirmPin={setConfirmPin} onContinue={() => void run(async () => {
-    if (pin.length !== 6 || !/^\d{6}$/.test(pin)) { setError('Choose exactly 6 digits for your PIN.'); return; }
-    if (pin !== confirmPin) { setError('PIN entries do not match.'); return; }
+    if (pin.length !== 6 || !/^\d{6}$/.test(pin)) { setPin(''); setConfirmPin(''); setError('Choose exactly 6 digits for your PIN.'); return; }
+    if (pin !== confirmPin) { setConfirmPin(''); setError('PIN entries do not match.'); return; }
     if (previewMode) {
       previewTestMode.setPreviewPin(pin);
       setPin('');
@@ -1555,11 +1558,16 @@ export default function FoundationScreen() {
       setView('wallet');
       return;
     }
+    const revision = navigation.revision;
+    setPin(''); setConfirmPin('');
     await nativeAccess().configurePin(pin);
-    setPinForBiometric(pin); setPin(''); setConfirmPin(''); await refreshSettings(); setView('biometric');
+    await refreshSettings();
+    if (nativeAccess().getStatus() !== 'unlocked') return;
+    if (revision !== navigation.revision) { await nativeAccess().lockWallet(); return; }
+    setPinForBiometric(pin); setView('biometric');
   })} />;
-  else if (view === 'biometric') content = <BiometricSetup availability={biometricAvailability} onEnable={() => void run(async () => { await nativeAccess().enableBiometricUnlock(true, pinForBiometric); setPinForBiometric(''); await refreshSettings(); setView('wallet'); })} onSkip={() => { setPinForBiometric(''); setView('wallet'); }} />;
-  else if (view === 'locked') content = <Locked previewMode={previewMode} biometricEnabled={previewMode ? false : settings.biometricEnabled} onUnlock={(value) => void run(async () => {
+  else if (view === 'biometric') content = <BiometricSetup availability={biometricAvailability} onEnable={() => void run(async () => { const revision = navigation.revision; setPinForBiometric(''); const result = await nativeAccess().enableBiometricUnlock(true, pinForBiometric); await refreshSettings(); if (revision !== navigation.revision) return; if (!result.authenticated) setError('Biometric setup was not completed. Use your PIN.'); setView('wallet'); })} onSkip={() => { setPinForBiometric(''); setView('wallet'); }} />;
+  else if (view === 'locked') content = <Locked key={backgrounded ? 'hidden' : 'visible'} previewMode={previewMode} biometricEnabled={previewMode ? false : settings.biometricEnabled} onUnlock={(value) => void run(async () => {
     if (previewMode) {
       const verified = previewTestMode.verifyPreviewPin(value);
       if (!verified) {
@@ -1573,7 +1581,7 @@ export default function FoundationScreen() {
     const result = await nativeAccess().unlockWithPin(value);
     if (!result.authenticated) { setError('Authentication failed. Try again or use your PIN fallback.'); return; }
     await refreshSettings();
-    setView('wallet');
+    if (access.getStatus() === 'unlocked' && appState.current !== 'background' && appState.current !== 'inactive') setView('wallet');
   })} onBiometric={() => void run(async () => {
     if (previewMode) return;
     if (!access) return;
@@ -1660,7 +1668,41 @@ export default function FoundationScreen() {
     }
     setView('locked');
   })} />;
-  else if (view === 'security') content = <Security settings={settings} biometricAvailability={biometricAvailability} securityPin={securityPin} setSecurityPin={setSecurityPin} newPin={newPin} setNewPin={setNewPin} onChangePin={() => void run(async () => { if (newPin.length !== 6 || !/^\d{6}$/.test(newPin)) { setError('Choose exactly 6 digits for your new PIN.'); return; } const result = await nativeAccess().changePin(securityPin, newPin); if (!result.authenticated) { setError('Current PIN was not accepted.'); return; } setSecurityPin(''); setNewPin(''); await refreshSettings(); setError('PIN updated.'); })} onToggleBiometric={() => void run(async () => { const result = await nativeAccess().enableBiometricUnlock(!settings.biometricEnabled, securityPin); if (!result.authenticated) { setError('Current PIN was not accepted.'); return; } setSecurityPin(''); await refreshSettings(); })} onAutoLock={(policy) => void run(async () => { await nativeAccess().setAutoLockPolicy(policy); await refreshSettings(); if (policy === 0) setView('locked'); })} onReveal={() => void run(async () => { if (!securityPin) { setError('Enter your current PIN first.'); return; } setRevealedPhrase(await nativeAccess().revealRecoveryPhrase(securityPin)); setSecurityPin(''); setView('recovery'); })} onLock={() => void run(async () => { await nativeAccess().lockWallet(); setView('locked'); })} onBack={() => { setError(''); setView('wallet'); }} />;
+  else if (view === 'security') content = <Security
+    settings={settings} biometricAvailability={biometricAvailability}
+    securityPin={securityPin} setSecurityPin={setSecurityPin} newPin={newPin} setNewPin={setNewPin}
+    onChangePin={() => void run(async () => {
+      setSecurityPin('');
+      setNewPin('');
+      if (!/^\d{6}$/.test(newPin)) { setError('Choose exactly 6 digits for your new PIN.'); return; }
+      const result = await nativeAccess().changePin(securityPin, newPin);
+      if (!result.authenticated) { setError('Current PIN was not accepted.'); return; }
+      await refreshSettings();
+      setError('PIN updated.');
+    })}
+    onToggleBiometric={() => void run(async () => {
+      setSecurityPin('');
+      const result = await nativeAccess().enableBiometricUnlock(!settings.biometricEnabled, securityPin);
+      if (!result.authenticated) { setError('Current PIN was not accepted.'); return; }
+      await refreshSettings();
+    })}
+    onAutoLock={(policy) => void run(async () => {
+      await nativeAccess().setAutoLockPolicy(policy);
+      await refreshSettings();
+    })}
+    onReveal={() => void run(async () => {
+      if (!securityPin) { setError('Enter your current PIN first.'); return; }
+      const revision = navigation.revision;
+      setSecurityPin('');
+      setNewPin('');
+      const phrase = await nativeAccess().revealRecoveryPhrase(securityPin);
+      if (revision !== navigation.revision || nativeAccess().getStatus() !== 'unlocked') return;
+      setRevealedPhrase(phrase);
+      setView('recovery');
+    })}
+    onLock={() => void run(async () => { await nativeAccess().lockWallet(); setView('locked'); })}
+    onBack={() => { setError(''); setView('wallet'); }}
+  />;
   else if (view === 'recovery' && revealedPhrase) content = <Recovery phrase={revealedPhrase} onClose={() => { setRevealedPhrase(''); setView('security'); }} />;
   else content = <Loading />;
 

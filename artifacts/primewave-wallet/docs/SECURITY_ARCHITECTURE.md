@@ -1751,3 +1751,8 @@ bounded retention settings. Provider failures, missing configuration,
 unavailable servers, and malformed telemetry are isolated and cannot block
 wallet unlock, creation, recovery, signing, broadcast, swaps, or DApp
 operations.
+### UI and local transaction authorization lifetimes
+
+Leaving Security Settings releases its PIN fields. Hiding the backup releases the displayed phrase. Backgrounding clears sensitive form and backup state and invalidates pending reveal and signing results, including under delayed auto-lock. An interrupted, unpersisted backup must be started again. A committed vault awaiting PIN setup resumes at PIN setup. Clearing JavaScript references limits reuse and display. Immutable strings, native text input buffers and garbage collection prevent a guarantee of physical memory erasure.
+
+Local transaction signing binds the review to its selected public account, network selection and wallet lifecycle. A review requires fresh successful authentication and consumes that approval once. Hardware keyboard, biometric prompt transitions, app-switcher masking and native Back behavior require physical-device verification.

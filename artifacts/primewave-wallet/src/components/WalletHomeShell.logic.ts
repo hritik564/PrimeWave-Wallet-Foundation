@@ -1,3 +1,4 @@
+import type { Wallet } from '@/src/core/wallet/models';
 import type { EvmNetwork } from '@/src/core/networks';
 import {
   PortfolioReadModelError,
@@ -191,4 +192,11 @@ export function filterRegisteredNetworks(networks: readonly EvmNetwork[], search
     network.configurationStatus === 'configured' ? network.nativeCurrency.symbol : '',
     network.chainId?.toString() ?? '',
   ].some(value => value.toLowerCase().includes(query)));
+}
+
+
+export function walletForSelection(wallet: Wallet, selection: string | null): Wallet {
+  const account = wallet.accounts.find(item => item.accountId === selection);
+  if (!account || account === wallet.accounts[0]) return wallet;
+  return { ...wallet, accounts: [account, ...wallet.accounts.filter(item => item !== account)] };
 }

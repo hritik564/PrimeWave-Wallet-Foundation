@@ -1,5 +1,5 @@
 import { decodeFunctionData } from 'viem';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -169,6 +169,7 @@ export function DAppTransactionReviewScreen({
   readonly createSigningDependency: (
     wallet: Wallet,
     networkId: string,
+    isReviewCurrent: () => boolean,
   ) => Promise<TransactionSigningDependency | null>;
   readonly createBroadcastDependency: (
     networkId: string,
@@ -203,11 +204,11 @@ export function DAppTransactionReviewScreen({
   const [activityLocalTransactionId, setActivityLocalTransactionId] = useState<string | null>(null);
   const decoded = useMemo(() => decodeCall(request.payload.calldata), [request.payload.calldata]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cancelled = false;
     void Promise.all([
       createConstructionEngine(wallet, request.networkId),
-      createSigningDependency(wallet, request.networkId),
+      createSigningDependency(wallet, request.networkId, () => !cancelled),
       createBroadcastDependency(request.networkId),
     ])
       .then(async ([nextEngine, nextSigning, nextBroadcast]) => {

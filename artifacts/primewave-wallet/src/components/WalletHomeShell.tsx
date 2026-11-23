@@ -83,6 +83,7 @@ import {
   safePortfolioDiagnostic,
   safePortfolioMessage,
   shortPublicAddress,
+  walletForSelection,
 } from './WalletHomeShell.logic';
 
 const iconSource = require('../../assets/images/mark.png');
@@ -1089,6 +1090,7 @@ type ShellProps = {
   createSigningDependency: (
     wallet: Wallet,
     networkId: string,
+    isReviewCurrent: () => boolean,
   ) => Promise<TransactionSigningDependency | null>;
   createBroadcastDependency: (
     networkId: string,
@@ -1109,11 +1111,8 @@ type ShellProps = {
 
 export function WalletHomeShell(props: ShellProps) {
   const [selection, setSelection] = useState<string | null>(null);
-  const account = props.wallet.accounts.find(item => item.accountId === selection) ?? props.wallet.accounts[0];
-  const wallet = useMemo(() => {
-    if (!account || account === props.wallet.accounts[0]) return props.wallet;
-    return { ...props.wallet, accounts: [account, ...props.wallet.accounts.filter(item => item !== account)] };
-  }, [props.wallet, account]);
+  const wallet = useMemo(() => walletForSelection(props.wallet, selection), [props.wallet, selection]);
+  const account = wallet.accounts[0];
 
   return <AccountHome key={JSON.stringify([wallet.walletId, account?.accountId])}
     {...props} wallet={wallet} onSelectAccount={setSelection} />;

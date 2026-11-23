@@ -438,6 +438,12 @@ export const supportedNetworks: readonly EvmNetwork[] = [
 
 export class NetworkRegistry {
   private readonly networks: readonly EvmNetwork[];
+  private selectionRevision = 0;
+
+  getSelectionRevision(): number {
+    return this.selectionRevision;
+  }
+
   private activeNetworkId: string | null = null;
 
   constructor(networks: readonly EvmNetwork[]) {
@@ -540,11 +546,13 @@ export class NetworkRegistry {
       );
     }
 
+    if (network.id !== this.activeNetworkId) this.selectionRevision++;
     this.activeNetworkId = network.id;
     return network;
   }
 
   clearActiveNetwork(): void {
+    if (this.activeNetworkId !== null) this.selectionRevision++;
     this.activeNetworkId = null;
   }
 }

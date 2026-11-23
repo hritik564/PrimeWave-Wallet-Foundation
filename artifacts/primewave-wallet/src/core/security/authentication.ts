@@ -412,12 +412,14 @@ export class AuthenticationManager implements WalletAuthenticator {
   }
 
   async authenticateWithPin(pin: string): Promise<AuthenticationResult> {
+    const revision = this.lockRevision;
     if (!isValidPin(pin)) {
       this.state = 'AUTHENTICATION_FAILED';
       return { authenticated: false, reason: 'rejected' };
     }
 
     const record = await this.readRecord();
+    if (revision !== this.lockRevision) return { authenticated: false, reason: 'locked' };
     if (!record) {
       this.state = 'AUTHENTICATION_UNAVAILABLE';
       return { authenticated: false, reason: 'not-configured' };
@@ -438,12 +440,14 @@ export class AuthenticationManager implements WalletAuthenticator {
     actual.fill(0);
     expected.fill(0);
 
+    if (revision !== this.lockRevision) return { authenticated: false, reason: 'locked' };
     if (authenticated) {
       await this.writeRecord({
         ...record,
         failedAttempts: 0,
         lockedUntil: null,
       });
+      if (revision !== this.lockRevision) return { authenticated: false, reason: 'locked' };
       this.state = 'UNLOCKED';
       return { authenticated: true, reason: 'success' };
     }
@@ -458,6 +462,7 @@ export class AuthenticationManager implements WalletAuthenticator {
       failedAttempts,
       lockedUntil: now + delay,
     });
+    if (revision !== this.lockRevision) return { authenticated: false, reason: 'locked' };
     this.state = 'AUTHENTICATION_FAILED';
     secureLogger.warning('Wallet PIN authentication failed', {
       attemptBackoffMs: delay,
@@ -466,6 +471,7 @@ export class AuthenticationManager implements WalletAuthenticator {
   }
 
   async authenticateWithBiometrics(): Promise<AuthenticationResult> {
+    const revision = this.lockRevision;
     let record: AuthenticationRecord | null;
     try {
       record = await withTimeout(
@@ -473,16 +479,19 @@ export class AuthenticationManager implements WalletAuthenticator {
         this.biometricTimeoutMs,
       );
     } catch {
+      if (revision !== this.lockRevision) return { authenticated: false, reason: 'locked' };
       this.state = 'AUTHENTICATION_UNAVAILABLE';
       return { authenticated: false, reason: 'unavailable' };
     }
 
+    if (revision !== this.lockRevision) return { authenticated: false, reason: 'locked' };
     if (!record || !record.biometricEnabled) {
       this.state = 'AUTHENTICATION_UNAVAILABLE';
       return { authenticated: false, reason: 'not-configured' };
     }
 
     const availability = await this.determineBiometricAvailability();
+    if (revision !== this.lockRevision) return { authenticated: false, reason: 'locked' };
     if (!availability.available) {
       this.state = 'AUTHENTICATION_UNAVAILABLE';
       return { authenticated: false, reason: 'unavailable' };
@@ -505,6 +514,7 @@ export class AuthenticationManager implements WalletAuthenticator {
         this.biometricTimeoutMs,
       );
 
+      if (revision !== this.lockRevision) return this.completeBiometricAttempt({ authenticated: false, reason: 'locked' });
       if (response.success) {
         this.state = 'UNLOCKED';
         result = { authenticated: true, reason: 'success' };
@@ -525,6 +535,7 @@ export class AuthenticationManager implements WalletAuthenticator {
         result = { authenticated: false, reason: 'rejected' };
       }
     } catch {
+      if (revision !== this.lockRevision) return this.completeBiometricAttempt({ authenticated: false, reason: 'locked' });
       this.state = 'AUTHENTICATION_UNAVAILABLE';
       result = { authenticated: false, reason: 'unavailable' };
     }
@@ -599,6 +610,7 @@ export class AuthenticationManager implements WalletAuthenticator {
   }
 
   async lockWallet(): Promise<void> {
+    this.lockRevision++;
     this.clearAutoLockTimer();
     this.isBackgrounded = false;
     this.pendingBackgroundLock = false;
@@ -613,6 +625,8 @@ export class AuthenticationManager implements WalletAuthenticator {
     }
     return { authenticated: false, reason: 'not-configured' };
   }
+
+  private lockRevision = 0;
 
   private async lockForBackground(): Promise<void> {
     let record: AuthenticationRecord | null;

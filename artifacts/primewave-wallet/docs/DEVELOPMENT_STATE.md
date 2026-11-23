@@ -789,7 +789,7 @@ increment.
 
 - Wire live ERC-20 balances into the portfolio and verify account and network isolation.
 - Persist transaction history across app restarts.
-- Verify that signing uses the selected account across a multi-account wallet.
+- C3.1 verified native transfer signing for two selected accounts with offline fixtures. Physical-device multi-account review remains pending.
 - Implement and verify a gas-aware maximum spend for native assets.
 - Test on physical Android devices, including keyboard and Back behavior, enlarged text, biometric fallback, app backgrounding and screen privacy.
 - Obtain a high-resolution or vector Ribbon-X launcher master and verify adaptive icon crops.

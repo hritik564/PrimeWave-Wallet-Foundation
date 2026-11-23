@@ -43,6 +43,7 @@ type InMemorySecretState = {
 const secretStates = new WeakMap<LocalWalletEngine, InMemorySecretState>();
 
 export class LocalWalletEngine implements WalletEngine, LocalSigningKeyAccess, MessageSigningKeyAccess {
+  private discardRevision = 0;
   private accounts: WalletAccount[] = [];
   private walletId: string | null = null;
   private createdAt: string | null = null;
@@ -74,9 +75,11 @@ export class LocalWalletEngine implements WalletEngine, LocalSigningKeyAccess, M
     secureLogger.info('Wallet core creation started');
     this.discard();
 
+    const revision = this.discardRevision;
     // 128 bits produces a standard 12-word BIP-39 phrase.
     const entropy = await (await this.entropyPromise).getRandomBytesAsync(16);
     try {
+      if (revision !== this.discardRevision) throw new Error('Wallet preparation was cancelled.');
       const mnemonic = entropyToMnemonic(entropy, wordlist);
       const firstAccount = derivePublicAccountFromMnemonic(mnemonic, 0);
       const createdAt = new Date().toISOString();
@@ -271,6 +274,7 @@ export class LocalWalletEngine implements WalletEngine, LocalSigningKeyAccess, M
   }
 
   discard(): void {
+    this.discardRevision++;
     const state = secretStates.get(this);
     if (state) {
       state.mnemonic = '';

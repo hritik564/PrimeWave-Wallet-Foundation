@@ -1,5 +1,5 @@
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Pressable,
@@ -129,6 +129,7 @@ export function WalletSwapExecutionScreen({
   readonly createSigningDependency: (
     wallet: Wallet,
     networkId: string,
+    isReviewCurrent: () => boolean,
   ) => Promise<TransactionSigningDependency | null>;
   readonly createBroadcastDependency: (
     networkId: string,
@@ -187,7 +188,7 @@ export function WalletSwapExecutionScreen({
   const [broadcastResult, setBroadcastResult] = useState<BroadcastResult | null>(null);
   const [confirmationResult, setConfirmationResult] = useState<ConfirmationResult | null>(null);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cancelled = false;
     if (!account || previewMode) {
       setState('failed');
@@ -202,7 +203,7 @@ export function WalletSwapExecutionScreen({
     }
     void Promise.all([
       createConstructionEngine(wallet, review.networkId),
-      createSigningDependency(wallet, review.networkId),
+      createSigningDependency(wallet, review.networkId, () => !cancelled),
       createBroadcastDependency(review.networkId),
     ]).then(([nextEngine, nextSigning, nextBroadcast]) => {
       if (cancelled) return;

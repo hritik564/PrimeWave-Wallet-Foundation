@@ -3,7 +3,7 @@ import { GlassLayer } from '@/src/design-system/components/GlassLayer';
 import { glassSurface } from '@/src/design-system/tokens/wallet-home';
 import { walletHomeColors as palette } from '@/src/design-system/tokens/wallet-home';
 import { Ionicons } from '@expo/vector-icons';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Linking,
@@ -124,6 +124,7 @@ export function TransactionReviewScreen({
   readonly createSigningDependency: (
     wallet: Wallet,
     networkId: string,
+    isReviewCurrent: () => boolean,
   ) => Promise<TransactionSigningDependency | null>;
   readonly createBroadcastDependency: (
     networkId: string,
@@ -167,7 +168,7 @@ export function TransactionReviewScreen({
     [draft, portfolio],
   );
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     let cancelled = false;
     setState('loading');
     setReview(null);
@@ -187,7 +188,7 @@ export function TransactionReviewScreen({
     }
     void Promise.all([
       createConstructionEngine(wallet, draft.networkId),
-      createSigningDependency(wallet, draft.networkId),
+      createSigningDependency(wallet, draft.networkId, () => !cancelled),
       createBroadcastDependency(draft.networkId),
     ])
       .then(([nextEngine, nextSigningDependency, nextBroadcastDependency]) => {
