@@ -2,7 +2,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { encodeFunctionData } from 'viem';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
-import { AppState, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { AppState, BackHandler, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, View } from 'react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/src/theme';
@@ -141,6 +141,7 @@ function AppButton({
   return (
     <Pressable
       accessibilityRole="button"
+      accessibilityState={{ disabled }}
       disabled={disabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -185,6 +186,8 @@ function Field({
         accessibilityLabel={label}
         autoCapitalize={autoCapitalize}
         autoCorrect={false}
+        autoComplete="off"
+        importantForAutofill="no"
         keyboardType={keyboardType}
         multiline={multiline}
         onChangeText={onChangeText}
@@ -207,12 +210,7 @@ function Header({ onBack }: { onBack?: () => void }) {
         <Pressable accessibilityLabel="Go back" accessibilityRole="button" onPress={onBack} style={styles.iconButton}>
           <Ionicons name="arrow-back" size={20} color={theme.colors.foreground} />
         </Pressable>
-      ) : (
-        <View style={styles.statusPill}>
-          <View style={styles.statusDot} />
-          <Text style={styles.statusText}>OFFLINE</Text>
-        </View>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -227,11 +225,17 @@ function Screen({
   sensitive?: boolean;
 }) {
   const insets = useSafeAreaInsets();
+  useEffect(() => {
+    if (Platform.OS !== 'android' || !onBack) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      onBack();
+      return true;
+    });
+    return () => subscription.remove();
+  }, [onBack]);
   return (
     <View style={styles.screen}>
-      <LinearGradient colors={theme.gradients.background} locations={[0, 0.48, 1]} style={StyleSheet.absoluteFill} />
-      <View style={styles.orbTop} />
-      <View style={styles.orbBottom} />
+      {!sensitive && <LinearGradient colors={theme.gradients.background} locations={[0, 0.48, 1]} style={StyleSheet.absoluteFill} />}
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.keyboardContainer}
@@ -245,11 +249,9 @@ function Screen({
             },
           ]}
           keyboardShouldPersistTaps="handled"
-          showsVerticalScrollIndicator={false}
           style={styles.scroll}
         >
           <Header onBack={onBack} />
-          {sensitive ? <View style={styles.sensitiveMarker} /> : null}
           {children}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -261,7 +263,7 @@ function SectionTitle({ eyebrow, title, body }: { eyebrow: string; title: string
   return (
     <View style={styles.sectionTitle}>
       <Text style={styles.eyebrow}>{eyebrow}</Text>
-      <Text style={styles.title}>{title}</Text>
+      <Text accessibilityRole="header" style={styles.title}>{title}</Text>
       <Text style={styles.body}>{body}</Text>
     </View>
   );
@@ -279,15 +281,15 @@ function Welcome({
   return (
     <Screen sensitive={false}>
       <View style={styles.hero}>
-        <Text style={styles.eyebrow}>{previewMode ? 'DEVELOPMENT • PREVIEW TEST MODE' : 'LOCAL • NON-CUSTODIAL • OFFLINE'}</Text>
-        <Text style={styles.heroTitle}>
+        <Text style={styles.eyebrow}>{previewMode ? 'DEVELOPMENT • PREVIEW TEST MODE' : 'SELF-CUSTODY WALLET'}</Text>
+        <Text accessibilityRole="header" style={styles.heroTitle}>
           Your keys stay{'\n'}
           <Text style={styles.heroAccent}>with you.</Text>
         </Text>
         <Text style={styles.body}>
           {previewMode
             ? 'This web preview uses a simulated public test identity for UI testing. It is not a real wallet and cannot sign transactions.'
-            : 'WAVEX gives you a private, device-local foundation for managing your own recovery material.'}
+            : 'Create a wallet on this device or restore one with your recovery phrase.'}
         </Text>
       </View>
       {previewMode ? (
@@ -302,7 +304,7 @@ function Welcome({
         <View style={styles.panelIcon}>
           <Ionicons name="shield-checkmark-outline" size={24} color={theme.colors.accent} />
         </View>
-        <Text style={styles.panelTitle}>{previewMode ? 'Start a simulated wallet session' : 'Start with a secure local vault'}</Text>
+        <Text style={styles.panelTitle}>{previewMode ? 'Start a simulated wallet session' : 'Set up your wallet'}</Text>
         <Text style={styles.panelBody}>
           {previewMode
             ? 'Use a custom six-digit test PIN to exercise onboarding, lock, unlock, and reset UI flows.'
@@ -311,7 +313,7 @@ function Welcome({
         <AppButton icon="add" label={previewMode ? 'Create test wallet' : 'Create new wallet'} onPress={onCreate} />
         {!previewMode ? <AppButton icon="download-outline" label="Import existing wallet" onPress={onImport} secondary /> : null}
       </View>
-       <Text style={styles.footerNote}>{previewMode ? 'Public test identity only • excluded from production builds' : 'WAVEX cannot recover a lost recovery phrase.'}</Text>
+       <Text style={styles.footerNote}>{previewMode ? 'Public test identity only • excluded from production builds' : 'WaveX cannot recover a lost recovery phrase.'}</Text>
     </Screen>
   );
 }
@@ -328,11 +330,25 @@ function Warning({ onContinue }: { onContinue: () => void }) {
         <Ionicons name="warning-outline" size={25} color={theme.states.warning} />
         <Text style={styles.warningTitle}>Write it down offline</Text>
         <Text style={styles.warningBody}>
-          Never screenshot it, send it to anyone, or store it in cloud notes. PrimeWave cannot recover it if it is lost.
+          Never screenshot it, send it to anyone, or store it in cloud notes. WaveX cannot recover it if it is lost.
         </Text>
       </View>
       <AppButton label="I understand — show my phrase" onPress={onContinue} icon="arrow-forward" />
     </Screen>
+  );
+}
+
+function PhraseWords({ words }: { words: string[] }) {
+  const { fontScale } = useWindowDimensions();
+  return (
+    <View style={styles.wordGrid}>
+      {words.map((word, index) => (
+        <View key={index} accessible style={[styles.wordCell, fontScale >= 1.4 && styles.wordCellWide]}>
+          <Text style={styles.wordIndex}>{index + 1}</Text>
+          <Text style={styles.wordText}>{word}</Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -349,14 +365,7 @@ function PhraseDisplay({ draft, onContinue }: { draft: WalletSetupResult; onCont
         <Ionicons name="lock-closed-outline" size={22} color={theme.colors.accent} />
         <Text style={styles.warningBody}>Do not copy or share this phrase. Anyone with it can control your wallet.</Text>
       </View>
-      <View style={styles.wordGrid}>
-        {words.map((word, index) => (
-          <View key={`${index}-${word}`} style={styles.wordCell}>
-            <Text style={styles.wordIndex}>{index + 1}</Text>
-            <Text style={styles.wordText}>{word}</Text>
-          </View>
-        ))}
-      </View>
+      <PhraseWords words={words} />
       <AppButton label="I wrote it down" onPress={onContinue} icon="checkmark" />
     </Screen>
   );
@@ -377,8 +386,8 @@ function PhraseConfirm({
     <Screen>
       <SectionTitle
         eyebrow="BACKUP CONFIRMATION"
-        title="Prove your backup is ready."
-        body="Enter the requested words from your written backup. The full phrase will not be shown again."
+        title="Check your backup"
+        body="Enter the requested words from your written backup. Keep the words in their original order."
       />
       <View style={styles.confirmCard}>
         {confirmationPositions.map((position, index) => (
@@ -401,11 +410,10 @@ function ImportScreen({ value, onChange, onContinue }: { value: string; onChange
     <Screen>
       <SectionTitle
         eyebrow="RESTORE LOCALLY"
-        title="Import a wallet."
-        body="Enter your BIP-39 recovery phrase on this device. It is validated and processed locally; it is never sent anywhere."
+        title="Import your wallet"
+        body="Enter your recovery phrase in its original order. WaveX checks it on this device."
       />
       <Field
-        autoCapitalize="sentences"
         label="Recovery phrase"
         multiline
         onChangeText={onChange}
@@ -467,9 +475,9 @@ function BiometricSetup({ availability, onEnable, onSkip }: { availability: Biom
   return (
     <Screen>
       <SectionTitle
-        eyebrow="OPTIONAL CONVENIENCE"
+        eyebrow="OPTIONAL UNLOCK METHOD"
         title="Unlock with biometrics?"
-        body={availability.available ? `Use ${label} through your operating system. PrimeWave never receives biometric data.` : 'Biometric hardware is not available or not enrolled on this device. You can always use your PIN.'}
+        body={availability.available ? `Use ${label} through your operating system. WaveX never receives biometric data.` : 'Biometric hardware is not available or not enrolled on this device. You can always use your PIN.'}
       />
       <View style={styles.biometricIcon}>
         <Ionicons name={availability.available ? 'scan-outline' : 'phone-portrait-outline'} size={45} color={theme.colors.accent} />
@@ -579,7 +587,8 @@ function Security({
 }) {
   return (
     <Screen onBack={onBack}>
-      <SectionTitle eyebrow="SECURITY" title="Protect this wallet." body="Changes require your current wallet PIN. Recovery material is never shown by default." />
+      <SectionTitle eyebrow="SECURITY" title="Protect this wallet." body="Manage device access, automatic locking and your recovery backup." />
+      <Field keyboardType="number-pad" label="Current PIN" onChangeText={setSecurityPin} placeholder="Required for protected actions" secureTextEntry value={securityPin} />
       <View style={styles.settingsCard}>
         <Text style={styles.cardEyebrow}>AUTHENTICATION</Text>
         <View style={styles.settingRow}><Text style={styles.settingLabel}>Biometric unlock</Text><Text style={styles.settingValue}>{settings.biometricEnabled ? 'ON' : 'OFF'}</Text></View>
@@ -587,10 +596,10 @@ function Security({
       </View>
       <View style={styles.settingsCard}>
         <Text style={styles.cardEyebrow}>AUTO-LOCK</Text>
-        <Text style={styles.helperText}>Current: {settings.autoLockPolicy === 0 ? 'Immediately on background' : `After ${settings.autoLockPolicy / 60} minutes`}</Text>
+        <Text style={styles.helperText}>Current: {settings.autoLockPolicy === 0 ? 'Immediately on background' : settings.autoLockPolicy < 60 ? `After ${settings.autoLockPolicy} seconds` : `After ${settings.autoLockPolicy / 60} minutes`}</Text>
         <View style={styles.choiceRow}>
           {[0, 30, 300, 900].map((policy) => (
-            <Pressable key={policy} onPress={() => onAutoLock(policy as AutoLockPolicy)} style={[styles.choice, settings.autoLockPolicy === policy && styles.choiceSelected]}>
+            <Pressable key={policy} accessibilityRole="button" accessibilityState={{ selected: settings.autoLockPolicy === policy }} onPress={() => onAutoLock(policy as AutoLockPolicy)} style={[styles.choice, settings.autoLockPolicy === policy && styles.choiceSelected]}>
               <Text style={[styles.choiceText, settings.autoLockPolicy === policy && styles.choiceTextSelected]}>{policy === 0 ? 'Now' : policy < 60 ? '30s' : `${policy / 60}m`}</Text>
             </Pressable>
           ))}
@@ -598,14 +607,13 @@ function Security({
       </View>
       <View style={styles.settingsCard}>
         <Text style={styles.cardEyebrow}>CHANGE PIN</Text>
-        <Field keyboardType="number-pad" label="Current PIN" onChangeText={setSecurityPin} placeholder="6 digits" secureTextEntry value={securityPin} />
         <Field keyboardType="number-pad" label="New PIN" onChangeText={setNewPin} placeholder="6 digits" secureTextEntry value={newPin} />
         <AppButton label="Update PIN" onPress={onChangePin} icon="key-outline" secondary />
       </View>
       <View style={styles.settingsCard}>
-        <Text style={styles.cardEyebrow}>BACKUP STATUS</Text>
-        <View style={styles.settingRow}><Text style={styles.settingLabel}>Recovery phrase</Text><Text style={styles.settingValue}>BACKED UP</Text></View>
-        <Text style={styles.helperText}>Viewing it again requires PIN authentication and an explicit warning.</Text>
+        <Text style={styles.cardEyebrow}>WALLET BACKUP</Text>
+        <View style={styles.settingRow}><Text style={styles.settingLabel}>Recovery phrase</Text><Ionicons name="eye-off-outline" size={18} color={theme.colors.mutedForeground} /></View>
+        <Text style={styles.helperText}>Enter your current PIN above. Choose a private place before revealing these words. Anyone who sees them can control your wallet.</Text>
         <AppButton label="View recovery phrase" onPress={onReveal} icon="eye-outline" secondary />
       </View>
       <AppButton label="Lock wallet now" onPress={onLock} danger icon="lock-closed-outline" />
@@ -615,12 +623,10 @@ function Security({
 
 function Recovery({ phrase, onClose }: { phrase: string; onClose: () => void }) {
   return (
-    <Screen>
+    <Screen onBack={onClose}>
       <SectionTitle eyebrow="AUTHENTICATED BACKUP" title="Recovery phrase" body="Anyone who has these words can control the wallet. Do not screenshot, copy, or share them." />
-      <View style={styles.warningPanel}><Ionicons name="warning-outline" size={23} color={theme.states.warning} /><Text style={styles.warningBody}>PrimeWave cannot recover this wallet if you lose this phrase.</Text></View>
-      <View style={styles.wordGrid}>
-        {phrase.split(' ').map((word, index) => <View key={`${index}-${word}`} style={styles.wordCell}><Text style={styles.wordIndex}>{index + 1}</Text><Text style={styles.wordText}>{word}</Text></View>)}
-      </View>
+      <View style={styles.warningPanel}><Ionicons name="warning-outline" size={23} color={theme.states.warning} /><Text style={styles.warningBody}>WaveX cannot recover this wallet if you lose this phrase.</Text></View>
+      <PhraseWords words={phrase.split(' ')} />
       <AppButton label="Hide recovery phrase" onPress={onClose} icon="eye-off-outline" />
     </Screen>
   );
@@ -1661,7 +1667,7 @@ export default function FoundationScreen() {
   return (
     <>
       {content}
-      {error ? <View accessibilityRole="alert" style={styles.errorToast}><Ionicons name="alert-circle-outline" size={17} color={theme.colors.destructive} /><Text style={styles.errorText}>{error}</Text><Pressable onPress={() => setError('')}><Ionicons name="close" size={18} color={theme.colors.mutedForeground} /></Pressable></View> : null}
+      {error ? <View accessibilityRole="alert" style={styles.errorToast}><Ionicons name="alert-circle-outline" size={17} color={theme.colors.destructive} /><Text style={styles.errorText}>{error}</Text><Pressable accessibilityRole="button" accessibilityLabel="Dismiss message" hitSlop={10} onPress={() => setError('')}><Ionicons name="close" size={18} color={theme.colors.mutedForeground} /></Pressable></View> : null}
        {backgrounded ? <View pointerEvents="auto" style={styles.privacyOverlay}><Ionicons name="lock-closed" size={30} color={theme.colors.accent} /><Text style={styles.privacyTitle}>WAVEX</Text><Text style={styles.privacyBody}>Wallet content hidden</Text></View> : null}
     </>
   );
@@ -1691,8 +1697,8 @@ const styles = StyleSheet.create({
   heroAccent: { color: theme.colors.accent },
   title: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: theme.typography.title.fontSize, letterSpacing: theme.typography.title.letterSpacing, lineHeight: theme.typography.title.lineHeight },
   body: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: theme.typography.body.fontSize, lineHeight: theme.typography.body.lineHeight },
-  sectionTitle: { marginTop: theme.spacing.xl, gap: theme.spacing.md },
-  panel: { borderRadius: theme.radius.lg, padding: theme.spacing.lg, gap: theme.spacing.md, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: 'rgba(124, 140, 255, 0.25)', ...theme.shadows.panel },
+  sectionTitle: { marginTop: theme.spacing.sm, gap: theme.spacing.md },
+  panel: { borderRadius: theme.radius.lg, padding: theme.spacing.lg, gap: theme.spacing.md, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
   panelIcon: { width: 48, height: 48, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(80, 217, 255, 0.1)', borderWidth: 1, borderColor: 'rgba(80, 217, 255, 0.24)' },
   panelTitle: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 17, lineHeight: 23 },
   panelBody: { color: theme.colors.mutedForeground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: theme.typography.bodyMedium.fontSize, lineHeight: 21 },
@@ -1709,7 +1715,7 @@ const styles = StyleSheet.create({
   resetCancelButton: { alignItems: 'center', justifyContent: 'center', minHeight: 40 },
   resetCancelText: { color: theme.colors.mutedForeground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13, textDecorationLine: 'underline' },
   buttonPressed: { opacity: theme.states.pressedOpacity, transform: [{ scale: 0.99 }] },
-  buttonText: { color: theme.colors.primaryForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 13, letterSpacing: 0.3 },
+  buttonText: { flexShrink: 1, textAlign: 'center', color: theme.colors.primaryForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 13, letterSpacing: 0.3 },
   buttonTextSecondary: { color: theme.colors.foreground },
   buttonTextDanger: { color: theme.colors.destructive },
   footerNote: { color: theme.colors.mutedForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 11, lineHeight: 17, textAlign: 'center', marginTop: 'auto' },
@@ -1717,7 +1723,8 @@ const styles = StyleSheet.create({
   warningTitle: { color: theme.states.warning, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 16 },
   warningBody: { color: theme.colors.secondaryForeground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14, lineHeight: 21 },
   wordGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: theme.spacing.sm },
-  wordCell: { width: '31%', minHeight: 54, borderRadius: theme.radius.sm, paddingHorizontal: 9, paddingVertical: 8, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
+  wordCell: { width: '48%', minHeight: 54, borderRadius: theme.radius.sm, paddingHorizontal: 9, paddingVertical: 8, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
+  wordCellWide: { width: '100%' },
   wordIndex: { color: theme.colors.mutedForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 10 },
   wordText: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13, marginTop: 4 },
   confirmCard: { gap: theme.spacing.md, padding: theme.spacing.lg, borderRadius: theme.radius.lg, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
@@ -1738,11 +1745,11 @@ const styles = StyleSheet.create({
   liveDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: theme.states.success },
   liveText: { color: theme.states.success, fontFamily: theme.typography.label.fontFamily, fontSize: 10, letterSpacing: 1 },
   settingsCard: { borderRadius: theme.radius.lg, padding: theme.spacing.lg, gap: theme.spacing.md, backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border },
-  settingRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  settingRow: { flexWrap: 'wrap', gap: 8, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   settingLabel: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 15 },
   settingValue: { color: theme.colors.accent, fontFamily: theme.typography.label.fontFamily, fontSize: 11, letterSpacing: 1 },
-  choiceRow: { flexDirection: 'row', gap: 7 },
-  choice: { flex: 1, paddingVertical: 11, alignItems: 'center', borderRadius: theme.radius.sm, backgroundColor: theme.colors.secondary, borderWidth: 1, borderColor: theme.colors.border },
+  choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 7 },
+  choice: { flexGrow: 1, minWidth: 48, minHeight: 48, justifyContent: 'center', paddingVertical: 11, alignItems: 'center', borderRadius: theme.radius.sm, backgroundColor: theme.colors.secondary, borderWidth: 1, borderColor: theme.colors.border },
   choiceSelected: { backgroundColor: 'rgba(80, 217, 255, 0.15)', borderColor: theme.colors.accent },
   choiceText: { color: theme.colors.mutedForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 11 },
   choiceTextSelected: { color: theme.colors.accent },

@@ -785,3 +785,13 @@ increment.
 - Generated Drizzle migration `0005_gifted_nick_fury.sql`; it is not applied
   to a production database.
 - Phase 9 and later work remain intentionally deferred.
+## C2.4 release blockers
+
+- Wire live ERC-20 balances into the portfolio and verify account and network isolation.
+- Persist transaction history across app restarts.
+- Verify that signing uses the selected account across a multi-account wallet.
+- Implement and verify a gas-aware maximum spend for native assets.
+- Test on physical Android devices, including keyboard and Back behavior, enlarged text, biometric fallback, app backgrounding and screen privacy.
+- Obtain a high-resolution or vector Ribbon-X launcher master and verify adaptive icon crops.
+
+PrimeWave Mainnet remains unavailable pending verified network configuration.
