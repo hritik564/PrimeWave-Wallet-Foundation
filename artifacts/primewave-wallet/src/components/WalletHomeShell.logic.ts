@@ -132,6 +132,18 @@ export function safePortfolioDiagnostic(error: unknown): string | null {
     : message;
 }
 
+export function portfolioForSelection(
+  model: PortfolioReadModel | null,
+  selection: Pick<PortfolioReadModel, 'accountId' | 'accountAddress' | 'networkId'>,
+): PortfolioReadModel | null {
+  if (!model || model.accountId !== selection.accountId ||
+      model.networkId !== selection.networkId ||
+      model.accountAddress.toLowerCase() !== selection.accountAddress.toLowerCase()) {
+    return null;
+  }
+  return model;
+}
+
 export function getPortfolioState(
   assetCount: number,
 ): Extract<HomePortfolioState, 'available' | 'empty'> {

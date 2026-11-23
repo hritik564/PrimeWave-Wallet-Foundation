@@ -34,7 +34,6 @@ import {
 import type { EvmNetwork, NetworkRegistry } from '@/src/core/networks';
 import { secureLogger } from '@/src/core/security/logging';
 import {
-  PortfolioReadModelError,
   type PortfolioAssetViewModel,
   type PortfolioReadModel,
   type PortfolioReadModelService,
@@ -76,6 +75,7 @@ import {
   type AssetFilter,
   getHomeBalancePresentation,
   getPortfolioState,
+  portfolioForSelection,
   homeNavigationLabels,
   safePortfolioDiagnostic,
   safePortfolioMessage,
@@ -1181,8 +1181,8 @@ export function WalletHomeShell({
   const [destination, setDestination] = useState<Destination>('home');
   const [accountPanelVisible, setAccountPanelVisible] = useState(false);
   const [networkSelectorVisible, setNetworkSelectorVisible] = useState(false);
-  const [portfolioState, setPortfolioState] = useState<PortfolioState>('loading');
-  const [portfolio, setPortfolio] = useState<PortfolioReadModel | null>(null);
+  const [loadedState, setPortfolioState] = useState<PortfolioState>('loading');
+  const [loadedPortfolio, setPortfolio] = useState<PortfolioReadModel | null>(null);
   const [portfolioError, setPortfolioError] = useState<string | null>(null);
   const [reviewDraft, setReviewDraft] = useState<PublicSendDraft | null>(null);
   const [swapReviewQuote, setSwapReviewQuote] = useState<SwapQuote | null>(null);
@@ -1205,6 +1205,10 @@ export function WalletHomeShell({
     }),
     [account?.accountId, account?.address, network.id],
   );
+
+  // A selection can change during render, before the request effect invalidates old reads.
+  const portfolio = portfolioForSelection(loadedPortfolio, accountQuery);
+  const portfolioState = loadedPortfolio && !portfolio ? 'loading' : loadedState;
 
   const loadPortfolio = useCallback(
     async (isRefresh = false) => {
@@ -1259,7 +1263,7 @@ export function WalletHomeShell({
           });
         }
         setPortfolio(next);
-        setPortfolioState(nextState);
+        setPortfolioState(next.state === 'unavailable' ? 'unavailable' : nextState);
       } catch (error) {
         if (requestId !== portfolioRequestRef.current) {
           if (previewDiagnosticsEnabled) {
@@ -1286,13 +1290,8 @@ export function WalletHomeShell({
           });
         }
         setPortfolioError(message);
-        if (isRefresh && portfolio) {
-          setPortfolioState(getPortfolioState(portfolio.assets.length));
-        } else if (error instanceof PortfolioReadModelError && error.code === 'READ_MODEL_AGGREGATION_FAILED') {
-          setPortfolioState('error');
-        } else {
-          setPortfolioState('unavailable');
-        }
+        setPortfolio(null);
+        setPortfolioState('unavailable');
       } finally {
         if (requestId === portfolioRequestRef.current) {
           if (previewDiagnosticsEnabled) {
