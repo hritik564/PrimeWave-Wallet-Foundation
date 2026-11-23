@@ -24,7 +24,7 @@ export function WalletLogo(props: Props) {
   const size = props.size ?? 32;
   const key = props.networkId !== undefined ? networkArtwork(props.networkId) : tokenArtwork(props.asset);
   const source = key && images[key];
-  return source ? <Image accessible={false} source={source} contentFit="contain" style={{ width: size, height: size }} /> :
+  return source ? <Image accessible={false} source={source} contentFit="contain" style={{ width: size, height: size, borderRadius: size / 2 }} /> :
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center', borderRadius: size / 2, backgroundColor: colors.surface }}>
       <Ionicons name={props.networkId !== undefined ? 'globe-outline' : 'layers-outline'} size={Math.round(size * 0.63)} color={colors.secondaryText} />
     </View>;

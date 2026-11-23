@@ -4,10 +4,13 @@ import {
   createSepoliaNetwork,
   NetworkRegistry,
   NetworkRegistryError,
-  defaultNetworkRegistry,
   supportedNetworks,
 } from '../registry';
 import type { EvmNetwork } from '../types';
+
+const fixtureRegistry = new NetworkRegistry(supportedNetworks.map(network =>
+  network.id === 'ethereum-sepolia' ? createSepoliaNetwork('https://sepolia.fixture.invalid') : network,
+));
 
 const configuredEthereum = supportedNetworks.find(
   (network) => network.id === 'ethereum',
@@ -24,7 +27,7 @@ function expectRegistryError(
 
 test('defines the requested enabled networks and one primary placeholder', () => {
   assert.deepEqual(
-    defaultNetworkRegistry.listNetworks().map((network) => network.id),
+    fixtureRegistry.listNetworks().map((network) => network.id),
     [
       'primewave',
       'ethereum',
@@ -37,7 +40,7 @@ test('defines the requested enabled networks and one primary placeholder', () =>
     ],
   );
   assert.deepEqual(
-    defaultNetworkRegistry.listEnabledNetworks().map((network) => network.id),
+    fixtureRegistry.listEnabledNetworks().map((network) => network.id),
     [
       'primewave',
       'ethereum',
@@ -49,43 +52,43 @@ test('defines the requested enabled networks and one primary placeholder', () =>
       'optimism',
     ],
   );
-  assert.equal(defaultNetworkRegistry.getPrimaryNetwork().id, 'primewave');
-  assert.equal(defaultNetworkRegistry.getPrimaryNetwork().chainId, null);
+  assert.equal(fixtureRegistry.getPrimaryNetwork().id, 'primewave');
+  assert.equal(fixtureRegistry.getPrimaryNetwork().chainId, null);
   assert.equal(
-    defaultNetworkRegistry.getPrimaryNetwork().configurationStatus,
+    fixtureRegistry.getPrimaryNetwork().configurationStatus,
     'placeholder',
   );
-  assert.equal(defaultNetworkRegistry.getActiveNetwork(), null);
+  assert.equal(fixtureRegistry.getActiveNetwork(), null);
 });
 
 test('supports lookup by stable ID and numeric chain ID', () => {
-  assert.equal(defaultNetworkRegistry.getById('base')?.chainId, 8453);
-  assert.equal(defaultNetworkRegistry.getByChainId(42161)?.id, 'arbitrum');
-  assert.equal(defaultNetworkRegistry.getById('ethereum-sepolia')?.chainId, 11155111);
-  assert.equal(defaultNetworkRegistry.getByChainId(11155111)?.id, 'ethereum-sepolia');
-  assert.equal(defaultNetworkRegistry.getByChainId(999999), undefined);
+  assert.equal(fixtureRegistry.getById('base')?.chainId, 8453);
+  assert.equal(fixtureRegistry.getByChainId(42161)?.id, 'arbitrum');
+  assert.equal(fixtureRegistry.getById('ethereum-sepolia')?.chainId, 11155111);
+  assert.equal(fixtureRegistry.getByChainId(11155111)?.id, 'ethereum-sepolia');
+  assert.equal(fixtureRegistry.getByChainId(999999), undefined);
 });
 
 test('requires explicit selection and rejects unconfigured primary activation', () => {
   expectRegistryError(
-    () => defaultNetworkRegistry.selectActiveNetwork('primewave'),
+    () => fixtureRegistry.selectActiveNetwork('primewave'),
     'NETWORK_NOT_CONFIGURED',
   );
-  const selected = defaultNetworkRegistry.selectActiveNetwork('ethereum');
+  const selected = fixtureRegistry.selectActiveNetwork('ethereum');
   assert.equal(selected.id, 'ethereum');
-  assert.equal(defaultNetworkRegistry.getActiveNetwork()?.id, 'ethereum');
+  assert.equal(fixtureRegistry.getActiveNetwork()?.id, 'ethereum');
 
-  defaultNetworkRegistry.clearActiveNetwork();
-  assert.equal(defaultNetworkRegistry.getActiveNetwork(), null);
+  fixtureRegistry.clearActiveNetwork();
+  assert.equal(fixtureRegistry.getActiveNetwork(), null);
 
-  const selectedSepolia = defaultNetworkRegistry.selectActiveNetwork('ethereum-sepolia');
+  const selectedSepolia = fixtureRegistry.selectActiveNetwork('ethereum-sepolia');
   assert.equal(selectedSepolia.displayName, 'Ethereum Sepolia');
   assert.equal(selectedSepolia.environment, 'testnet');
-  defaultNetworkRegistry.clearActiveNetwork();
+  fixtureRegistry.clearActiveNetwork();
 });
 
 test('registers Sepolia with isolated testnet metadata and explorer URLs', () => {
-  const sepolia = defaultNetworkRegistry.getById('ethereum-sepolia') as EvmNetwork;
+  const sepolia = fixtureRegistry.getById('ethereum-sepolia') as EvmNetwork;
   assert.equal(sepolia.chainId, 11155111);
   assert.equal(sepolia.environment, 'testnet');
   assert.equal(sepolia.nativeCurrency.symbol, 'ETH');
@@ -102,7 +105,7 @@ test('registers Sepolia with isolated testnet metadata and explorer URLs', () =>
     'https://sepolia.etherscan.io/tx/{txHash}',
   );
   assert.equal(sepolia.rpc.endpoints.length, 1);
-  assert.equal(defaultNetworkRegistry.getById('ethereum')?.chainId, 1);
+  assert.equal(fixtureRegistry.getById('ethereum')?.chainId, 1);
 });
 
 test('fails closed when Sepolia RPC configuration is missing or invalid', () => {
@@ -111,7 +114,7 @@ test('fails closed when Sepolia RPC configuration is missing or invalid', () => 
   assert.equal(unavailable.configurationStatus, 'unavailable');
   assert.deepEqual(unavailable.rpc.endpoints, []);
   const registry = new NetworkRegistry([
-    defaultNetworkRegistry.getPrimaryNetwork(),
+    fixtureRegistry.getPrimaryNetwork(),
     unavailable,
   ]);
   expectRegistryError(
@@ -121,7 +124,7 @@ test('fails closed when Sepolia RPC configuration is missing or invalid', () => 
 
   expectRegistryError(
     () => new NetworkRegistry([
-      defaultNetworkRegistry.getPrimaryNetwork(),
+      fixtureRegistry.getPrimaryNetwork(),
       createSepoliaNetwork('http://rpc.example.com'),
     ]),
     'INVALID_NETWORK',
@@ -276,7 +279,7 @@ test('allows future custom development networks without enabling automatic switc
     configurationStatus: 'configured',
   };
   const registry = new NetworkRegistry([
-    defaultNetworkRegistry.getPrimaryNetwork(),
+    fixtureRegistry.getPrimaryNetwork(),
     customDevelopmentNetwork,
   ]);
 

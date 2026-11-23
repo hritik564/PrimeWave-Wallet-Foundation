@@ -1,3 +1,4 @@
+import { WalletLogo } from '@/src/design-system/components/WalletLogo';
 import { GlassLayer } from '@/src/design-system/components/GlassLayer';
 import { glassSurface } from '@/src/design-system/tokens/wallet-home';
 import { walletHomeColors as palette } from '@/src/design-system/tokens/wallet-home';
@@ -19,7 +20,6 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { theme } from '@/src/theme';
 import {
   WaveXAssetRow,
-  WaveXAssetIcon,
   WaveXButton,
   WaveXBottomNavigation,
   WaveXBottomSheet,
@@ -357,11 +357,7 @@ function NetworkSelector({
                 pressed && styles.pressed,
               ]}
             >
-              <View style={[styles.networkOptionIcon, selected && available && styles.networkOptionIconSelected]}>
-                <Text style={styles.networkOptionInitial}>
-                  {candidate.displayName.slice(0, 1).toUpperCase()}
-                </Text>
-              </View>
+              <WalletLogo networkId={candidate.id} />
               <View style={styles.networkOptionCopy}>
                 <View style={styles.networkOptionTitleRow}>
                   <Text numberOfLines={1} style={styles.networkOptionName}>
@@ -371,7 +367,7 @@ function NetworkSelector({
                     <Ionicons name="checkmark-circle" size={16} color={palette.cyan} />
                   ) : null}
                 </View>
-                <Text style={styles.networkOptionMeta}>{status}</Text>
+                <Text style={styles.networkOptionMeta}>{candidate.environment === 'testnet' ? `Testnet · ${status}` : status}</Text>
               </View>
               {!available ? (
                 <Ionicons name="lock-closed-outline" size={16} color={theme.states.warning} />
@@ -416,7 +412,7 @@ function NetworkCard({
       style={({ pressed }) => [styles.networkCard, pressed && styles.pressed]}
     >
       <View style={styles.networkIcon}>
-        <Ionicons name="globe-outline" size={20} color={configured ? palette.cyan : theme.states.warning} />
+        <WalletLogo networkId={network.id} size={24} />
       </View>
       <View style={styles.networkCopy}>
         <Text style={styles.networkName}>{network.displayName}</Text>
@@ -619,16 +615,11 @@ function AssetRow({
   ]
     .filter(Boolean)
     .join(' • ');
-  const imageUri =
-    asset.icon.status === 'available' && typeof asset.icon.reference === 'string'
-      ? asset.icon.reference
-      : null;
 
   return (
     <WaveXAssetRow
       amount={amount}
-      imageUri={imageUri}
-      initials={asset.icon.fallback.initials}
+      logo={<WalletLogo asset={asset.identity} size={36} />}
       onPress={onPress}
       status={asset.balanceState === 'positive' && asset.availabilityState === 'available' ? undefined : assetStateLabel(asset)}
       subtitle={subtitle}
@@ -722,10 +713,6 @@ function AssetDetailsScreen({
     network.explorer.addressUrlTemplate
       ? network.explorer.addressUrlTemplate.replace('{address}', asset.contractAddress)
       : null;
-  const imageUri =
-    asset.icon.status === 'available' && typeof asset.icon.reference === 'string'
-      ? asset.icon.reference
-      : null;
   const amount = asset.formattedBalance ?? 'Unavailable';
   const statusTone =
     asset.availabilityState === 'available'
@@ -758,12 +745,9 @@ function AssetDetailsScreen({
         <WaveXNetworkBadge name={network.displayName} symbol={network.nativeCurrency.symbol} />
       </View>
 
-      <View style={styles.assetDetailsHero}>
-        <WaveXAssetIcon
-          imageUri={imageUri}
-          initials={asset.icon.fallback.initials}
-          label={`${assetDisplayName(asset)} icon`}
-        />
+      <View style={[styles.assetDetailsHero, glassSurface]}>
+          <GlassLayer />
+        <WalletLogo asset={asset.identity} size={52} />
         <Text style={styles.assetDetailsName}>{assetDisplayName(asset)}</Text>
         <Text style={styles.assetDetailsSymbol}>{assetDisplaySubtitle(asset)}</Text>
         <WaveXStatusIndicator
@@ -883,7 +867,8 @@ function AssetsBalanceSummary({
 }) {
   const balance = getHomeBalancePresentation(state, model);
   return (
-    <View style={styles.assetsBalanceCard}>
+    <View style={[styles.assetsBalanceCard, glassSurface]}>
+          <GlassLayer />
       <Text style={styles.cardEyebrow}>NATIVE BALANCE</Text>
       <Text accessibilityLabel={`Portfolio value ${balance.value}`} style={styles.assetsBalanceValue}>
         {balance.value}

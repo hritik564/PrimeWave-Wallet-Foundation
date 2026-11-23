@@ -1,5 +1,7 @@
+import { GlassLayer } from '@/src/design-system/components/GlassLayer';
+import { glassSurface } from '@/src/design-system/tokens/wallet-home';
+import { WalletLogo } from '@/src/design-system/components/WalletLogo';
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -93,36 +95,10 @@ function ActivityAssetVisual({
   readonly network: ActivityReadModelItem['presentation']['network'];
   readonly action: ActivityReadModelItem['presentation']['action'];
 }) {
-  const hasRemoteReference =
-    asset?.icon.status === 'available' && asset.icon.reference !== null;
-  const networkAsset = asset?.icon.fallback.initials ?? '––';
   return (
     <View style={styles.assetVisual}>
-      <View style={styles.assetCircle}>
-        {hasRemoteReference ? (
-          <Image
-            accessibilityLabel={`${assetLabel(asset)} icon`}
-            contentFit="contain"
-            source={{ uri: asset.icon.reference as string }}
-            style={styles.assetImage}
-          />
-        ) : (
-          <Text style={styles.assetInitials}>
-            {asset ? networkAsset : action === 'swapped' ? '↔' : '··'}
-          </Text>
-        )}
-      </View>
-      <View
-        accessibilityLabel={`${network.name} network badge`}
-        style={[
-          styles.networkBadge,
-          !network.available && styles.networkBadgeUnavailable,
-        ]}
-      >
-        <Text style={styles.networkBadgeText}>
-          {network.badgeFallbackInitials || '??'}
-        </Text>
-      </View>
+      <WalletLogo asset={asset?.identity ?? null} size={40} />
+      <View style={styles.networkBadge}><WalletLogo networkId={network.networkId} size={18} /></View>
     </View>
   );
 }
@@ -443,7 +419,8 @@ function ActivityStateCard({
   readonly onAction?: () => void;
 }) {
   return (
-    <View style={styles.stateCard}>
+    <View style={[styles.stateCard, glassSurface]}>
+          <GlassLayer />
       <View style={styles.stateIcon}>
         <Ionicons name={icon} size={23} color={theme.colors.accent} />
       </View>
@@ -572,7 +549,7 @@ export function WalletActivityScreen({
         <Text style={styles.cardEyebrow}>WALLET HISTORY</Text>
         <Text style={styles.screenTitle}>Activity</Text>
         <Text style={styles.screenIntro}>
-          Asset-first activity for the active public account.
+          Transactions for this account.
         </Text>
       </View>
       <Pressable
@@ -604,7 +581,7 @@ export function WalletActivityScreen({
   } else if (activityState === 'unavailable') {
     content = (
       <ActivityStateCard
-        body="Activity is not available in this preview context. No fake transactions are shown."
+        body="Activity could not be loaded for this account."
         icon="cloud-offline-outline"
         title="Activity data unavailable"
       />
@@ -629,7 +606,7 @@ export function WalletActivityScreen({
       <ActivityStateCard
         body={
           items.length === 0
-            ? 'Completed and in-progress activity will appear here when the existing activity architecture has records for this account.'
+            ? 'Transactions for this account will appear here.'
             : 'Try another activity type or network filter.'
         }
         icon="time-outline"

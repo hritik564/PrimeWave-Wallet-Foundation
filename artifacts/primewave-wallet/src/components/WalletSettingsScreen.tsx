@@ -1,3 +1,5 @@
+import { GlassLayer } from '@/src/design-system/components/GlassLayer';
+import { glassSurface } from '@/src/design-system/tokens/wallet-home';
 import * as Application from 'expo-application';
 import { Ionicons } from '@expo/vector-icons';
 import {
@@ -93,15 +95,11 @@ export function WalletSettingsScreen({
       showsVerticalScrollIndicator={false}
     >
       <View style={styles.intro}>
-        <Text style={styles.eyebrow}>SETTINGS</Text>
-        <Text style={styles.title}>Control your wallet.</Text>
-        <Text style={styles.body}>
-          Review public account details, network context, security status, and
-          available preferences.
-        </Text>
+        <Text accessibilityRole="header" style={styles.title}>Settings</Text>
       </View>
 
-      <View accessibilityRole="summary" style={styles.identityCard}>
+      <View accessibilityRole="summary" style={[styles.identityCard, glassSurface]}>
+          <GlassLayer />
         <View style={styles.identityIcon}>
           <Ionicons name="settings-outline" size={22} color={theme.colors.accent} />
         </View>
@@ -122,7 +120,8 @@ export function WalletSettingsScreen({
       {sections.map((section) => (
         <View key={section.id} style={styles.section}>
           <Text style={styles.sectionLabel}>{section.title}</Text>
-          <View style={styles.sectionCard}>
+          <View style={[styles.sectionCard, glassSurface]}>
+          <GlassLayer />
             {section.rows.map((row, index) => {
               const actionable =
                 row.action === 'account' ||

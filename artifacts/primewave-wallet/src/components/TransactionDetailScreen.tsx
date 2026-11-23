@@ -1,5 +1,5 @@
+import { WalletLogo } from '@/src/design-system/components/WalletLogo';
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -85,35 +85,10 @@ function dateParts(item: ActivityReadModelItem): {
 
 function AssetVisual({ item }: { readonly item: ActivityReadModelItem }) {
   const asset = item.presentation.primaryAsset;
-  const hasRemoteReference =
-    asset?.icon.status === 'available' && asset.icon.reference !== null;
   return (
     <View style={styles.assetVisual}>
-      <View style={styles.assetCircle}>
-        {hasRemoteReference ? (
-          <Image
-            accessibilityLabel={`${assetLabel(item)} icon`}
-            contentFit="contain"
-            source={{ uri: asset.icon.reference as string }}
-            style={styles.assetImage}
-          />
-        ) : (
-          <Text style={styles.assetInitials}>
-            {asset?.icon.fallback.initials ?? '··'}
-          </Text>
-        )}
-      </View>
-      <View
-        accessibilityLabel={`${item.presentation.network.name} network badge`}
-        style={[
-          styles.networkBadge,
-          !item.presentation.network.available && styles.networkBadgeUnavailable,
-        ]}
-      >
-        <Text style={styles.networkBadgeText}>
-          {item.presentation.network.badgeFallbackInitials || '??'}
-        </Text>
-      </View>
+      <WalletLogo asset={asset?.identity ?? null} size={40} />
+      <View style={styles.networkBadge}><WalletLogo networkId={item.networkId} size={18} /></View>
     </View>
   );
 }

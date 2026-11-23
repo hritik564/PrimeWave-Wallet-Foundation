@@ -2,7 +2,6 @@ import { GlassLayer } from './GlassLayer';
 import { glassSurface } from '../tokens/wallet-home';
 import { walletHomeColors as palette } from '../tokens/wallet-home';
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import {
   ActivityIndicator,
   Modal,
@@ -297,33 +296,14 @@ export function WaveXAccountBadge({
   );
 }
 
-export function WaveXAssetIcon({
-  initials,
-  imageUri,
-  label,
-}: {
-  readonly initials: string;
-  readonly imageUri?: string | null;
-  readonly label?: string;
-}) {
-  return (
-    <View accessibilityLabel={label} style={styles.assetIcon}>
-      {imageUri ? (
-        <Image accessibilityLabel={label} contentFit="contain" source={{ uri: imageUri }} style={styles.assetImage} />
-      ) : (
-        <Text style={styles.assetInitials}>{initials}</Text>
-      )}
-    </View>
-  );
-}
+export { WalletLogo as WaveXAssetIcon } from './WalletLogo';
 
 export function WaveXAssetRow({
   title,
   subtitle,
   amount,
   status,
-  imageUri,
-  initials,
+  logo,
   onPress,
   trailing,
 }: {
@@ -331,14 +311,13 @@ export function WaveXAssetRow({
   readonly subtitle: string;
   readonly amount: string;
   readonly status?: string;
-  readonly imageUri?: string | null;
-  readonly initials: string;
+  readonly logo: React.ReactNode;
   readonly onPress?: () => void;
   readonly trailing?: React.ReactNode;
 }) {
   const content = (
     <>
-      <WaveXAssetIcon initials={initials} imageUri={imageUri} label={`${title} icon`} />
+      {logo}
       <View style={styles.rowCopy}>
         <Text numberOfLines={1} style={styles.rowTitle}>{title}</Text>
         <Text numberOfLines={1} style={styles.rowSubtitle}>{subtitle}</Text>

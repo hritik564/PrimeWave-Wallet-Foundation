@@ -1,3 +1,4 @@
+import { WalletLogo } from '@/src/design-system/components/WalletLogo';
 import { GlassLayer } from '@/src/design-system/components/GlassLayer';
 import { glassSurface } from '@/src/design-system/tokens/wallet-home';
 import { walletHomeColors as palette } from '@/src/design-system/tokens/wallet-home';
@@ -15,7 +16,6 @@ import {
 } from 'react-native';
 import { theme } from '@/src/theme';
 import {
-  WaveXAssetIcon,
   WaveXAssetRow,
   WaveXBottomSheet,
   WaveXButton,
@@ -46,20 +46,6 @@ import {
 
 type PortfolioState = 'loading' | 'available' | 'empty' | 'unavailable' | 'error';
 
-function AssetIcon({ asset }: { asset: PortfolioAssetViewModel }) {
-  const imageUri =
-    asset.icon.status === 'available' && typeof asset.icon.reference === 'string'
-      ? asset.icon.reference
-      : null;
-  return (
-    <WaveXAssetIcon
-      imageUri={imageUri}
-      initials={asset.icon.fallback.initials}
-      label={`${assetDisplayName(asset)} icon`}
-    />
-  );
-}
-
 function AssetPicker({
   asset,
   assets,
@@ -84,7 +70,7 @@ function AssetPicker({
         style={({ pressed }) => [styles.assetSelector, pressed && styles.pressed]}
       >
       <GlassLayer />
-        {asset ? <AssetIcon asset={asset} /> : <View style={styles.assetIcon}><Ionicons name="layers-outline" size={20} color={palette.secondaryText} /></View>}
+        {asset ? <WalletLogo asset={asset.identity} /> : <View style={styles.assetIcon}><Ionicons name="layers-outline" size={20} color={palette.secondaryText} /></View>}
         <View style={styles.assetSelectorCopy}>
           <Text style={styles.cardEyebrow}>SENDING ASSET</Text>
           <Text style={styles.assetSelectorTitle}>{asset?.symbol ?? 'Select asset'}</Text>
@@ -112,12 +98,7 @@ function AssetPicker({
             return (
               <WaveXAssetRow
                 amount={item.formattedBalance ?? 'Unavailable'}
-                initials={item.icon.fallback.initials}
-                imageUri={
-                  item.icon.status === 'available' && typeof item.icon.reference === 'string'
-                    ? item.icon.reference
-                    : null
-                }
+                logo={<WalletLogo asset={item.identity} />}
                 key={assetIdentityKey(item.identity)}
                 onPress={() => {
                   onSelect(item);

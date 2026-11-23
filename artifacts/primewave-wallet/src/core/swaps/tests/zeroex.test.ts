@@ -4,7 +4,7 @@ import {
   createAssetIdentity,
   createTokenAssetIdentity,
 } from '@/src/core/assets';
-import { defaultNetworkRegistry } from '@/src/core/networks';
+import { createSepoliaNetwork, defaultNetworkRegistry, NetworkRegistry } from '@/src/core/networks';
 import {
   createZeroExSwapQuoteProvider,
   DEFAULT_ZEROEX_TIMEOUT_MS,
@@ -168,7 +168,7 @@ test('rejects Sepolia before making any 0x request', async () => {
     },
   });
   const service = new SwapQuoteService(
-    defaultNetworkRegistry,
+    new NetworkRegistry([defaultNetworkRegistry.getPrimaryNetwork(), createSepoliaNetwork('https://sepolia.fixture.invalid')]),
     provider,
     { now: () => NOW },
   );

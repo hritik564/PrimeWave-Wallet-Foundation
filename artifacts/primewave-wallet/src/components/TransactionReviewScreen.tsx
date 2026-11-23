@@ -1,3 +1,4 @@
+import { WalletLogo } from '@/src/design-system/components/WalletLogo';
 import { GlassLayer } from '@/src/design-system/components/GlassLayer';
 import { glassSurface } from '@/src/design-system/tokens/wallet-home';
 import { walletHomeColors as palette } from '@/src/design-system/tokens/wallet-home';
@@ -863,7 +864,7 @@ export function TransactionReviewScreen({
       ) : review ? (
         <>
           <SectionCard eyebrow="ASSET / AMOUNT">
-            <Text style={styles.title}>{draft.amount} {review.asset.symbol ?? review.asset.name}</Text>
+            <View style={styles.recipientRow}><WalletLogo asset={review.asset.identity} /><Text style={styles.title}>{draft.amount} {review.asset.symbol ?? review.asset.name}</Text></View>
             <DetailRow label="Network" value={network.displayName} />
             <DetailRow label="Estimated network fee" value={`${review.preview.estimatedNetworkFeeDisplay} ${review.preview.symbol}`} />
             {review.asset.assetType === 'fungible_token' && review.asset.contractAddress ? (

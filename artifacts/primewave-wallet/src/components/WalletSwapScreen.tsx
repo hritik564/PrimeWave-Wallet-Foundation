@@ -1,5 +1,7 @@
+import { GlassLayer } from '@/src/design-system/components/GlassLayer';
+import { glassSurface } from '@/src/design-system/tokens/wallet-home';
+import { WalletLogo } from '@/src/design-system/components/WalletLogo';
 import { Ionicons } from '@expo/vector-icons';
-import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -46,23 +48,8 @@ export function assetName(asset: PortfolioAssetViewModel | null): string {
   return asset?.name ?? asset?.symbol ?? (asset?.assetType === 'native' ? 'Native asset' : 'Token asset');
 }
 
-function assetIconLabel(asset: PortfolioAssetViewModel): string {
-  return (asset.symbol ?? asset.name ?? (asset.assetType === 'native' ? 'N' : 'T'))
-    .slice(0, 3)
-    .toUpperCase();
-}
-
 export function AssetIcon({ asset, size = 'regular' }: { asset: PortfolioAssetViewModel; size?: 'regular' | 'large' }) {
-  const remoteIcon = asset.icon.status === 'available' && asset.icon.reference !== null;
-  return (
-    <View style={[styles.assetIcon, size === 'large' && styles.assetIconLarge]}>
-      {remoteIcon ? (
-        <Image contentFit="contain" source={{ uri: asset.icon.reference as string }} style={styles.assetIconImage} />
-      ) : (
-        <Text style={styles.assetInitials}>{assetIconLabel(asset)}</Text>
-      )}
-    </View>
-  );
+  return <WalletLogo asset={asset.identity} size={size === 'large' ? 48 : 36} />;
 }
 
 function NetworkContext({ network, onPress }: { network: EvmNetwork; onPress: () => void }) {
@@ -75,7 +62,7 @@ function NetworkContext({ network, onPress }: { network: EvmNetwork; onPress: ()
       style={({ pressed }) => [styles.networkContext, pressed && styles.pressed]}
     >
       <View style={styles.networkIcon}>
-        <Ionicons name="globe-outline" size={20} color={configured ? theme.colors.accent : theme.states.warning} />
+        <WalletLogo networkId={network.id} />
       </View>
       <View style={styles.networkCopy}>
         <Text style={styles.cardEyebrow}>SELECTED NETWORK</Text>
@@ -235,7 +222,8 @@ function QuoteCard({
     : 'Route details unavailable';
 
   return (
-    <View style={styles.quoteCard}>
+    <View style={[styles.quoteCard, glassSurface]}>
+          <GlassLayer />
       <View style={styles.quoteHeader}>
         <View>
           <Text style={styles.cardEyebrow}>LIVE QUOTE</Text>
@@ -412,12 +400,12 @@ export function WalletSwapScreen({
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.heading}>
-          <Text style={styles.eyebrow}>SWAP</Text>
-          <Text style={styles.title}>Exchange assets</Text>
-          <Text style={styles.body}>Get a live exact-input quote for the selected network. Nothing is signed or broadcast from this screen.</Text>
+          <Text style={styles.title}>Swap</Text>
+          <Text style={styles.body}>Select a pair to request a quote.</Text>
         </View>
         <NetworkContext network={network} onPress={onNetworkPress} />
-        <View style={styles.tradeCard}>
+        <View style={[styles.tradeCard, glassSurface]}>
+          <GlassLayer />
           <View style={styles.tradeLabelRow}>
             <Text style={styles.cardEyebrow}>YOU SELL</Text>
             <Text style={styles.balanceLabel}>{sellAsset?.formattedBalance ? `Balance ${sellAsset.formattedBalance}` : 'Balance unavailable'}</Text>
@@ -448,7 +436,8 @@ export function WalletSwapScreen({
         <Pressable accessibilityLabel="Reverse swap pair" accessibilityRole="button" disabled={!sellAsset || !buyAsset} onPress={swapPair} style={({ pressed }) => [styles.reverseButton, pressed && styles.pressed]}>
           <Ionicons name="swap-vertical-outline" size={20} color={theme.colors.accent} />
         </Pressable>
-        <View style={styles.tradeCard}>
+        <View style={[styles.tradeCard, glassSurface]}>
+          <GlassLayer />
           <View style={styles.tradeLabelRow}>
             <Text style={styles.cardEyebrow}>YOU RECEIVE</Text>
             <Text style={styles.balanceLabel}>{quote && !expired ? 'Estimated output' : 'Output after quote'}</Text>
@@ -518,8 +507,8 @@ export function WalletSwapScreen({
 
 const styles = StyleSheet.create({
   keyboardContainer: { flex: 1 },
-  content: { paddingHorizontal: theme.spacing.lg, paddingBottom: 132, gap: theme.spacing.md },
-  heading: { marginTop: theme.spacing.lg, gap: theme.spacing.sm },
+  content: { paddingHorizontal: theme.spacing.lg, paddingBottom: 24, gap: theme.spacing.md },
+  heading: { marginTop: 8, gap: 4 },
   eyebrow: { color: theme.colors.accent, fontFamily: theme.typography.eyebrow.fontFamily, fontSize: theme.typography.eyebrow.fontSize, letterSpacing: theme.typography.eyebrow.letterSpacing },
   title: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 32, lineHeight: 39 },
   body: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 14, lineHeight: 21 },

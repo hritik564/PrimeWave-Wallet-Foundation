@@ -1,3 +1,4 @@
+import { WalletLogo } from '@/src/design-system/components/WalletLogo';
 import { Ionicons } from '@expo/vector-icons';
 import { useState } from 'react';
 import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -57,7 +58,7 @@ function AddressList({ accountName, address, registry }: { accountName: string; 
         const value = receivingAddress(item, address);
         const planned = item.id === 'primewave' && !receiveNetworkStatus(item).configured;
         return <View key={item.id} style={styles.row}>
-          <View style={styles.badge}><Ionicons name={planned ? 'time-outline' : 'globe-outline'} size={18} color={colors.secondaryText} /></View>
+          <WalletLogo networkId={item.id} />
           <View style={styles.identity}><Text style={styles.name}>{item.displayName}</Text>
             <Text style={styles.note}>{planned ? 'Planned · Unavailable' : value ? shortPublicAddress(value) : 'Address unavailable'}</Text>
           </View>
@@ -74,7 +75,7 @@ function AddressList({ accountName, address, registry }: { accountName: string; 
           {qrFailed ? <Text>QR unavailable</Text> : <QRCode value={payload} size={RECEIVE_QR_SIZE} quietZone={RECEIVE_QR_QUIET_ZONE}
             ecl={RECEIVE_QR_ERROR_CORRECTION} color="#090B0E" backgroundColor="#ffffff" onError={() => setQrFailed(true)} />}
         </View>
-        <Text accessibilityRole="header" style={styles.name}>{network.displayName} receiving address</Text>
+        <View style={styles.actions}><WalletLogo networkId={network.id} size={24} /><Text accessibilityRole="header" style={styles.name}>{network.displayName} receiving address</Text></View>
         <Text style={styles.note}>Ask the sender to use {network.displayName}. Sending on a different network may result in lost funds.</Text>
         <Text selectable accessibilityLabel="Full public address" style={styles.address}>{payload}</Text>
         <View style={styles.actions}>
