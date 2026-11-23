@@ -1,8 +1,10 @@
+import { NetworkRegistry, supportedNetworks } from "@/src/core/networks";
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { EvmNetwork } from '@/src/core/networks';
 import {
   createReceiveQrPayload,
+  receivingNetworks, receivingAddress, receivingExplorer,
   receiveNetworkStatus,
 } from '../receive.logic';
 
@@ -46,4 +48,22 @@ test('Receive network status keeps configured, unconfigured, and disabled states
     label: 'Disabled',
     configured: false,
   });
+});
+test('Receive uses the same exact public address independently of the active network', () => {
+  const registry = new NetworkRegistry(supportedNetworks);
+  registry.selectActiveNetwork('ethereum');
+  const list = receivingNetworks(registry.listNetworks());
+  const first = '0x0000000000000000000000000000000000000001';
+  const second = '0x0000000000000000000000000000000000000002';
+  for (const id of ['ethereum', 'bnb-smart-chain']) {
+    const entry = list.find(item => item.id === id)!;
+    assert.equal(receivingAddress(entry, first), first);
+    assert.equal(createReceiveQrPayload(receivingAddress(entry, second)!), second);
+    assert.equal(receivingExplorer(entry, second), entry.explorer.addressUrlTemplate?.replace('{address}', second));
+    assert.equal(receivingExplorer(entry, 'invalid/path'), null);
+  }
+  const planned = list.find(item => item.id === 'primewave')!;
+  assert.equal(receivingAddress(planned, first), null);
+  assert.equal(receivingExplorer(planned, first), null);
+  assert.equal(registry.getActiveNetwork()?.id, 'ethereum');
 });

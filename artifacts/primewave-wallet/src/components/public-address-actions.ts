@@ -8,7 +8,7 @@ export type ShareResult = 'shared' | 'cancelled' | 'unavailable';
 export async function copyPublicText(value: string): Promise<void> {
   const normalized = value.trim();
   if (normalized.length === 0) throw new Error('PUBLIC_ADDRESS_UNAVAILABLE');
-  await Clipboard.setStringAsync(normalized);
+  if (!await Clipboard.setStringAsync(normalized)) throw new Error('CLIPBOARD_WRITE_FAILED');
 }
 
 export async function copyPublicAddress(address: string): Promise<void> {

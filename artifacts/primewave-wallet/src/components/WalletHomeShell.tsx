@@ -6,6 +6,7 @@ import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  BackHandler,
   Linking,
   Pressable,
   RefreshControl,
@@ -1369,10 +1370,21 @@ function AccountHome({
     setSwapApproval(null);
   }, [network.id]);
 
+  const focused = destination === 'send' || destination === 'receive';
+  useEffect(() => {
+    if (!focused) return;
+    const subscription = BackHandler.addEventListener('hardwareBackPress', () => {
+      if (reviewDraft) setReviewDraft(null);
+      else setDestination('home');
+      return true;
+    });
+    return () => subscription.remove();
+  }, [focused, reviewDraft]);
+
   return (
     <View style={styles.shell}>
-      <View style={[styles.shellContent, { paddingTop: insets.top + 8 }]}>
-        <Header
+      <View style={[styles.shellContent, { paddingTop: insets.top + 8, paddingBottom: focused ? insets.bottom : 0 }]}>
+        {!(destination === 'send' && reviewDraft) && <Header
           onBack={() => setDestination('home')}
           wallet={wallet}
           detailMode={
@@ -1392,7 +1404,7 @@ function AccountHome({
           }
           onAccountPress={() => setAccountPanelVisible(true)}
           onSettingsPress={() => setDestination('settings')}
-        />
+        />}
         <PreviewBanner previewMode={previewMode} />
         {destination === 'home' ? (
           <ScrollView
@@ -1479,12 +1491,7 @@ function AccountHome({
             onSwap={() => setDestination('swap')}
           />
         ) : destination === 'receive' ? (
-          <ReceiveScreen
-            network={network}
-            onBack={() => setDestination('home')}
-            onNetworkPress={() => setNetworkSelectorVisible(true)}
-            wallet={wallet}
-          />
+          <ReceiveScreen registry={networkRegistry} wallet={wallet} />
         ) : destination === 'send' ? (
           reviewDraft ? (
             <TransactionReviewScreen
@@ -1508,7 +1515,6 @@ function AccountHome({
                 ) ?? null
               }
               network={network}
-              onBack={() => setDestination('home')}
               onComingSoon={onComingSoon}
               onNetworkPress={() => setNetworkSelectorVisible(true)}
               onReviewDraft={(draft) => {
@@ -1622,7 +1628,7 @@ function AccountHome({
           <PlaceholderDestination destination={destination} onBack={() => setDestination('home')} />
         )}
       </View>
-      <View style={{ paddingBottom: insets.bottom }}>
+      {!focused && <View style={{ paddingBottom: insets.bottom }}>
       <WaveXBottomNavigation
         items={navigationItems}
         selectedKey={destination === 'asset-details' ? assetDetailsOrigin : ['receive', 'send'].includes(destination) ? 'home' : destination === 'dapps' ? 'settings' : destination}
@@ -1632,7 +1638,7 @@ function AccountHome({
           setDestination(key as Destination);
         }}
       />
-      </View>
+      </View>}
       <AccountPanel
         onClose={() => setAccountPanelVisible(false)}
         onLock={onLock}

@@ -152,7 +152,6 @@ export function WalletSendScreen({
   portfolio,
   portfolioState,
   initialAsset,
-  onBack,
   onNetworkPress,
   onComingSoon,
   onReviewDraft,
@@ -162,7 +161,6 @@ export function WalletSendScreen({
   readonly portfolio: PortfolioReadModel | null;
   readonly portfolioState: PortfolioState;
   readonly initialAsset?: PortfolioAssetViewModel | null;
-  readonly onBack: () => void;
   readonly onNetworkPress: () => void;
   readonly onComingSoon: (message: string) => void;
   readonly onReviewDraft: (draft: PublicSendDraft) => void;
@@ -263,6 +261,7 @@ export function WalletSendScreen({
           </View>
           <View style={[styles.inputShell, recipientState.state === 'invalid' && styles.inputError, recipientState.state === 'valid' || recipientState.state === 'normalized' ? styles.inputValid : null]}>
             <TextInput
+              multiline
               accessibilityLabel="Recipient Address"
               autoCapitalize="none"
               autoCorrect={false}
@@ -278,7 +277,7 @@ export function WalletSendScreen({
             </View>
           </View>
           {recipientState.state === 'invalid' ? <Text accessibilityRole="alert" style={styles.errorText}>{recipientState.message}</Text> : null}
-          {recipientState.state === 'normalized' ? <Text style={styles.successText}>Address checksum normalized. Verify the destination.</Text> : null}
+          {recipientState.state === 'normalized' || recipientState.state === 'valid' ? <Text style={styles.successText}>Valid address format. Verify the recipient before sending.</Text> : null}
           {pasteState === 'pasted' ? <Text style={styles.successText}>Address pasted from clipboard.</Text> : null}
           {pasteState === 'error' ? <Text style={styles.errorText}>Could not read the clipboard.</Text> : null}
           {recipientState.state === 'empty' ? <Text style={styles.helperText}>Enter or paste a public EVM address.</Text> : null}
@@ -310,10 +309,7 @@ export function WalletSendScreen({
           label="Review Transaction"
           onPress={handleReview}
         />
-        <Pressable accessibilityLabel="Back to Home" accessibilityRole="button" onPress={onBack} style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}>
-          <Ionicons name="arrow-back-outline" size={18} color={palette.cyan} />
-          <Text style={styles.secondaryButtonText}>Back to Home</Text>
-        </Pressable>
+
       </ScrollView>
     </KeyboardAvoidingView>
   );

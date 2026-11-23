@@ -1,270 +1,108 @@
-import { GlassLayer } from '@/src/design-system/components/GlassLayer';
-import { glassSurface } from '@/src/design-system/tokens/wallet-home';
-import { walletHomeColors as palette } from '@/src/design-system/tokens/wallet-home';
 import { Ionicons } from '@expo/vector-icons';
+import { useState } from 'react';
+import { Linking, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import QRCode from 'react-native-qrcode-svg';
-import { useEffect, useMemo, useState } from 'react';
-import {
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { theme } from '@/src/theme';
-import type { EvmNetwork } from '@/src/core/networks';
+import { WaveXBottomSheet } from '@/src/design-system';
+import { walletHomeColors as colors } from '@/src/design-system/tokens/wallet-home';
+import type { EvmNetwork, NetworkRegistry } from '@/src/core/networks';
 import type { Wallet } from '@/src/core/wallet/models';
+import { copyPublicAddress, createPublicAddressShareMessage, sharePublicAddress } from './public-address-actions';
+import { createReceiveQrPayload, receivingAddress, receivingExplorer, receivingNetworks, receiveNetworkStatus,
+  RECEIVE_QR_ERROR_CORRECTION, RECEIVE_QR_QUIET_ZONE, RECEIVE_QR_SIZE } from './receive.logic';
 import { shortPublicAddress } from './WalletHomeShell.logic';
-import {
-  createReceiveQrPayload,
-  RECEIVE_QR_ERROR_CORRECTION,
-  RECEIVE_QR_QUIET_ZONE,
-  RECEIVE_QR_SIZE,
-  receiveNetworkStatus,
-} from './receive.logic';
-import {
-  copyPublicAddress,
-  createPublicAddressShareMessage,
-  sharePublicAddress,
-  type ShareResult,
-} from './public-address-actions';
 
-type ActionState = 'idle' | 'copied' | 'shared' | 'cancelled' | 'unavailable';
-
-export function ReceiveScreen({
-  wallet,
-  network,
-  onBack,
-  onNetworkPress,
-}: {
-  wallet: Wallet;
-  network: EvmNetwork;
-  onBack: () => void;
-  onNetworkPress: () => void;
+function Action({ label, icon, onPress, disabled = false, caption }: {
+  label: string; icon: keyof typeof Ionicons.glyphMap; onPress: () => void; disabled?: boolean; caption?: string;
 }) {
+  return <Pressable accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled }}
+    disabled={disabled} onPress={onPress} style={({ pressed }) => [styles.action, { opacity: disabled ? 0.35 : pressed ? 0.7 : 1 }]}>
+    <Ionicons name={icon} size={20} color={colors.cyan} />
+    {caption && <Text style={styles.link}>{caption}</Text>}
+  </Pressable>;
+}
+
+export function ReceiveScreen({ wallet, registry }: { wallet: Wallet; registry: NetworkRegistry }) {
   const account = wallet.accounts[0];
-  const address = account?.address.trim() ?? '';
-  const qrPayload = createReceiveQrPayload(address);
-  const shortAddress = shortPublicAddress(address);
-  const [copyState, setCopyState] = useState<ActionState>('idle');
-  const [shareState, setShareState] = useState<ActionState>('idle');
+  return <AddressList key={JSON.stringify([wallet.walletId, account?.accountId, account?.address])}
+    accountName={account ? `Account ${account.index + 1}` : 'Account unavailable'}
+    address={account?.address ?? ''} registry={registry} />;
+}
+
+function AddressList({ accountName, address, registry }: { accountName: string; address: string; registry: NetworkRegistry }) {
+  const [sheetId, setSheetId] = useState<string | null>(null);
+  const [notice, setNotice] = useState('');
   const [qrFailed, setQrFailed] = useState(false);
+  const networks = receivingNetworks(registry.listNetworks());
+  const network = networks.find(item => item.id === sheetId);
+  const payload = network && createReceiveQrPayload(receivingAddress(network, address) ?? '');
+  const explorer = network && receivingExplorer(network, address);
 
-  useEffect(() => {
-    setCopyState('idle');
-    setShareState('idle');
-    setQrFailed(false);
-  }, [address, network.id]);
-
-  const { configured, label: networkStatus } = receiveNetworkStatus(network);
-  const shareMessage = useMemo(
-    () => createPublicAddressShareMessage(network, address),
-    [address, network],
-  );
-
-  const handleCopy = async () => {
-    if (!address) {
-      setCopyState('unavailable');
-      return;
-    }
+  async function copy(item: EvmNetwork) {
+    const value = receivingAddress(item, address);
+    if (!value) return;
     try {
-      await copyPublicAddress(address);
-      setCopyState('copied');
+      await copyPublicAddress(value);
+      setNotice(`${item.displayName} address copied`);
     } catch {
-      setCopyState('unavailable');
+      setNotice('Could not copy the address. Try again.');
     }
-  };
+  }
 
-  const handleShare = async () => {
-    if (!address) {
-      setShareState('unavailable');
-      return;
-    }
-    const result: ShareResult = await sharePublicAddress(shareMessage);
-    setShareState(result);
-  };
-
-  return (
-    <ScrollView
-      accessibilityLabel="Receive screen"
-      contentContainerStyle={styles.content}
-      showsVerticalScrollIndicator={false}
-    >
-      <View style={styles.heading}>
-        <Text accessibilityRole="header" style={styles.title}>Receive</Text>
-      </View>
-
-      <Pressable
-        accessibilityLabel={`Network ${network.displayName}, ${networkStatus}`}
-        accessibilityRole="button"
-        onPress={onNetworkPress}
-        style={({ pressed }) => [styles.networkContext, pressed && styles.pressed]}
-      >
-        <View style={styles.networkIcon}>
-          <Ionicons
-            name="globe-outline"
-            size={20}
-            color={configured ? palette.cyan : theme.states.warning}
-          />
-        </View>
-        <View style={styles.networkCopy}>
-          <Text style={styles.cardEyebrow}>SELECTED NETWORK</Text>
-          <Text style={styles.networkName}>{network.displayName}</Text>
-          {!configured && <Text style={styles.warningTitle}>Unavailable · Choose another network</Text>}
-        </View>
-        <Ionicons
-          name="chevron-down"
-          size={20}
-          color={palette.secondaryText}
-        />
-      </Pressable>
-
-      <Text accessibilityRole="alert" style={styles.warningBody}>
-        {configured ? `Only send assets on ${network.displayName} to this address.` : 'Choose a configured network before receiving funds.'}
-      </Text>
-      <View style={styles.receiveCard}>
-      <GlassLayer />
-        <View
-          accessible
-          accessibilityLabel={configured && qrPayload && !qrFailed ? `QR code for wallet address ${shortAddress}` : 'QR unavailable'}
-          style={styles.qrFrame}
-        >
-          {configured && qrPayload && !qrFailed ? (
-            <QRCode
-              backgroundColor="#ffffff"
-              color="#07111f"
-              ecl={RECEIVE_QR_ERROR_CORRECTION}
-              onError={() => setQrFailed(true)}
-              quietZone={RECEIVE_QR_QUIET_ZONE}
-              size={RECEIVE_QR_SIZE}
-              value={qrPayload}
-            />
-          ) : (
-            <View style={styles.qrFallback}>
-              <Ionicons
-                name="qr-code-outline"
-                size={46}
-                color={palette.secondaryText}
-              />
-              <Text style={styles.qrFallbackText}>
-                {!configured ? 'Network unavailable' : address ? 'QR unavailable' : 'Public address unavailable'}
-              </Text>
-            </View>
-          )}
-        </View>
-
-        <View style={styles.accountHeading}>
-          <View>
-            <Text style={styles.cardEyebrow}>PUBLIC ACCOUNT</Text>
-            <Text style={styles.accountName}>
-              {account ? `Account ${account.index + 1}` : 'Account unavailable'}
-            </Text>
+  return <>
+    <ScrollView accessibilityLabel="Receive screen" contentContainerStyle={styles.content}>
+      <Text accessibilityRole="header" style={styles.title}>Receiving addresses</Text>
+      <Text style={styles.account}>{accountName}</Text>
+      <Text style={styles.note}>Use the same public address on each supported EVM network.</Text>
+      {networks.map(item => {
+        const value = receivingAddress(item, address);
+        const planned = item.id === 'primewave' && !receiveNetworkStatus(item).configured;
+        return <View key={item.id} style={styles.row}>
+          <View style={styles.badge}><Ionicons name={planned ? 'time-outline' : 'globe-outline'} size={18} color={colors.secondaryText} /></View>
+          <View style={styles.identity}><Text style={styles.name}>{item.displayName}</Text>
+            <Text style={styles.note}>{planned ? 'Planned · Unavailable' : value ? shortPublicAddress(value) : 'Address unavailable'}</Text>
           </View>
-          <Ionicons name="person-circle-outline" size={28} color={palette.cyan} />
-        </View>
-        <Text
-          accessibilityLabel="Full public address"
-          selectable
-          style={styles.fullAddress}
-        >
-          {address || 'Unavailable'}
-        </Text>
-
-        <View style={styles.actions}>
-          <Pressable
-            accessibilityLabel="Copy address"
-            accessibilityRole="button"
-            disabled={!address}
-            onPress={() => void handleCopy()}
-            style={({ pressed }) => [styles.actionButton, pressed && styles.pressed]}
-          >
-            <Ionicons
-              name={copyState === 'copied' ? 'checkmark' : 'copy-outline'}
-              size={18}
-              color={copyState === 'copied' ? theme.states.success : palette.cyan}
-            />
-            <Text style={styles.actionText}>
-              {copyState === 'copied' ? 'Copied' : 'Copy Address'}
-            </Text>
-          </Pressable>
-          <Pressable
-            accessibilityLabel="Share address"
-            accessibilityRole="button"
-            disabled={!address || !configured}
-            onPress={() => void handleShare()}
-            style={({ pressed }) => [styles.actionButton, styles.shareButton, pressed && styles.pressed]}
-          >
-            <Ionicons name="share-outline" size={18} color={palette.text} />
-            <Text style={styles.shareText}>Share Address</Text>
-          </Pressable>
-        </View>
-        {copyState === 'unavailable' ? (
-          <Text style={styles.actionNotice}>Could not copy the public address. Try again.</Text>
-        ) : null}
-        {shareState === 'shared' ? (
-          <Text style={styles.actionNoticeSuccess}>Public address ready to share.</Text>
-        ) : null}
-        {shareState === 'cancelled' ? (
-          <Text style={styles.actionNotice}>Sharing was cancelled.</Text>
-        ) : null}
-        {shareState === 'unavailable' ? (
-          <Text style={styles.actionNotice}>
-            Sharing is unavailable in this preview. Use Copy Address instead.
-          </Text>
-        ) : null}
-      </View>
-
-      <Pressable
-        accessibilityLabel="Back to Home"
-        accessibilityRole="button"
-        onPress={onBack}
-        style={({ pressed }) => [styles.backButton, pressed && styles.pressed]}
-      >
-        <Ionicons name="arrow-back-outline" size={17} color={palette.cyan} />
-        <Text style={styles.backText}>Back to Home</Text>
-      </Pressable>
+          <Action label={`Copy ${item.displayName} receiving address`} icon="copy-outline" disabled={!value} onPress={() => void copy(item)} />
+          <Action label={`Show ${item.displayName} QR code`} icon="qr-code-outline" disabled={!value}
+            onPress={() => { setNotice(''); setQrFailed(false); setSheetId(item.id); }} />
+        </View>;
+      })}
+      {!sheetId && !!notice && <Text accessibilityLiveRegion="polite" style={styles.link}>{notice}</Text>}
     </ScrollView>
-  );
+    <WaveXBottomSheet visible={!!payload} title={network ? `${accountName} · ${network.displayName}` : accountName} onClose={() => { setSheetId(null); setNotice(''); }}>
+      {network && payload && <>
+        <View accessible accessibilityLabel={`QR code for ${payload}`} style={styles.qr}>
+          {qrFailed ? <Text>QR unavailable</Text> : <QRCode value={payload} size={RECEIVE_QR_SIZE} quietZone={RECEIVE_QR_QUIET_ZONE}
+            ecl={RECEIVE_QR_ERROR_CORRECTION} color="#090B0E" backgroundColor="#ffffff" onError={() => setQrFailed(true)} />}
+        </View>
+        <Text accessibilityRole="header" style={styles.name}>{network.displayName} receiving address</Text>
+        <Text style={styles.note}>Ask the sender to use {network.displayName}. Sending on a different network may result in lost funds.</Text>
+        <Text selectable accessibilityLabel="Full public address" style={styles.address}>{payload}</Text>
+        <View style={styles.actions}>
+          <Action label={`Copy ${network.displayName} address from QR sheet`} caption="Copy address" icon="copy-outline" onPress={() => void copy(network)} />
+          <Action label="Share address" caption="Share" icon="share-outline" onPress={async () => {
+            if (await sharePublicAddress(createPublicAddressShareMessage(network, payload)) === 'unavailable') setNotice('Sharing unavailable. Use Copy address.');
+          }} />
+        </View>
+        {explorer && <Action label="View in Explorer" caption="View in Explorer" icon="open-outline"
+          onPress={() => void Linking.openURL(explorer).catch(() => setNotice('Could not open explorer.'))} />}
+        {!!notice && <Text accessibilityLiveRegion="polite" style={styles.link}>{notice}</Text>}
+      </>}
+    </WaveXBottomSheet>
+  </>;
 }
 
 const styles = StyleSheet.create({
-  content: {
-    paddingHorizontal: theme.spacing.lg,
-    paddingBottom: 120,
-    gap: theme.spacing.md,
-  },
-  heading: { marginTop: 8, gap: 4 },
-  eyebrow: { color: palette.cyan, fontFamily: theme.typography.eyebrow.fontFamily, fontSize: theme.typography.eyebrow.fontSize, letterSpacing: theme.typography.eyebrow.letterSpacing },
-  title: { color: palette.text, fontFamily: theme.typography.title.fontFamily, fontSize: 27, lineHeight: 34 },
-  body: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 14, lineHeight: 21 },
-  networkContext: { padding: theme.spacing.md, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.divider },
-  networkIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: palette.surface },
-  networkCopy: { flex: 1, gap: 3 },
-  cardEyebrow: { color: palette.cyan, fontFamily: theme.typography.label.fontFamily, fontSize: 10, letterSpacing: 1.05 },
-  networkName: { color: palette.text, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 15 },
-  networkMeta: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 11 },
-  receiveCard: { padding: 12, gap: 8, borderRadius: 16, ...glassSurface },
-  qrFrame: { alignSelf: 'center', padding: 8, borderRadius: 14, backgroundColor: '#ffffff', borderWidth: 1, borderColor: palette.divider },
-  qrFallback: { width: 224, height: 224, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm, backgroundColor: '#f5f8ff' },
-  qrFallbackText: { color: '#40506e', fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 12 },
-  accountHeading: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  accountName: { color: palette.text, fontFamily: theme.typography.title.fontFamily, fontSize: 21, marginTop: 4 },
-  shortAddress: { color: palette.cyan, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 22, letterSpacing: 0.4 },
-  fullAddress: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 12, lineHeight: 18 },
-  actions: { flexDirection: 'row', gap: theme.spacing.sm },
-  actionButton: { flex: 1, minHeight: 48, paddingHorizontal: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, borderRadius: theme.radius.md, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.divider },
-  shareButton: { backgroundColor: palette.surface, borderColor: palette.divider },
-  actionText: { color: palette.cyan, fontFamily: theme.typography.label.fontFamily, fontSize: 11 },
-  shareText: { color: palette.text, fontFamily: theme.typography.label.fontFamily, fontSize: 11 },
-  actionNotice: { color: theme.states.warning, fontFamily: theme.typography.body.fontFamily, fontSize: 11, lineHeight: 16 },
-  actionNoticeSuccess: { color: theme.states.success, fontFamily: theme.typography.body.fontFamily, fontSize: 11, lineHeight: 16 },
-  warningCard: { padding: theme.spacing.md, flexDirection: 'row', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: 'rgba(244, 200, 107, 0.08)', borderWidth: 1, borderColor: 'rgba(244, 200, 107, 0.3)' },
-  warningIcon: { width: 36, height: 36, alignItems: 'center', justifyContent: 'center', borderRadius: 12, backgroundColor: 'rgba(244, 200, 107, 0.12)' },
-  warningCopy: { flex: 1, gap: 4 },
-  warningTitle: { color: theme.states.warning, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 13 },
-  warningBody: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 12, lineHeight: 18 },
-  warningStatus: { color: theme.states.warning, fontFamily: theme.typography.label.fontFamily, fontSize: 10, letterSpacing: 0.3 },
-  backButton: { minHeight: 46, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm },
-  backText: { color: palette.cyan, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
-  pressed: { opacity: 0.76 },
+  content: { padding: 20, gap: 6 },
+  title: { fontSize: 26, color: colors.text, fontFamily: 'Inter_700Bold' },
+  account: { fontSize: 16, color: colors.text, fontFamily: 'Inter_600SemiBold', marginTop: 4 },
+  note: { color: colors.secondaryText, fontSize: 13, lineHeight: 19 },
+  row: { minHeight: 58, flexDirection: 'row', alignItems: 'center', gap: 4, borderBottomWidth: StyleSheet.hairlineWidth, borderColor: colors.divider },
+  badge: { width: 32, height: 32, borderRadius: 16, backgroundColor: colors.surface, alignItems: 'center', justifyContent: 'center', marginRight: 4 },
+  identity: { flex: 1, minWidth: 0 },
+  name: { color: colors.text, fontSize: 15, fontFamily: 'Inter_600SemiBold' },
+  action: { minWidth: 44, minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
+  actions: { flexDirection: 'row', gap: 20 },
+  link: { color: colors.cyan, fontSize: 13 },
+  qr: { alignSelf: 'center', padding: 10, borderRadius: 12, backgroundColor: '#ffffff' },
+  address: { color: colors.text, fontSize: 15, lineHeight: 22 },
 });

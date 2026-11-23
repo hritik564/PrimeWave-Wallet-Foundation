@@ -26,3 +26,16 @@ export function receiveNetworkStatus(network: EvmNetwork): {
   }
   return { label: 'Configured', configured: true };
 }
+export function receivingNetworks(networks: readonly EvmNetwork[]) {
+  return networks.filter(network => receiveNetworkStatus(network).configured || network.id === 'primewave');
+}
+
+export function receivingAddress(network: EvmNetwork, publicAddress: string) {
+  if (!receiveNetworkStatus(network).configured || !/^0x[0-9a-fA-F]{40}$/.test(publicAddress)) return null;
+  return publicAddress;
+}
+
+export function receivingExplorer(network: EvmNetwork, publicAddress: string) {
+  const address = receivingAddress(network, publicAddress);
+  return address ? network.explorer.addressUrlTemplate?.replace('{address}', address) ?? null : null;
+}

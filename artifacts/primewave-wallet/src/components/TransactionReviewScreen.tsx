@@ -834,6 +834,7 @@ export function TransactionReviewScreen({
   }
 
   return (
+    <View style={{ flex: 1 }}>
     <ScrollView
       accessibilityLabel="Transaction review screen"
       contentContainerStyle={styles.content}
@@ -862,9 +863,8 @@ export function TransactionReviewScreen({
       ) : review ? (
         <>
           <SectionCard eyebrow="ASSET / AMOUNT">
-            <DetailRow label="Asset" value={`${review.asset.name ?? 'Asset'} (${review.asset.symbol ?? '—'})`} />
+            <Text style={styles.title}>{draft.amount} {review.asset.symbol ?? review.asset.name}</Text>
             <DetailRow label="Network" value={network.displayName} />
-            <DetailRow label="Exact amount" value={`${draft.amount} ${review.asset.symbol ?? ''}`} />
             <DetailRow label="Estimated network fee" value={`${review.preview.estimatedNetworkFeeDisplay} ${review.preview.symbol}`} />
             {review.asset.assetType === 'fungible_token' && review.asset.contractAddress ? (
               <DetailRow label="Token contract" value={shortAddress(review.asset.contractAddress)} />
@@ -946,19 +946,6 @@ export function TransactionReviewScreen({
             </View>
           ) : null}
 
-          {state === 'ready' ? (
-            <Pressable
-              accessibilityLabel="Confirm Transaction"
-              accessibilityRole="button"
-              disabled={confirming}
-              onPress={() => void handleConfirm()}
-              style={({ pressed }) => [styles.primaryButton, confirming && styles.disabledButton, pressed && !confirming && styles.pressed]}
-            >
-              <Text style={styles.primaryButtonText}>{confirming ? 'Checking review…' : 'Confirm Transaction'}</Text>
-              <Ionicons name="arrow-forward-outline" size={18} color={theme.colors.primaryForeground} />
-            </Pressable>
-          ) : null}
-
           {state === 'awaiting-auth' ? (
             <SectionCard eyebrow="AUTHORIZE TRANSACTION" warning>
               <Text style={styles.cardBody}>
@@ -1027,6 +1014,19 @@ export function TransactionReviewScreen({
         <Text style={styles.secondaryButtonText}>Back to Send</Text>
       </Pressable>
     </ScrollView>
+    <View style={{ paddingHorizontal: 20, paddingBottom: 8 }}>{review && state === 'ready' ? (
+            <Pressable
+              accessibilityLabel="Confirm Transaction"
+              accessibilityRole="button"
+              disabled={confirming}
+              onPress={() => void handleConfirm()}
+              style={({ pressed }) => [styles.primaryButton, confirming && styles.disabledButton, pressed && !confirming && styles.pressed]}
+            >
+              <Text style={styles.primaryButtonText}>{confirming ? 'Checking review…' : 'Confirm Transaction'}</Text>
+              <Ionicons name="arrow-forward-outline" size={18} color={theme.colors.primaryForeground} />
+            </Pressable>
+          ) : null}</View>
+    </View>
   );
 }
 
