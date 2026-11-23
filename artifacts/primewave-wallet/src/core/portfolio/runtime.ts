@@ -32,6 +32,15 @@ export function createAppPortfolioRuntime(
   const repository = new InMemoryTokenPreferenceRepository();
   const providers = new Map<string, { readonly chainId: number | null; readonly promise: Promise<ReadProvider> }>();
   const discoveries = new Map<string, TokenDiscoveryService>();
+  const candidateCatalog = new Map<string, TokenCandidate>();
+  let activeReaders: {
+    networkId: string;
+    provider: ReadProvider;
+    tokens: ERC20TokenService;
+    discovery: TokenDiscoveryService;
+  } | null = null;
+  const getRegisteredTokens = () =>
+    Object.freeze([...candidateCatalog.values()]);
 
   const providerFor = (networkId: string): Promise<ReadProvider> => {
     const network = registry.getById(networkId);
@@ -63,13 +72,21 @@ export function createAppPortfolioRuntime(
     }
     const accountState = new EvmAccountStateService(registry, provider);
     const readService = { accountState, provider };
-    const tokens = new ERC20TokenService(assets, [readService], {}, tokenRegistry);
-    let discovery = discoveries.get(networkId);
-    if (!discovery) {
-      discovery = new TokenDiscoveryService(tokens, [readService], { repository });
+    if (
+      activeReaders?.networkId !== networkId ||
+      activeReaders.provider !== provider
+    ) {
+      const tokens = new ERC20TokenService(assets, [readService], {}, tokenRegistry);
+      const discovery = new TokenDiscoveryService(tokens, [readService], { repository });
+      for (const candidate of candidateCatalog.values()) {
+        if (candidate.assetIdentity.networkId === networkId) {
+          discovery.restoreCandidate(candidate);
+        }
+      }
+      activeReaders = { networkId, provider, tokens, discovery };
       discoveries.set(networkId, discovery);
     }
-    return { accountState, readService, tokens, discovery };
+    return { accountState, readService, ...activeReaders };
   };
 
   const readModel = new PortfolioReadModelService({
@@ -84,9 +101,12 @@ export function createAppPortfolioRuntime(
         [readService],
         { tokenDiscoveryService: discovery },
       );
-      const identities = discovery.getCandidates()
-        .filter(candidate => candidate.assetIdentity.networkId === networkId)
-        .map(candidate => candidate.assetIdentity);
+      const identities =
+        query.tokenIdentities ??
+        discovery
+          .getCandidates()
+          .filter((candidate) => candidate.assetIdentity.networkId === networkId)
+          .map((candidate) => candidate.assetIdentity);
       return aggregation.getPortfolio({ ...query, tokenIdentities: identities });
     },
   });
@@ -95,11 +115,17 @@ export function createAppPortfolioRuntime(
     readModel,
     async registerToken(request: UserAddedTokenRequest): Promise<TokenCandidate> {
       const { discovery } = await servicesFor(request.networkId);
-      return discovery.addUserToken(request);
+      const candidate = await discovery.addUserToken(request);
+      candidateCatalog.set(
+        JSON.stringify([
+          candidate.assetIdentity.networkId,
+          candidate.assetIdentity.contractAddress,
+        ]),
+        candidate,
+      );
+      return candidate;
     },
-    getRegisteredTokens: () => Object.freeze(
-      [...discoveries.values()].flatMap(discovery => [...discovery.getCandidates()]),
-    ),
+    getRegisteredTokens,
   });
 }
 

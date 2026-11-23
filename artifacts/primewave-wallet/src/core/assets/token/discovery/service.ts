@@ -394,6 +394,24 @@ export class TokenDiscoveryService {
     });
   }
 
+  restoreCandidate(candidate: TokenCandidate): void {
+    const identity = candidate.assetIdentity;
+    const validatedIdentity = this.registry.resolveIdentity(
+      identity.networkId,
+      identity.contractAddress,
+    );
+    if (
+      getAssetIdentityKey(validatedIdentity) !== getAssetIdentityKey(identity) ||
+      candidate.token.assetId !== identity.assetId ||
+      candidate.token.contractAddress !== identity.contractAddress ||
+      candidate.token.networkId !== identity.networkId
+    ) {
+      throw new AssetError('DISCOVERY_INVALID_TOKEN');
+    }
+    this.registry.upsert(candidate.token);
+    this.candidates.set(getAssetIdentityKey(identity), candidate);
+  }
+
   getCandidate(identity: TokenAssetIdentity): TokenCandidate | undefined {
     return this.candidates.get(getAssetIdentityKey(identity));
   }

@@ -21,7 +21,7 @@ const contracts = [
 function str(value: string) { return encodeFunctionResult({abi:[{type:'function',name:'f',stateMutability:'view',inputs:[],outputs:[{type:'string'}]}],functionName:'f',result:value}); }
 function uint(value: bigint) { return encodeAbiParameters(parseAbiParameters('uint256'),[value]); }
 
-function fixture(options: { wrongChain?: boolean; failToken?: boolean; delayed?: boolean } = {}) {
+function fixture(options: { wrongChain?: boolean; failToken?: boolean; delayed?: boolean; failInitialProvider?: boolean } = {}) {
   const registry = new NetworkRegistry(supportedNetworks); registry.selectActiveNetwork('ethereum');
   const tokenBalances = new Map<string,bigint>();
   let started!:()=>void, release!:()=>void;
@@ -45,7 +45,10 @@ function fixture(options: { wrongChain?: boolean; failToken?: boolean; delayed?:
     } else throw Error('Unexpected RPC method');
     return {status:200,body:{jsonrpc:'2.0',id,result}};
   }};
+  let providerAttempts=0;
   const createProvider=async(r:NetworkRegistry)=>{
+    providerAttempts++;
+    if(options.failInitialProvider && providerAttempts===1) throw new Error('provider initialization failed');
     const selected=r.getActiveNetwork()!;
     const networkTransport:RpcTransport={async request(request) {
       const {method,params,id}=JSON.parse(request.body) as {method:string;params:any[];id:number};
@@ -55,7 +58,7 @@ function fixture(options: { wrongChain?: boolean; failToken?: boolean; delayed?:
     return createEvmRpcProvider(r,{transport:networkTransport});
   };
   const runtime=createAppPortfolioRuntime(registry,createProvider);
-  return {registry,runtime,readModel:runtime.readModel,tokenBalances,pending,release,createProvider,transport};
+  return {registry,runtime,readModel:runtime.readModel,tokenBalances,pending,release,createProvider,transport,getProviderAttempts:()=>providerAttempts};
 }
 
 test('native runtime gracefully reports no candidates and isolates network identity', async()=>{
@@ -91,6 +94,62 @@ test('runtime registration persists across refresh, account and network switches
   const isolated=fixture();
   const clean=await isolated.readModel.getPortfolio({...accounts[0],networkId:'ethereum'});
   assert.equal(clean.assets.length,1);
+});
+
+test('runtime honors explicit token subsets, empty lists and omitted identities', async()=>{
+  const f=fixture();
+  await f.runtime.registerToken({networkId:'ethereum',contractAddress:contracts[0]});
+  await f.runtime.registerToken({networkId:'ethereum',contractAddress:contracts[1]});
+  const omitted=await f.readModel.getPortfolio({...accounts[0],networkId:'ethereum'});
+  assert.equal(omitted.assets.filter(asset=>asset.identity.assetType==='fungible_token').length,2);
+  const subset=await f.readModel.getPortfolio({...accounts[0],networkId:'ethereum',tokenIdentities:[{assetType:'fungible_token',networkId:'ethereum',assetId:contracts[1]}]});
+  assert.deepEqual(subset.assets.filter(asset=>asset.identity.assetType==='fungible_token').map(asset=>asset.identity.assetId),[contracts[1]]);
+  const empty=await f.readModel.getPortfolio({...accounts[0],networkId:'ethereum',tokenIdentities:[]});
+  assert.equal(empty.assets.filter(asset=>asset.identity.assetType==='fungible_token').length,0);
+  const unknown=await f.readModel.getPortfolio({...accounts[0],networkId:'ethereum',tokenIdentities:[{assetType:'fungible_token',networkId:'ethereum',assetId:'0x0000000000000000000000000000000000000099'}]});
+  assert.equal(unknown.assets.filter(asset=>asset.identity.assetType==='fungible_token').length,0);
+});
+
+test('runtime recovers after provider initialization failure and retains candidates', async()=>{
+  const f=fixture({failInitialProvider:true});
+  await assert.rejects(f.runtime.registerToken({networkId:'ethereum',contractAddress:contracts[0]}));
+  assert.equal(f.getProviderAttempts(),1);
+  const registered=await f.runtime.registerToken({networkId:'ethereum',contractAddress:contracts[0]});
+  assert.equal(registered.assetIdentity.assetId,contracts[0]);
+  f.tokenBalances.set(contracts[0]+accounts[0].accountAddress,77n);
+  const result=await f.readModel.getPortfolio({...accounts[0],networkId:'ethereum'});
+  assert.equal(result.assets.find(asset=>asset.identity.assetType==='fungible_token')?.rawBalance,77n);
+  assert.equal(f.getProviderAttempts(),2);
+});
+
+test('runtime provider failure preserves native balance and marks token unavailable', async()=>{
+  const f=fixture({failToken:true});
+  await f.runtime.registerToken({networkId:'ethereum',contractAddress:contracts[0]});
+  const result=await f.readModel.getPortfolio({...accounts[0],networkId:'ethereum'});
+  assert.equal(result.assets.find(asset=>asset.identity.assetType==='native')?.rawBalance,7n);
+  assert.equal(result.assets.find(asset=>asset.identity.assetType==='fungible_token')?.availabilityState,'unavailable');
+});
+
+test('runtime initialization recovery retains registered token', async()=>{
+  const f=fixture({failInitialProvider:true});
+  await assert.rejects(f.runtime.registerToken({networkId:'ethereum',contractAddress:contracts[0]}));
+  const candidate=await f.runtime.registerToken({networkId:'ethereum',contractAddress:contracts[0]});
+  assert.equal(candidate.assetIdentity.contractAddress,contracts[0]);
+  f.tokenBalances.set(contracts[0]+accounts[0].accountAddress,88n);
+  const recovered=await f.readModel.getPortfolio({...accounts[0],networkId:'ethereum'});
+  assert.equal(recovered.assets.find(asset=>asset.identity.assetType==='fungible_token')?.rawBalance,88n);
+  assert.equal(f.getProviderAttempts(),2);
+});
+
+test('runtime replacement reader retains catalog after network switch invalidates old provider', async()=>{
+  const f=fixture();
+  await f.runtime.registerToken({networkId:'ethereum',contractAddress:contracts[0]});
+  f.registry.selectActiveNetwork('bnb-smart-chain');
+  await f.readModel.getPortfolio({...accounts[0],networkId:'bnb-smart-chain'});
+  f.registry.selectActiveNetwork('ethereum');
+  const result=await f.readModel.getPortfolio({...accounts[0],networkId:'ethereum'});
+  assert.equal(result.assets.filter(asset=>asset.identity.assetType==='fungible_token').length,1);
+  assert.equal(result.assets.find(asset=>asset.identity.assetType==='fungible_token')?.rawBalance,0n);
 });
 
 test('token RPC errors stay unavailable and preserve native balance', async()=>{
