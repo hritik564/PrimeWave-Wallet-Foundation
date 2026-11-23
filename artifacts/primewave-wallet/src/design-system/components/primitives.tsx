@@ -1,3 +1,5 @@
+import { GlassLayer } from './GlassLayer';
+import { glassSurface } from '../tokens/wallet-home';
 import { walletHomeColors as palette } from '../tokens/wallet-home';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -446,6 +448,7 @@ export function WaveXBottomSheet({
       <View style={styles.modalRoot}>
         <Pressable accessibilityLabel={`Close ${title}`} accessibilityRole="button" onPress={onClose} style={styles.backdrop} />
         <View accessibilityViewIsModal style={styles.sheet}>
+          <GlassLayer sheet />
           <View style={styles.sheetHandle} />
           <View style={styles.sheetHeader}>
             <Text style={styles.sheetTitle}>{title}</Text>
@@ -734,7 +737,7 @@ const styles = StyleSheet.create({
   divider: { height: 1, backgroundColor: colors.borderSubtle },
   modalRoot: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(0, 0, 0, 0.62)' },
-  sheet: { maxHeight: '86%', paddingTop: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, gap: spacing.sm, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, backgroundColor: palette.surface, ...shadows.panel },
+  sheet: { maxHeight: '86%', paddingTop: spacing.sm, paddingHorizontal: spacing.lg, paddingBottom: spacing.xl, gap: spacing.sm, borderTopLeftRadius: radius.sheet, borderTopRightRadius: radius.sheet, ...shadows.panel, ...glassSurface },
   sheetHandle: { alignSelf: 'center', width: 44, height: 4, borderRadius: radius.pill, backgroundColor: palette.divider },
   sheetHeader: { minHeight: 48, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   sheetTitle: { ...typography.cardTitle, color: colors.textPrimary },

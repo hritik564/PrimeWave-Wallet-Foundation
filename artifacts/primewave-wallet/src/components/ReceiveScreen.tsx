@@ -1,3 +1,5 @@
+import { GlassLayer } from '@/src/design-system/components/GlassLayer';
+import { glassSurface } from '@/src/design-system/tokens/wallet-home';
 import { walletHomeColors as palette } from '@/src/design-system/tokens/wallet-home';
 import { Ionicons } from '@expo/vector-icons';
 import QRCode from 'react-native-qrcode-svg';
@@ -121,6 +123,7 @@ export function ReceiveScreen({
         {configured ? `Only send assets on ${network.displayName} to this address.` : 'Choose a configured network before receiving funds.'}
       </Text>
       <View style={styles.receiveCard}>
+      <GlassLayer />
         <View
           accessible
           accessibilityLabel={configured && qrPayload && !qrFailed ? `QR code for wallet address ${shortAddress}` : 'QR unavailable'}
@@ -240,7 +243,7 @@ const styles = StyleSheet.create({
   cardEyebrow: { color: palette.cyan, fontFamily: theme.typography.label.fontFamily, fontSize: 10, letterSpacing: 1.05 },
   networkName: { color: palette.text, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 15 },
   networkMeta: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 11 },
-  receiveCard: { padding: 12, gap: 8, borderRadius: 16, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.divider },
+  receiveCard: { padding: 12, gap: 8, borderRadius: 16, ...glassSurface },
   qrFrame: { alignSelf: 'center', padding: 8, borderRadius: 14, backgroundColor: '#ffffff', borderWidth: 1, borderColor: palette.divider },
   qrFallback: { width: 224, height: 224, alignItems: 'center', justifyContent: 'center', gap: theme.spacing.sm, backgroundColor: '#f5f8ff' },
   qrFallbackText: { color: '#40506e', fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 12 },

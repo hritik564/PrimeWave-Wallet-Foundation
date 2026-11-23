@@ -1,3 +1,5 @@
+import { colors } from './colors';
+
 export const shadows = {
   none: {
     shadowColor: 'transparent',
@@ -14,14 +16,14 @@ export const shadows = {
     elevation: 6,
   },
   glow: {
-    shadowColor: '#50d9ff',
+    shadowColor: colors.accent,
     shadowOpacity: 0.16,
     shadowRadius: 24,
     shadowOffset: { width: 0, height: 8 },
     elevation: 8,
   },
   focus: {
-    shadowColor: '#50d9ff',
+    shadowColor: colors.accent,
     shadowOpacity: 0.35,
     shadowRadius: 6,
     shadowOffset: { width: 0, height: 0 },

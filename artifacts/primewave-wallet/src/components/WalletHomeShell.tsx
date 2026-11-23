@@ -1,3 +1,5 @@
+import { GlassLayer } from '@/src/design-system/components/GlassLayer';
+import { glassSurface } from '@/src/design-system/tokens/wallet-home';
 import { walletHomeColors as palette } from '@/src/design-system/tokens/wallet-home';
 import { Ionicons } from '@expo/vector-icons';
 import { Image } from 'expo-image';
@@ -552,6 +554,7 @@ function PortfolioSummary({
   const balance = getHomeBalancePresentation(state, model);
   return (
     <View style={styles.portfolioCard}>
+      <GlassLayer />
       <View style={styles.portfolioCardHeader}>
         <View>
           <Text style={styles.cardEyebrow}>NATIVE BALANCE</Text>
@@ -1737,7 +1740,7 @@ const styles = StyleSheet.create({
   networkName: { color: palette.secondaryText, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 14 },
   networkStatus: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 11 },
   networkChevron: { width: 28, alignItems: 'center' },
-  portfolioCard: { paddingHorizontal: 16, paddingVertical: 12, gap: 1, borderRadius: 14, backgroundColor: palette.surface },
+  portfolioCard: { paddingHorizontal: 16, paddingVertical: 12, gap: 1, borderRadius: 14, ...glassSurface },
   portfolioCardHeader: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   portfolioTitle: { color: palette.text, fontFamily: theme.typography.title.fontFamily, fontSize: 22, lineHeight: 28, marginTop: 4 },
   portfolioBody: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 12, lineHeight: 18 },

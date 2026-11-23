@@ -39,8 +39,8 @@ test('exposes the complete UI-0 primitive manifest from one design-system entry 
 });
 
 test('keeps semantic colors, spacing, radius, and motion values centralized', () => {
-  assert.equal(colors.background, '#070b19');
-  assert.equal(colors.accent, '#50d9ff');
+  assert.equal(colors.background, '#090B0E');
+  assert.equal(colors.accent, '#0DECFE');
   assert.equal(colors.success, '#65e6a6');
   assert.equal(spacing.lg, 24);
   assert.equal(radius.sheet, 28);

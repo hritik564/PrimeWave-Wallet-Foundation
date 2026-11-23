@@ -1,3 +1,5 @@
+import { GlassLayer } from '@/src/design-system/components/GlassLayer';
+import { glassSurface } from '@/src/design-system/tokens/wallet-home';
 import { walletHomeColors as palette } from '@/src/design-system/tokens/wallet-home';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
@@ -81,6 +83,7 @@ function AssetPicker({
         onPress={() => setVisible(true)}
         style={({ pressed }) => [styles.assetSelector, pressed && styles.pressed]}
       >
+      <GlassLayer />
         {asset ? <AssetIcon asset={asset} /> : <View style={styles.assetIcon}><Ionicons name="layers-outline" size={20} color={palette.secondaryText} /></View>}
         <View style={styles.assetSelectorCopy}>
           <Text style={styles.cardEyebrow}>SENDING ASSET</Text>
@@ -332,7 +335,7 @@ const styles = StyleSheet.create({
   networkMeta: { color: palette.secondaryText, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 12 },
   fromCard: { padding: theme.spacing.md, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.md, backgroundColor: theme.colors.surface, borderWidth: 1, borderColor: palette.divider },
   fromIcon: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: theme.radius.sm, backgroundColor: palette.surface },
-  assetSelector: { minHeight: 54, padding: 10, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.lg, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.divider },
+  assetSelector: { minHeight: 54, padding: 10, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.lg, ...glassSurface },
   assetIcon: { width: 42, height: 42, alignItems: 'center', justifyContent: 'center', borderRadius: 14, backgroundColor: palette.surface },
   assetInitials: { color: palette.text, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
   assetSelectorCopy: { flex: 1, gap: 3 },

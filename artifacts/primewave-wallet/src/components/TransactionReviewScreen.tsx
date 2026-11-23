@@ -1,3 +1,5 @@
+import { GlassLayer } from '@/src/design-system/components/GlassLayer';
+import { glassSurface } from '@/src/design-system/tokens/wallet-home';
 import { walletHomeColors as palette } from '@/src/design-system/tokens/wallet-home';
 import { Ionicons } from '@expo/vector-icons';
 import { useEffect, useMemo, useState } from 'react';
@@ -79,6 +81,7 @@ function SectionCard({
 }) {
   return (
     <View style={[styles.card, warning && styles.warningCard]}>
+      {eyebrow === 'ASSET / AMOUNT' && <GlassLayer />}
       <Text style={styles.cardEyebrow}>{eyebrow}</Text>
       {children}
     </View>
@@ -1033,7 +1036,7 @@ const styles = StyleSheet.create({
   eyebrow: { color: palette.cyan, fontFamily: theme.typography.eyebrow.fontFamily, fontSize: theme.typography.eyebrow.fontSize, letterSpacing: theme.typography.eyebrow.letterSpacing },
   title: { color: palette.text, fontFamily: theme.typography.title.fontFamily, fontSize: 27, lineHeight: 34 },
   body: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 14, lineHeight: 21 },
-  card: { padding: theme.spacing.md, gap: theme.spacing.sm, borderRadius: theme.radius.lg, backgroundColor: palette.surface, borderWidth: 1, borderColor: palette.divider },
+  card: { padding: theme.spacing.md, gap: theme.spacing.sm, borderRadius: theme.radius.lg, ...glassSurface },
   warningCard: { borderColor: 'rgba(244, 200, 107, 0.42)', backgroundColor: 'rgba(244, 200, 107, 0.08)' },
   cardEyebrow: { color: palette.cyan, fontFamily: theme.typography.label.fontFamily, fontSize: 10, letterSpacing: 1.15 },
   cardBody: { color: palette.secondaryText, fontFamily: theme.typography.body.fontFamily, fontSize: 13, lineHeight: 20 },
