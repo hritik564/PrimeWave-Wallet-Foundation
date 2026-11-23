@@ -63,43 +63,23 @@ export function getHomeBalancePresentation(
     };
   }
 
-  const visibleAssets = model?.assets.filter((asset) => asset.visibility === 'visible') ?? [];
-  const hasUnavailableAsset = visibleAssets.some(
-    (asset) => asset.availabilityState !== 'available',
-  );
-
-  if (hasUnavailableAsset) {
+  const native = model?.assets.find(asset => asset.assetType === 'native' && asset.visibility === 'visible');
+  if (!native || native.availabilityState !== 'available' ||
+      native.rawBalance === null || native.formattedBalance === null) {
     return {
       value: '—',
-      detail: 'Balance partially unavailable',
-      supporting: 'Some asset balances could not be read',
+      detail: 'Balance unavailable',
+      supporting: 'No confirmed native balance',
       available: false,
       zero: false,
     };
   }
-
-  const hasPositiveBalance = visibleAssets.some(
-    (asset) =>
-      asset.availabilityState === 'available' &&
-      asset.balanceState === 'positive',
-  );
-
-  if (!hasPositiveBalance) {
-    return {
-      value: '0',
-      detail: 'Available balance',
-      supporting: 'No assets on this network yet',
-      available: true,
-      zero: true,
-    };
-  }
-
   return {
-    value: '—',
-    detail: 'Fiat value unavailable',
-    supporting: 'Native balances are shown below',
+    value: native.formattedBalance,
+    detail: native.symbol ?? native.name ?? 'Native asset',
+    supporting: model?.networkName ?? '',
     available: true,
-    zero: false,
+    zero: native.rawBalance === 0n,
   };
 }
 

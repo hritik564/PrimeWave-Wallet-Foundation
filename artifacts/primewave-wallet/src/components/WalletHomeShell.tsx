@@ -1,5 +1,4 @@
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Image } from 'expo-image';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -17,7 +16,6 @@ import { theme } from '@/src/theme';
 import {
   WaveXAssetRow,
   WaveXAssetIcon,
-  WaveXBadge,
   WaveXButton,
   WaveXBottomNavigation,
   WaveXBottomSheet,
@@ -189,13 +187,13 @@ function AccountPanel({
   wallet,
   onClose,
   onLock,
-  onComingSoon,
+  onSelect,
 }: {
   visible: boolean;
   wallet: Wallet;
   onClose: () => void;
   onLock: () => void;
-  onComingSoon: (label: string) => void;
+  onSelect: (accountId: string) => void;
 }) {
   const [copyState, setCopyState] = useState<'idle' | 'copied' | 'error'>('idle');
   const account = wallet.accounts[0];
@@ -217,9 +215,6 @@ function AccountPanel({
 
   return (
     <WaveXBottomSheet onClose={onClose} title="Accounts" visible={visible}>
-      <Text style={styles.sheetIntro}>
-        Choose a public account without exposing secret material.
-      </Text>
       <View style={styles.accountList}>
         {wallet.accounts.map((candidate) => {
           const selected = candidate.accountId === account?.accountId;
@@ -229,11 +224,7 @@ function AccountPanel({
               accessibilityRole="radio"
               accessibilityState={{ checked: selected }}
               key={candidate.accountId}
-              onPress={() => {
-                if (!selected) {
-                  onComingSoon('Account switching is not available yet.');
-                }
-              }}
+              onPress={() => { onSelect(candidate.accountId); onClose(); }}
               style={({ pressed }) => [
                 styles.accountOption,
                 selected && styles.accountOptionSelected,
@@ -259,25 +250,6 @@ function AccountPanel({
             </Pressable>
           );
         })}
-      </View>
-      <View style={styles.accountActions}>
-        {[
-          ['add-circle-outline', 'Add account'],
-          ['download-outline', 'Import account'],
-          ['settings-outline', 'Manage accounts'],
-        ].map(([icon, label]) => (
-          <Pressable
-            accessibilityLabel={`${label}. Not available`}
-            accessibilityRole="button"
-            key={label}
-            onPress={() => onComingSoon(`${label} is not available yet.`)}
-            style={({ pressed }) => [styles.accountAction, pressed && styles.pressed]}
-          >
-            <Ionicons name={icon as keyof typeof Ionicons.glyphMap} size={18} color={theme.colors.accent} />
-            <Text style={styles.accountActionText}>{label}</Text>
-            <WaveXBadge label="Unavailable" tone="neutral" />
-          </Pressable>
-        ))}
       </View>
       <Pressable
         accessibilityLabel="Copy public address"
@@ -343,7 +315,7 @@ function NetworkSelector({
   return (
     <WaveXBottomSheet onClose={onClose} title="Select network" visible={visible}>
       <Text style={styles.sheetIntro}>
-        Network changes are explicit and refresh your account-scoped portfolio.
+        Choose where to view your balances.
       </Text>
       {selectionMessage ? (
         <View accessibilityRole="alert" style={styles.selectionMessage}>
@@ -355,16 +327,15 @@ function NetworkSelector({
         {networks.map((candidate) => {
           const selected = selectedNetwork.id === candidate.id;
           const configured = candidate.configurationStatus === 'configured';
-          const status = !candidate.enabled
-            ? 'Disabled'
-            : configured
-              ? 'Connected'
-              : 'Not configured';
+          const available = candidate.enabled && configured && candidate.chainId !== null;
+          const status = available ? (selected ? 'Selected' : 'Available')
+            : candidate.isPrimary ? 'Planned · Unavailable' : 'Unavailable';
           return (
             <Pressable
               accessibilityLabel={`${candidate.displayName}, ${status}${selected ? ', selected' : ''}`}
               accessibilityRole="radio"
-              accessibilityState={{ checked: selected, disabled: !candidate.enabled }}
+              accessibilityState={{ checked: selected && available, disabled: !available }}
+              disabled={!available}
               key={candidate.id}
               onPress={() => selectNetwork(candidate)}
               style={({ pressed }) => [
@@ -384,19 +355,19 @@ function NetworkSelector({
                   <Text numberOfLines={1} style={styles.networkOptionName}>
                     {candidate.displayName}
                   </Text>
-                  {selected ? (
+                  {selected && available ? (
                     <Ionicons name="checkmark-circle" size={16} color={theme.colors.accent} />
                   ) : null}
                 </View>
                 <Text style={styles.networkOptionMeta}>
-                  {candidate.nativeCurrency.symbol} • {candidate.environment.toUpperCase()}
+                  {configured ? candidate.nativeCurrency.symbol : 'Awaiting network configuration'}
                 </Text>
                 <WaveXStatusIndicator
                   label={status}
                   tone={!candidate.enabled ? 'warning' : configured ? 'success' : 'neutral'}
                 />
               </View>
-              {!candidate.enabled ? (
+              {!available ? (
                 <Ionicons name="lock-closed-outline" size={16} color={theme.states.warning} />
               ) : null}
             </Pressable>
@@ -442,12 +413,11 @@ function NetworkCard({
         <Ionicons name="globe-outline" size={20} color={configured ? theme.colors.accent : theme.states.warning} />
       </View>
       <View style={styles.networkCopy}>
-        <Text style={styles.cardEyebrow}>SELECTED NETWORK</Text>
         <Text style={styles.networkName}>{network.displayName}</Text>
         <Text style={styles.networkStatus}>
           {configured
-            ? `${network.nativeCurrency.symbol} • Connected`
-            : `${network.nativeCurrency.symbol} • Not configured`}
+            ? network.environment.toUpperCase()
+            : 'Planned · Unavailable'}
         </Text>
       </View>
       <View style={styles.networkChevron}>
@@ -460,7 +430,7 @@ function NetworkCard({
 function ActionButton({
   label,
   icon,
-  comingSoon = true,
+  comingSoon = false,
   available = true,
   onPress,
 }: {
@@ -489,7 +459,7 @@ function ActionButton({
         pressed && styles.pressed,
       ]}
     >
-      <View style={styles.actionIcon}>
+      <View style={[styles.actionIcon, label === 'Swap' && { backgroundColor: '#302746' }]}>
         <Ionicons
           name={icon}
           size={20}
@@ -527,6 +497,7 @@ function PortfolioSummary({
   onRefresh,
   refreshing,
   networkConfigured,
+  onChooseNetwork,
 }: {
   state: PortfolioState;
   model: PortfolioReadModel | null;
@@ -535,6 +506,7 @@ function PortfolioSummary({
   onRefresh: () => void;
   refreshing: boolean;
   networkConfigured: boolean;
+  onChooseNetwork: () => void;
 }) {
   if (state === 'loading') return <PortfolioSkeleton />;
 
@@ -545,11 +517,11 @@ function PortfolioSummary({
           body={
             networkConfigured
               ? 'Check your connection and try again.'
-              : 'This network is not configured yet. Choose another network or try again.'
+              : 'Mainnet configuration is pending. Choose a configured network to view balances.'
           }
-          onAction={onRefresh}
-          actionLabel="Retry"
-          title="Couldn't load your balance."
+          onAction={networkConfigured ? onRefresh : onChooseNetwork}
+          actionLabel={networkConfigured ? "Retry" : "Choose network"}
+          title="Balance unavailable"
         />
         {diagnosticEnabled && errorMessage ? (
           <Text style={styles.refreshNotice}>Preview diagnostic: {errorMessage}</Text>
@@ -581,8 +553,7 @@ function PortfolioSummary({
     <View style={styles.portfolioCard}>
       <View style={styles.portfolioCardHeader}>
         <View>
-          <Text style={styles.cardEyebrow}>TOTAL BALANCE</Text>
-          <Text style={styles.portfolioTitle}>Your wallet</Text>
+          <Text style={styles.cardEyebrow}>NATIVE BALANCE</Text>
         </View>
         <RefreshButton onPress={onRefresh} refreshing={refreshing} compact />
       </View>
@@ -593,12 +564,9 @@ function PortfolioSummary({
         {balance.value}
       </Text>
       <View style={styles.balanceDetailRow}>
-        <WaveXStatusIndicator
-          label={balance.detail}
-          tone={balance.zero ? 'neutral' : 'info'}
-        />
+        <Text style={styles.networkName}>{balance.detail}</Text>
       </View>
-      <Text style={styles.portfolioBody}>{balance.supporting}</Text>
+
       {errorMessage ? (
         <Text style={styles.refreshNotice}>Refresh note: {errorMessage}</Text>
       ) : null}
@@ -689,8 +657,7 @@ function AssetPreview({
     <View style={styles.assetSection}>
       <View style={styles.sectionHeader}>
         <View>
-          <Text style={styles.cardEyebrow}>ASSET PREVIEW</Text>
-          <Text style={styles.sectionTitle}>Balances</Text>
+          <Text style={styles.sectionTitle}>Your assets</Text>
         </View>
         <Pressable
           accessibilityLabel="View all assets"
@@ -919,7 +886,7 @@ function AssetsBalanceSummary({
   const balance = getHomeBalancePresentation(state, model);
   return (
     <View style={styles.assetsBalanceCard}>
-      <Text style={styles.cardEyebrow}>PORTFOLIO VALUE</Text>
+      <Text style={styles.cardEyebrow}>NATIVE BALANCE</Text>
       <Text accessibilityLabel={`Portfolio value ${balance.value}`} style={styles.assetsBalanceValue}>
         {balance.value}
       </Text>
@@ -1126,28 +1093,7 @@ function PlaceholderDestination({
   );
 }
 
-export function WalletHomeShell({
-  wallet,
-  previewMode,
-  network,
-  networkRegistry,
-  readModelService,
-  createConstructionEngine,
-  createSigningDependency,
-  createBroadcastDependency,
-  activityService,
-  activityReadModelService,
-  authenticationSettings,
-  biometricAvailability,
-  swapQuoteService,
-  dappSessions = [],
-  dappAvailable = false,
-  onDAppDisconnect = async () => undefined,
-  onNetworkSelect,
-  onSecurity,
-  onLock,
-  onComingSoon,
-}: {
+type ShellProps = {
   wallet: Wallet;
   previewMode: boolean;
   network: EvmNetwork;
@@ -1176,7 +1122,43 @@ export function WalletHomeShell({
   onSecurity?: () => void;
   onLock: () => void;
   onComingSoon: (label: string) => void;
-}) {
+};
+
+export function WalletHomeShell(props: ShellProps) {
+  const [selection, setSelection] = useState<string | null>(null);
+  const account = props.wallet.accounts.find(item => item.accountId === selection) ?? props.wallet.accounts[0];
+  const wallet = useMemo(() => {
+    if (!account || account === props.wallet.accounts[0]) return props.wallet;
+    return { ...props.wallet, accounts: [account, ...props.wallet.accounts.filter(item => item !== account)] };
+  }, [props.wallet, account]);
+
+  return <AccountHome key={JSON.stringify([wallet.walletId, account?.accountId])}
+    {...props} wallet={wallet} onSelectAccount={setSelection} />;
+}
+
+function AccountHome({
+  onSelectAccount,
+  wallet,
+  previewMode,
+  network,
+  networkRegistry,
+  readModelService,
+  createConstructionEngine,
+  createSigningDependency,
+  createBroadcastDependency,
+  activityService,
+  activityReadModelService,
+  authenticationSettings,
+  biometricAvailability,
+  swapQuoteService,
+  dappSessions = [],
+  dappAvailable = false,
+  onDAppDisconnect = async () => undefined,
+  onNetworkSelect,
+  onSecurity,
+  onLock,
+  onComingSoon,
+}: ShellProps & { onSelectAccount: (accountId: string) => void }) {
   const insets = useSafeAreaInsets();
   const [destination, setDestination] = useState<Destination>('home');
   const [accountPanelVisible, setAccountPanelVisible] = useState(false);
@@ -1291,7 +1273,7 @@ export function WalletHomeShell({
         }
         setPortfolioError(message);
         setPortfolio(null);
-        setPortfolioState('unavailable');
+        setPortfolioState(network.configurationStatus === 'configured' ? 'error' : 'unavailable');
       } finally {
         if (requestId === portfolioRequestRef.current) {
           if (previewDiagnosticsEnabled) {
@@ -1311,7 +1293,7 @@ export function WalletHomeShell({
         }
       }
     },
-    [account, accountQuery, previewDiagnosticsEnabled, readModelService],
+    [account, accountQuery, network.configurationStatus, previewDiagnosticsEnabled, readModelService],
   );
 
   const refreshPortfolio = useCallback(() => {
@@ -1392,14 +1374,7 @@ export function WalletHomeShell({
 
   return (
     <View style={styles.shell}>
-      <LinearGradient
-        colors={theme.gradients.background}
-        locations={[0, 0.48, 1]}
-        style={StyleSheet.absoluteFill}
-      />
-      <View style={styles.orbTop} />
-      <View style={styles.orbBottom} />
-      <View style={[styles.shellContent, { paddingTop: insets.top + 18 }]}>
+      <View style={[styles.shellContent, { paddingTop: insets.top + 8 }]}>
         <Header
           onBack={() => setDestination('home')}
           wallet={wallet}
@@ -1426,7 +1401,7 @@ export function WalletHomeShell({
           <ScrollView
             contentContainerStyle={[
               styles.homeScrollContent,
-              { paddingBottom: insets.bottom + 102 },
+              { paddingBottom: theme.spacing.lg },
             ]}
             refreshControl={
               <RefreshControl
@@ -1443,6 +1418,7 @@ export function WalletHomeShell({
               onPress={() => setNetworkSelectorVisible(true)}
             />
             <PortfolioSummary
+              onChooseNetwork={() => setNetworkSelectorVisible(true)}
               diagnosticEnabled={previewMode}
               errorMessage={portfolioError}
               model={portfolio}
@@ -1477,13 +1453,7 @@ export function WalletHomeShell({
                   label="Swap"
                   onPress={() => setDestination('swap')}
                 />
-                <ActionButton
-                  available={false}
-                  comingSoon={false}
-                  icon="card-outline"
-                  label="Buy"
-                  onPress={() => undefined}
-                />
+
               </View>
             </View>
             <AssetPreview
@@ -1655,19 +1625,21 @@ export function WalletHomeShell({
           <PlaceholderDestination destination={destination} onBack={() => setDestination('home')} />
         )}
       </View>
+      <View style={{ paddingBottom: insets.bottom }}>
       <WaveXBottomNavigation
         items={navigationItems}
-        selectedKey={destination}
+        selectedKey={destination === 'asset-details' ? assetDetailsOrigin : ['receive', 'send'].includes(destination) ? 'home' : destination === 'dapps' ? 'settings' : destination}
         onSelect={(key) => {
           setReviewDraft(null);
           setSwapReviewQuote(null);
           setDestination(key as Destination);
         }}
       />
+      </View>
       <AccountPanel
         onClose={() => setAccountPanelVisible(false)}
         onLock={onLock}
-        onComingSoon={onComingSoon}
+        onSelect={onSelectAccount}
         visible={accountPanelVisible}
         wallet={wallet}
       />
@@ -1683,13 +1655,13 @@ export function WalletHomeShell({
 }
 
 const styles = StyleSheet.create({
-  shell: { flex: 1, backgroundColor: theme.colors.background },
+  shell: { flex: 1, backgroundColor: '#0a1122' },
   shellContent: { flex: 1 },
   orbTop: { position: 'absolute', top: -150, right: -125, width: 320, height: 320, borderRadius: 160, backgroundColor: 'rgba(80, 217, 255, 0.07)' },
   orbBottom: { position: 'absolute', bottom: -170, left: -160, width: 380, height: 380, borderRadius: 190, backgroundColor: 'rgba(124, 140, 255, 0.07)' },
   homeHeader: { paddingHorizontal: theme.spacing.lg, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   brandLockup: { flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm },
-  brandMark: { width: 38, height: 38, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(124, 140, 255, 0.55)' },
+  brandMark: { width: 48, height: 48, borderRadius: 12, overflow: 'hidden', borderWidth: 1, borderColor: 'rgba(124, 140, 255, 0.55)' },
   brandIcon: { width: '100%', height: '100%' },
   brandName: { color: theme.colors.foreground, fontFamily: 'Inter_700Bold', fontSize: 13, letterSpacing: 2 },
   brandProduct: { color: theme.colors.accent, fontFamily: 'Inter_600SemiBold', fontSize: 10, letterSpacing: 2.8, marginTop: 2 },
@@ -1762,19 +1734,19 @@ const styles = StyleSheet.create({
   eyebrow: { color: theme.colors.accent, fontFamily: theme.typography.eyebrow.fontFamily, fontSize: theme.typography.eyebrow.fontSize, letterSpacing: theme.typography.eyebrow.letterSpacing, lineHeight: theme.typography.eyebrow.lineHeight },
   heroTitle: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 34, lineHeight: 40, letterSpacing: -1.2 },
   body: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 14, lineHeight: 21 },
-  networkCard: { minHeight: 82, padding: theme.spacing.md, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderRadius: theme.radius.lg, backgroundColor: 'rgba(18, 29, 56, 0.86)', borderWidth: 1, borderColor: theme.colors.border },
+  networkCard: { minHeight: 48, flexDirection: 'row', alignItems: 'center', gap: 10 },
   networkIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(80, 217, 255, 0.1)' },
   networkCopy: { flex: 1, gap: 2 },
   cardEyebrow: { color: theme.colors.accent, fontFamily: theme.typography.eyebrow.fontFamily, fontSize: 10, letterSpacing: 1.25 },
   networkName: { color: theme.colors.foreground, fontFamily: theme.typography.bodyMedium.fontFamily, fontSize: 15 },
   networkStatus: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 11 },
   networkChevron: { width: 28, alignItems: 'center' },
-  portfolioCard: { padding: theme.spacing.lg, gap: theme.spacing.sm, borderRadius: theme.radius.lg, backgroundColor: 'rgba(18, 29, 56, 0.9)', borderWidth: 1, borderColor: 'rgba(80, 217, 255, 0.24)', ...theme.shadows.panel },
+  portfolioCard: { padding: theme.spacing.lg, gap: 8, borderRadius: 22, backgroundColor: '#131e36' },
   portfolioCardHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   portfolioTitle: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 22, lineHeight: 28, marginTop: 4 },
   portfolioBody: { color: theme.colors.mutedForeground, fontFamily: theme.typography.body.fontFamily, fontSize: 12, lineHeight: 18 },
   refreshNotice: { color: theme.states.warning, fontFamily: theme.typography.body.fontFamily, fontSize: 11, lineHeight: 17 },
-  balanceValue: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 52, lineHeight: 58, letterSpacing: -1.5, marginTop: theme.spacing.sm },
+  balanceValue: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 36, lineHeight: 44, letterSpacing: -1 },
   balanceDetailRow: { flexDirection: 'row', alignItems: 'center' },
   assetCountRow: { flexDirection: 'row', alignItems: 'baseline', gap: theme.spacing.sm, marginTop: theme.spacing.sm },
   assetCount: { color: theme.colors.foreground, fontFamily: theme.typography.title.fontFamily, fontSize: 48, lineHeight: 54, letterSpacing: -1.5 },
@@ -1783,13 +1755,13 @@ const styles = StyleSheet.create({
   errorCard: { borderColor: 'rgba(255, 101, 132, 0.38)' },
   stateIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(244, 200, 107, 0.1)' },
   refreshButton: { minHeight: 42, paddingHorizontal: theme.spacing.md, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: theme.radius.md, backgroundColor: theme.colors.secondary, borderWidth: 1, borderColor: theme.colors.border },
-  refreshButtonCompact: { width: 38, height: 38, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: theme.colors.secondary, borderWidth: 1, borderColor: theme.colors.border },
+  refreshButtonCompact: { width: 48, height: 48, alignItems: 'center', justifyContent: 'center', borderRadius: 19, backgroundColor: theme.colors.secondary, borderWidth: 1, borderColor: theme.colors.border },
   refreshText: { color: theme.colors.foreground, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
   actionsSection: { gap: theme.spacing.sm },
   actionsRow: { flexDirection: 'row', gap: theme.spacing.sm },
-  actionButton: { flex: 1, minHeight: 88, paddingVertical: theme.spacing.sm, alignItems: 'center', justifyContent: 'center', gap: 7, borderRadius: theme.radius.pill, backgroundColor: 'rgba(18, 29, 56, 0.72)', borderWidth: 1, borderColor: theme.colors.border },
+  actionButton: { flex: 1, minHeight: 72, alignItems: 'center', justifyContent: 'center', gap: 8 },
   actionButtonDisabled: { opacity: theme.states.disabledOpacity },
-  actionIcon: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(80, 217, 255, 0.1)' },
+  actionIcon: { width: 48, height: 48, borderRadius: 18, alignItems: 'center', justifyContent: 'center', backgroundColor: '#202c49' },
   actionLabel: { color: theme.colors.foreground, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
   actionUnavailable: { color: theme.colors.mutedForeground, fontFamily: theme.typography.micro.fontFamily, fontSize: 9 },
   assetSection: { gap: theme.spacing.sm },
@@ -1798,7 +1770,7 @@ const styles = StyleSheet.create({
   sectionCount: { color: theme.colors.mutedForeground, fontFamily: theme.typography.label.fontFamily, fontSize: 12 },
   viewAllButton: { minHeight: 36, paddingHorizontal: 6, flexDirection: 'row', alignItems: 'center', gap: 3 },
   viewAllText: { color: theme.colors.accent, fontFamily: theme.typography.label.fontFamily, fontSize: 11 },
-  assetList: { overflow: 'hidden', borderRadius: theme.radius.lg, backgroundColor: 'rgba(18, 29, 56, 0.78)', borderWidth: 1, borderColor: theme.colors.border },
+  assetList: { paddingHorizontal: 4 },
   assetRow: { minHeight: 76, paddingHorizontal: theme.spacing.md, paddingVertical: 12, flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm, borderBottomWidth: 1, borderBottomColor: 'rgba(126, 145, 191, 0.14)' },
   assetIcon: { width: 42, height: 42, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(124, 140, 255, 0.16)', borderWidth: 1, borderColor: 'rgba(124, 140, 255, 0.28)' },
   assetIconImage: { width: 25, height: 25, borderRadius: 8 },

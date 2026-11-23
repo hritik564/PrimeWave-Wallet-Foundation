@@ -595,7 +595,7 @@ export function WaveXBottomNavigation({
             accessibilityState={{ selected }}
             key={item.key}
             onPress={() => onSelect(item.key)}
-            style={({ pressed }) => [styles.navItem, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.navItem, selected && styles.navSelected, pressed && styles.pressed]}
           >
             <Ionicons name={item.icon} size={19} color={selected ? colors.accent : colors.textMuted} />
             <Text style={[styles.navLabel, selected && styles.navLabelSelected]}>{item.label}</Text>
@@ -757,8 +757,9 @@ const styles = StyleSheet.create({
   statusDot_error: { backgroundColor: colors.error },
   statusDot_info: { backgroundColor: colors.info },
   statusIndicatorText: { ...typography.caption, color: colors.textSecondary },
-  bottomNavigation: { minHeight: 76, paddingHorizontal: spacing.sm, paddingBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, ...shadows.panel },
-  navItem: { minWidth: 58, minHeight: 54, alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: radius.sm },
+  bottomNavigation: { minHeight: 64, paddingHorizontal: spacing.sm, paddingBottom: spacing.sm, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', backgroundColor: colors.surface, borderTopWidth: 1, borderTopColor: colors.border, },
+  navSelected: { backgroundColor: colors.secondary },
+  navItem: { flex: 1, minWidth: 0, minHeight: 54, alignItems: 'center', justifyContent: 'center', gap: 4, borderRadius: radius.sm },
   navLabel: { ...typography.micro, letterSpacing: 0.2, color: colors.textMuted },
   navLabelSelected: { color: colors.accent },
 });

@@ -82,13 +82,14 @@ test('derives honest portfolio and asset presentation states', () => {
 });
 
 test('keeps Home balance presentation honest when fiat values are unavailable', () => {
-  assert.deepEqual(getHomeBalancePresentation('empty', null), {
-    value: '0',
-    detail: 'Available balance',
-    supporting: 'No assets on this network yet',
-    available: true,
-    zero: true,
-  });
+  assert.equal(getHomeBalancePresentation('empty', null).zero, false);
+  for (const [amount, formatted] of [[0n, '0'], [1234567890123456789n, '1.234567890123456789']] as const) {
+    const model = { assets: [asset({ rawBalance: amount, formattedBalance: formatted })] } as unknown as NonNullable<Parameters<typeof getHomeBalancePresentation>[1]>;
+    const balance = getHomeBalancePresentation('available', model);
+    assert.equal(balance.value, formatted);
+    assert.equal(balance.detail, 'PWX');
+    assert.equal(balance.zero, amount === 0n);
+  }
   assert.equal(getHomeBalancePresentation('loading', null).available, false);
   assert.equal(getHomeBalancePresentation('unavailable', null).detail, 'Balance unavailable');
 });
@@ -100,7 +101,7 @@ test('does not collapse unavailable asset reads into an available zero balance',
   const presentation = getHomeBalancePresentation('available', model);
   assert.equal(presentation.value, '—');
   assert.equal(presentation.zero, false);
-  assert.equal(presentation.detail, 'Balance partially unavailable');
+  assert.equal(presentation.detail, 'Balance unavailable');
 });
 
 test('uses metadata fallbacks without inferring trust', () => {
