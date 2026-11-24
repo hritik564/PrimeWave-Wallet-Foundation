@@ -13,6 +13,8 @@ node_modules
 
 # Local credentials and environment files must not enter EAS build archives.
 /.replit
+/screenshots
+/attached_assets
 .env
 .env.*
 !.env.example
