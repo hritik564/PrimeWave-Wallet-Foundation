@@ -18,6 +18,7 @@ class MockRpc implements RpcTransport {
   balance = RAW_BALANCE;
   readonly balancesByAddress = new Map<string, bigint>();
   priorityFee = 1_500_000_000n;
+  failNextEstimate = false;
   holdNextEstimate = false;
   resolveEstimate: ((response: RpcTransportResponse) => void) | null = null;
   estimateRequestId: number | null = null;
@@ -28,6 +29,10 @@ class MockRpc implements RpcTransport {
     const body = JSON.parse(request.body) as { id: number; method: string; params?: unknown[] };
     this.requests.push(body.method);
     if (body.method === 'eth_sendRawTransaction') throw new Error('Broadcast forbidden in this integration test.');
+    if (body.method === 'eth_estimateGas' && this.failNextEstimate) {
+      this.failNextEstimate = false;
+      return { status: 200, body: { jsonrpc: '2.0', id: body.id, error: { code: -32000, message: 'temporary estimate failure' } } };
+    }
     const result = (): unknown => {
       switch (body.method) {
         case 'eth_chainId': return '0x1';
@@ -121,6 +126,15 @@ test('runtime Max quote is bound to the selected public account balance', async 
   assert.equal(second.rawBalance, 4_000_000_000_000_000_000n);
   assert.equal(second.maxAmount, second.rawBalance - second.feeReserve);
   await assert.rejects(engine.estimateNativeTransferMax({ accountId: 'account-1', from: secondAddress, to: TO }));
+});
+
+test('Max estimate can recover after a transient RPC gas-estimation failure', async () => {
+  const rpc = new MockRpc();
+  const { engine } = await runtime(rpc);
+  rpc.failNextEstimate = true;
+  await assert.rejects(engine.estimateNativeTransferMax({ accountId: 'account-1', from: FROM, to: TO }));
+  const retry = await engine.estimateNativeTransferMax({ accountId: 'account-1', from: FROM, to: TO });
+  assert.equal(retry.maxAmount, RAW_BALANCE - retry.feeReserve);
 });
 
 test('review rejects a Max draft when fees spike before signing-time rebuild', async () => {

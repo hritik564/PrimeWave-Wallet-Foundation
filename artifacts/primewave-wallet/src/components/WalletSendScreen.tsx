@@ -31,6 +31,7 @@ import type { Wallet } from '@/src/core/wallet/models';
 import { pastePublicAddress } from './public-address-actions';
 import {
   assetIdentityKey,
+  canRequestNativeMax,
   createPublicSendDraft,
   getSendableAssets,
   selectDefaultSendAsset,
@@ -204,6 +205,26 @@ export function WalletSendScreen({
   const recipientState = validateRecipient(recipient);
   const networkAvailable =
     network.enabled && network.configurationStatus === 'configured' && network.chainId !== null;
+  const canEstimateMax = canRequestNativeMax({
+    hasAccount: Boolean(account),
+    hasConstructionEngine: Boolean(constructionEngine),
+    isNativeAsset: selectedAsset?.assetType === 'native',
+    assetAvailable: selectedAsset?.availabilityState === 'available' && selectedAsset.rawBalance !== null,
+    recipientValid: normalizedRecipient !== null,
+    networkAvailable: networkAvailable && networkRegistry.getActiveNetwork()?.id === network.id &&
+      networkRegistry.getSelectionRevision() === selectionRevision,
+    appActive,
+    maxState,
+  });
+
+  const invalidatePendingMax = (clearAmount = false, amountToPreserve: string | null = null) => {
+    const shouldClearAmount = clearAmount || appliedMax.current;
+    maxRequestGuard.invalidate();
+    setMaxQuote(null);
+    setMaxState('idle');
+    appliedMax.current = false;
+    if (shouldClearAmount && amountToPreserve === null) setAmount('');
+  };
 
   useEffect(() => {
     setSelectedAssetKey(defaultAsset ? assetIdentityKey(defaultAsset.identity) : '');
@@ -235,11 +256,8 @@ export function WalletSendScreen({
     const revision = networkRegistry.getSelectionRevision();
     if (maxQuoteRevision.current !== revision) {
       maxQuoteRevision.current = revision;
-      maxRequestGuard.invalidate();
+      invalidatePendingMax(true);
       setMaxQuote(null);
-      setMaxState('idle');
-      setAmount('');
-      appliedMax.current = false;
     }
   }, [network.id, network.chainId, networkRegistry, selectionRevision]);
 
@@ -248,11 +266,8 @@ export function WalletSendScreen({
       const active = state === 'active';
       setAppActive(active);
       if (!active) {
-        maxRequestGuard.invalidate();
+        invalidatePendingMax(true);
         setMaxQuote(null);
-        setMaxState('idle');
-        setAmount('');
-        appliedMax.current = false;
       }
     });
     return () => subscription.remove();
@@ -306,8 +321,10 @@ export function WalletSendScreen({
   }, [network.id]);
 
   const handlePaste = async () => {
+    invalidatePendingMax();
     try {
       const value = await pastePublicAddress();
+      invalidatePendingMax();
       setRecipient(value);
       setPasteState('pasted');
     } catch {
@@ -333,10 +350,13 @@ export function WalletSendScreen({
   };
 
   const handleMax = async () => {
-    if (!account || !constructionEngine || !normalizedRecipient || !quoteIsCurrent) return;
+    if (!account || !constructionEngine || !normalizedRecipient || !canEstimateMax) return;
     const revision = networkRegistry.getSelectionRevision();
     const generation = maxRequestGuard.begin();
+    if (appliedMax.current) setAmount('');
+    appliedMax.current = false;
     setMaxState('loading');
+    setMaxQuote(null);
     try {
       const quote = await constructionEngine.estimateNativeTransferMax({
         accountId: account.accountId,
@@ -344,24 +364,42 @@ export function WalletSendScreen({
         to: normalizedRecipient,
       });
       if (
-        !maxRequestGuard.isCurrent(generation, revision, () => networkRegistry.getSelectionRevision(), () => appActive && networkRegistry.getActiveNetwork()?.id === network.id) ||
         quote.accountId !== account.accountId ||
         quote.address.toLowerCase() !== account.address.toLowerCase() ||
         quote.networkId !== network.id || quote.chainId !== BigInt(network.chainId as number) ||
         quote.recipient !== normalizedRecipient || quote.maxAmount < 0n || quote.maxAmount > quote.rawBalance
-      ) return;
-      setMaxQuote(quote);
-      maxQuoteRevision.current = revision;
-      setAmount(formatAssetAmount(quote.maxAmount, selectedAsset?.decimals ?? network.nativeCurrency.decimals));
-      appliedMax.current = true;
-      setMaxState('ready');
-    } catch {
-      if (maxRequestGuard.isCurrent(generation, revision, () => networkRegistry.getSelectionRevision(), () => true)) {
-        setMaxQuote(null);
-        setMaxState('unavailable');
-        appliedMax.current = false;
+      ) {
+        maxRequestGuard.applyIfCurrent(generation, revision, () => networkRegistry.getSelectionRevision(),
+          () => appActive && networkRegistry.getActiveNetwork()?.id === network.id,
+          () => { setMaxQuote(null); setMaxState('unavailable'); appliedMax.current = false; });
+        return;
       }
+      maxRequestGuard.applyIfCurrent(generation, revision, () => networkRegistry.getSelectionRevision(),
+        () => appActive && networkRegistry.getActiveNetwork()?.id === network.id,
+        () => {
+          setMaxQuote(quote);
+          maxQuoteRevision.current = revision;
+          // This is a programmatic Max application; user edits use handleAmountChange.
+          setAmount(formatAssetAmount(quote.maxAmount, selectedAsset?.decimals ?? network.nativeCurrency.decimals));
+          appliedMax.current = true;
+          setMaxState('ready');
+        });
+    } catch {
+      maxRequestGuard.applyIfCurrent(generation, revision, () => networkRegistry.getSelectionRevision(),
+        () => appActive && networkRegistry.getActiveNetwork()?.id === network.id,
+        () => { setMaxQuote(null); setMaxState('unavailable'); appliedMax.current = false; });
     }
+  };
+
+  const handleAmountChange = (value: string) => {
+    invalidatePendingMax(false, value);
+    setAmount(value);
+  };
+
+  const handleRecipientChange = (value: string) => {
+    invalidatePendingMax();
+    setRecipient(value);
+    setPasteState('idle');
   };
 
   return (
@@ -383,7 +421,7 @@ export function WalletSendScreen({
           <Text style={styles.networkName}>{network.displayName}</Text>
           <Ionicons name="chevron-down" size={16} color={palette.secondaryText} />
         </Pressable>
-        <AssetPicker asset={selectedAsset} assets={sendableAssets} onSelect={(next) => { setSelectedAssetKey(assetIdentityKey(next.identity)); setRecipient(''); setAmount(''); }} />
+        <AssetPicker asset={selectedAsset} assets={sendableAssets} onSelect={(next) => { invalidatePendingMax(true); setSelectedAssetKey(assetIdentityKey(next.identity)); setRecipient(''); setPasteState('idle'); }} />
         <View style={styles.fieldGroup}>
           <View style={styles.fieldHeader}>
             <Text style={styles.fieldLabel}>Recipient address</Text>
@@ -404,7 +442,7 @@ export function WalletSendScreen({
               accessibilityLabel="Recipient Address"
               autoCapitalize="none"
               autoCorrect={false}
-              onChangeText={(value) => { maxRequestGuard.invalidate(); setMaxQuote(null); setMaxState('idle'); appliedMax.current = false; setRecipient(value); setPasteState('idle'); }}
+              onChangeText={handleRecipientChange}
               placeholder="0x..."
               placeholderTextColor={palette.secondaryText}
               selectTextOnFocus={false}
@@ -424,9 +462,9 @@ export function WalletSendScreen({
         <View style={styles.fieldGroup}>
           <View style={styles.fieldHeader}><Text style={styles.fieldLabel}>Amount</Text><Text style={styles.amountUnit}>{selectedAsset?.symbol ?? ''}</Text></View>
           <View style={[styles.inputShell, validation.amount.state === 'invalid' && styles.inputError, validation.amount.state === 'valid' && styles.inputValid]}>
-            <TextInput accessibilityLabel="Amount" autoCapitalize="none" autoCorrect={false} keyboardType="decimal-pad" onChangeText={setAmount} placeholder="0.00" placeholderTextColor={palette.secondaryText} style={styles.input} value={amount} />
-            <Pressable accessibilityLabel="Use maximum transferable balance after reserving network fees" accessibilityRole="button" disabled={!quoteIsCurrent || !maxAmount} accessibilityState={{ disabled: !quoteIsCurrent || !maxAmount }} onPress={() => { void handleMax(); }} style={({ pressed }) => [styles.maxButton, pressed && styles.pressed]}>
-              <Text style={[styles.maxText, (!quoteIsCurrent || !maxAmount) && styles.helperText]}>Max</Text>
+            <TextInput accessibilityLabel="Amount" autoCapitalize="none" autoCorrect={false} keyboardType="decimal-pad" onChangeText={handleAmountChange} placeholder="0.00" placeholderTextColor={palette.secondaryText} style={styles.input} value={amount} />
+            <Pressable accessibilityLabel={maxState === 'unavailable' ? 'Retry maximum transferable estimate' : 'Use maximum transferable balance after reserving network fees'} accessibilityRole="button" disabled={!canEstimateMax} accessibilityState={{ disabled: !canEstimateMax }} onPress={() => { void handleMax(); }} style={({ pressed }) => [styles.maxButton, pressed && styles.pressed]}>
+              <Text style={[styles.maxText, !canEstimateMax && styles.helperText]}>Max</Text>
             </Pressable>
           </View>
           {validation.amount.state === 'invalid' ? <Text accessibilityRole="alert" style={styles.errorText}>{validation.amount.message}</Text> : null}
@@ -442,6 +480,7 @@ export function WalletSendScreen({
             {maxState === 'loading' ? 'Estimating gas and reserving the network fee…'
               : maxState === 'ready' && maxQuote ? `Max reserves up to ${formatAssetAmount(maxQuote.feeReserve, selectedAsset.decimals ?? 18)} ${network.nativeCurrency.symbol} for network fees.`
               : maxState === 'unavailable' ? 'Max is unavailable because the balance, gas, or fee estimate could not be verified.'
+              : normalizedRecipient ? 'Tap Max to calculate a fresh transferable amount after network fees.'
               : 'Enter a valid recipient to estimate Max after reserving network fees.'}
           </Text>}
         </View>

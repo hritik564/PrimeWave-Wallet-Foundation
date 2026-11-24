@@ -48,6 +48,35 @@ export class NativeMaxRequestGuard {
       selectionRevision === getSelectionRevision() &&
       isContextCurrent();
   }
+
+  applyIfCurrent(
+    generation: number,
+    selectionRevision: number,
+    getSelectionRevision: () => number,
+    isContextCurrent: () => boolean,
+    apply: () => void,
+  ): boolean {
+    if (!this.isCurrent(generation, selectionRevision, getSelectionRevision, isContextCurrent)) {
+      return false;
+    }
+    apply();
+    return true;
+  }
+}
+
+export function canRequestNativeMax(input: {
+  readonly hasAccount: boolean;
+  readonly hasConstructionEngine: boolean;
+  readonly isNativeAsset: boolean;
+  readonly assetAvailable: boolean;
+  readonly recipientValid: boolean;
+  readonly networkAvailable: boolean;
+  readonly appActive: boolean;
+  readonly maxState: 'idle' | 'loading' | 'ready' | 'unavailable';
+}): boolean {
+  return input.hasAccount && input.hasConstructionEngine && input.isNativeAsset &&
+    input.assetAvailable && input.recipientValid && input.networkAvailable &&
+    input.appActive && input.maxState !== 'loading';
 }
 
 export function assetIdentityKey(identity: AssetIdentity): string {
