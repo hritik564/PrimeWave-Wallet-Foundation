@@ -12,6 +12,7 @@ out-tsc
 node_modules
 
 # Local credentials and environment files must not enter EAS build archives.
+/.replit
 .env
 .env.*
 !.env.example
