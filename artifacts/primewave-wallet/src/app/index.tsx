@@ -17,7 +17,7 @@ import {
   createPreviewPortfolioReadModelService,
 } from '@/src/core/development';
 import {
-  createAppPortfolioRuntime,
+  createWalletPortfolioRuntime,
   type AppPortfolioRuntime,
 } from '@/src/core/portfolio';
 import {
@@ -646,14 +646,6 @@ export default function FoundationScreen() {
   );
   const previewTestMode = useMemo(() => new PreviewTestMode(), []);
   const [runtimeGeneration, setRuntimeGeneration] = useState(0);
-  const portfolioRuntime = useMemo<AppPortfolioRuntime | null>(
-    () => previewMode ? null : createAppPortfolioRuntime(),
-    [previewMode, runtimeGeneration],
-  );
-  const portfolioReadModelService = useMemo(
-    () => previewMode ? createPreviewPortfolioReadModelService() : portfolioRuntime?.readModel ?? null,
-    [previewMode, portfolioRuntime],
-  );
   const swapQuoteService = useMemo(() => {
     try {
       return new SwapQuoteService(
@@ -977,6 +969,18 @@ export default function FoundationScreen() {
       }
     },
     [access, accessRevision, previewMode, previewTestMode],
+  );
+  const portfolioRuntime = useMemo<AppPortfolioRuntime | null>(
+    () => createWalletPortfolioRuntime({
+      previewMode,
+      walletId: currentWallet?.walletId ?? null,
+      preferenceStorage: AsyncStorage,
+    }, defaultNetworkRegistry, createEvmRpcProvider),
+    [previewMode, currentWallet?.walletId, runtimeGeneration],
+  );
+  const portfolioReadModelService = useMemo(
+    () => previewMode ? createPreviewPortfolioReadModelService() : portfolioRuntime?.readModel ?? null,
+    [previewMode, portfolioRuntime],
   );
   const activityService = useMemo(
     () => previewMode || !currentWallet ? null : new ActivityService({
@@ -1645,6 +1649,7 @@ export default function FoundationScreen() {
       if (!access) return;
       await nativeAccess().resetLocalWallet();
     }
+    try { await portfolioRuntime?.clear(); } catch { /* A newly generated wallet identity isolates any uncleared preference snapshot. */ }
     setRuntimeGeneration(generation => generation + 1);
     setSettings({ biometricEnabled: false, autoLockPolicy: 0, pinConfigured: false });
     setPin('');

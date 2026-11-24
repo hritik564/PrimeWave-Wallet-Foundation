@@ -38,6 +38,7 @@ export type AssetErrorCode =
   | 'DISCOVERY_LOG_QUERY_FAILED'
   | 'DISCOVERY_METADATA_FAILED'
   | 'DISCOVERY_PERSISTENCE_FAILED'
+  | 'DISCOVERY_PREFERENCES_UNAVAILABLE'
   | 'DISCOVERY_UNSUPPORTED'
   | 'PORTFOLIO_INVALID_REQUEST'
   | 'PORTFOLIO_NETWORK_UNAVAILABLE'
@@ -90,6 +91,7 @@ const SAFE_MESSAGES: Record<AssetErrorCode, string> = {
   DISCOVERY_LOG_QUERY_FAILED: 'The token discovery log query failed.',
   DISCOVERY_METADATA_FAILED: 'The discovered token metadata could not be read.',
   DISCOVERY_PERSISTENCE_FAILED: 'The token preference could not be saved.',
+  DISCOVERY_PREFERENCES_UNAVAILABLE: 'Saved token preferences are unavailable. Existing token settings were preserved.',
   DISCOVERY_UNSUPPORTED: 'This token discovery operation is not supported.',
   PORTFOLIO_INVALID_REQUEST: 'The portfolio request is invalid.',
   PORTFOLIO_NETWORK_UNAVAILABLE: 'The portfolio network is unavailable.',

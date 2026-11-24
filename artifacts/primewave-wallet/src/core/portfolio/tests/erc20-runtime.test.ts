@@ -1,13 +1,13 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import { encodeAbiParameters, encodeFunctionResult, parseAbiParameters } from 'viem';
-import { TokenDiscoveryService, InMemoryTokenPreferenceRepository } from '@/src/core/assets';
+import { TokenDiscoveryService, InMemoryTokenPreferenceRepository, type TokenPreferenceKeyValueStorage } from '@/src/core/assets';
 import { EvmAccountStateService } from '@/src/core/blockchain/account-state';
 import { createEvmRpcProvider, type RpcTransport } from '@/src/core/blockchain/rpc';
 import { NetworkRegistry, supportedNetworks } from '@/src/core/networks';
 import { AssetRegistry, ERC20TokenService } from '@/src/core/assets';
 import { PortfolioAggregationService } from '../service';
-import { createAppPortfolioRuntime } from '../runtime';
+import { createAppPortfolioRuntime, createWalletPortfolioRuntime } from '../runtime';
 
 const accounts = [
   { accountId: 'account-a', accountAddress: '0x0000000000000000000000000000000000000001' },
@@ -21,7 +21,9 @@ const contracts = [
 function str(value: string) { return encodeFunctionResult({abi:[{type:'function',name:'f',stateMutability:'view',inputs:[],outputs:[{type:'string'}]}],functionName:'f',result:value}); }
 function uint(value: bigint) { return encodeAbiParameters(parseAbiParameters('uint256'),[value]); }
 
-function fixture(options: { wrongChain?: boolean; failToken?: boolean; delayed?: boolean; failInitialProvider?: boolean } = {}) {
+function fixture(options: { wrongChain?: boolean; failToken?: boolean; delayed?: boolean; delayedMetadata?: boolean; failInitialProvider?: boolean } = {}) {
+  let delayMetadata = options.delayedMetadata ?? false;
+  let tokenName = 'Test Token';
   const registry = new NetworkRegistry(supportedNetworks); registry.selectActiveNetwork('ethereum');
   const tokenBalances = new Map<string,bigint>();
   let started!:()=>void, release!:()=>void;
@@ -36,10 +38,11 @@ function fixture(options: { wrongChain?: boolean; failToken?: boolean; delayed?:
       const to=String(params[0].to).toLowerCase(), data=String(params[0].data);
       if(options.failToken && to===contracts[0] && data.startsWith('0x70a08231')) throw Error('RPC unavailable');
       if(data.startsWith('0x70a08231') && options.delayed && to===contracts[0]) { started(); await gate; }
+      if(delayMetadata && to===contracts[0] && ['0x313ce567','0x06fdde03','0x95d89b41'].some(selector=>data.startsWith(selector))) { started(); await gate; }
       if(data.startsWith('0x70a08231')) {
         const addr='0x'+data.slice(-40); result=uint(tokenBalances.get(to+addr)??0n);
       } else if(data.startsWith('0x313ce567')) result=uint(18n);
-      else if(data.startsWith('0x06fdde03')) result=str('Test Token');
+      else if(data.startsWith('0x06fdde03')) result=str(tokenName);
       else if(data.startsWith('0x95d89b41')) result=str('TST');
       else throw Error('Unexpected token call');
     } else throw Error('Unexpected RPC method');
@@ -58,7 +61,24 @@ function fixture(options: { wrongChain?: boolean; failToken?: boolean; delayed?:
     return createEvmRpcProvider(r,{transport:networkTransport});
   };
   const runtime=createAppPortfolioRuntime(registry,createProvider);
-  return {registry,runtime,readModel:runtime.readModel,tokenBalances,pending,release,createProvider,transport,getProviderAttempts:()=>providerAttempts};
+  return {registry,runtime,readModel:runtime.readModel,tokenBalances,pending,release,createProvider,transport,getProviderAttempts:()=>providerAttempts,setDelayedMetadata:(value:boolean)=>{delayMetadata=value;},setTokenName:(value:string)=>{tokenName=value;}};
+}
+
+class PreferenceStorage implements TokenPreferenceKeyValueStorage {
+  readonly values = new Map<string, string>();
+  failReads = false;
+  writes = 0;
+  reads = 0;
+  deferWrites = false;
+  pending: { key: string; value: string; resolve: () => void }[] = [];
+  async getItem(key: string) { this.reads++; if (this.failReads) throw new Error('read failure'); return this.values.get(key) ?? null; }
+  async setItem(key: string, value: string) {
+    this.writes++;
+    if (this.deferWrites) await new Promise<void>((resolve) => this.pending.push({ key, value, resolve: () => { this.values.set(key, value); resolve(); } }));
+    else this.values.set(key, value);
+  }
+  async removeItem(key: string) { this.values.delete(key); }
+  completeNext() { const pending = this.pending.shift(); assert.ok(pending); pending.resolve(); }
 }
 
 test('native runtime gracefully reports no candidates and isolates network identity', async()=>{
@@ -204,4 +224,116 @@ test('portfolio query accepts only explicit token candidates and contract identi
   const other=await bscDiscovery.addUserToken({networkId:'bnb-smart-chain',contractAddress:contracts[0]});
   assert.notEqual(token.assetIdentity.networkId,other.assetIdentity.networkId);
   assert.notEqual(token.assetIdentity,other.assetIdentity);
+});
+
+test('production runtime restores registered token after restart and reads a fresh account-specific balance', async()=>{
+  const f=fixture(); const storage=new PreferenceStorage();
+  const first=createAppPortfolioRuntime(f.registry,f.createProvider,{walletId:'wallet-restart',preferenceStorage:storage});
+  await first.registerToken({networkId:'ethereum',contractAddress:contracts[0]});
+  for (const raw of storage.values.values()) assert.equal(raw.includes('rawBalance'),false);
+  f.setTokenName('Revalidated Token');
+  f.tokenBalances.set(contracts[0]+accounts[0].accountAddress,41n);
+
+  const restarted=createAppPortfolioRuntime(f.registry,f.createProvider,{walletId:'wallet-restart',preferenceStorage:storage});
+  const accountOne=await restarted.readModel.getPortfolio({...accounts[0],networkId:'ethereum'});
+  assert.equal(accountOne.assets.find(asset=>asset.identity.assetType==='fungible_token')?.rawBalance,41n);
+  assert.equal(restarted.getRegisteredTokens().length,1);
+  assert.equal(restarted.getRegisteredTokens()[0]?.token.name,'Revalidated Token');
+  f.tokenBalances.set(contracts[0]+accounts[0].accountAddress,99n);
+  const fresh=await restarted.readModel.getPortfolio({...accounts[0],networkId:'ethereum'});
+  assert.equal(fresh.assets.find(asset=>asset.identity.assetType==='fungible_token')?.rawBalance,99n);
+  f.tokenBalances.set(contracts[0]+accounts[1].accountAddress,7n);
+  const accountTwo=await restarted.readModel.getPortfolio({...accounts[1],networkId:'ethereum'});
+  assert.equal(accountTwo.assets.find(asset=>asset.identity.assetType==='fungible_token')?.rawBalance,7n);
+});
+
+test('production runtime retains same-address token preferences separately by network and visibility',async()=>{
+  const f=fixture(); const storage=new PreferenceStorage();
+  const first=createAppPortfolioRuntime(f.registry,f.createProvider,{walletId:'wallet-networks',preferenceStorage:storage});
+  await first.registerToken({networkId:'ethereum',contractAddress:contracts[0],visibility:'hidden'});
+  f.registry.selectActiveNetwork('bnb-smart-chain');
+  await first.registerToken({networkId:'bnb-smart-chain',contractAddress:contracts[0]});
+  const restarted=createAppPortfolioRuntime(f.registry,f.createProvider,{walletId:'wallet-networks',preferenceStorage:storage});
+  const bnb=await restarted.readModel.getPortfolio({...accounts[0],networkId:'bnb-smart-chain',includeHidden:true});
+  assert.equal(bnb.assets.filter(asset=>asset.identity.assetType==='fungible_token').length,1);
+  assert.equal(restarted.getRegisteredTokens()[0]?.assetIdentity.networkId,'bnb-smart-chain');
+  f.registry.selectActiveNetwork('ethereum');
+  const ethereum=await restarted.readModel.getPortfolio({...accounts[0],networkId:'ethereum',includeHidden:true});
+  assert.equal(ethereum.assets.filter(asset=>asset.identity.assetType==='fungible_token').length,1);
+  const restoredHidden=restarted.getRegisteredTokens().find(candidate=>candidate.assetIdentity.networkId==='ethereum');
+  assert.equal(restoredHidden?.visibility,'hidden');
+});
+
+test('production runtime deduplicates registration, rejects invalid identities, and isolates wallets',async()=>{
+  const f=fixture(); const storage=new PreferenceStorage();
+  const first=createAppPortfolioRuntime(f.registry,f.createProvider,{walletId:'wallet-isolated-a',preferenceStorage:storage});
+  await first.registerToken({networkId:'ethereum',contractAddress:contracts[0]});
+  await first.registerToken({networkId:'ethereum',contractAddress:contracts[0]});
+  assert.equal(first.getRegisteredTokens().length,1);
+  await assert.rejects(first.registerToken({networkId:'ethereum',contractAddress:'incomplete'}));
+  const second=createAppPortfolioRuntime(f.registry,f.createProvider,{walletId:'wallet-isolated-b',preferenceStorage:storage});
+  const result=await second.readModel.getPortfolio({...accounts[0],networkId:'ethereum'});
+  assert.equal(result.assets.filter(asset=>asset.identity.assetType==='fungible_token').length,0);
+  assert.equal(second.getRegisteredTokens().length,0);
+});
+
+test('production runtime reports corrupt and unreadable preferences without overwriting them',async()=>{
+  const f=fixture(); const storage=new PreferenceStorage();
+  const first=createAppPortfolioRuntime(f.registry,f.createProvider,{walletId:'wallet-storage',preferenceStorage:storage});
+  await first.registerToken({networkId:'ethereum',contractAddress:contracts[0]});
+  const original=new Map(storage.values); const writes=storage.writes;
+  storage.failReads=true;
+  const unavailable=createAppPortfolioRuntime(f.registry,f.createProvider,{walletId:'wallet-storage',preferenceStorage:storage});
+  await assert.rejects(unavailable.readModel.getPortfolio({...accounts[0],networkId:'ethereum'}), {code:'READ_MODEL_PREFERENCES_UNAVAILABLE'});
+  assert.equal(unavailable.getPreferenceState(),'unavailable');
+  assert.equal(storage.writes,writes);
+  assert.deepEqual(storage.values,original);
+  storage.failReads=false;
+  const recovered=createAppPortfolioRuntime(f.registry,f.createProvider,{walletId:'wallet-storage',preferenceStorage:storage});
+  assert.equal((await recovered.readModel.getPortfolio({...accounts[0],networkId:'ethereum'})).assets.filter(asset=>asset.identity.assetType==='fungible_token').length,1);
+
+  const key=[...storage.values.keys()][0]!;
+  storage.values.set(key,'corrupt');
+  const corrupted=createAppPortfolioRuntime(f.registry,f.createProvider,{walletId:'wallet-storage',preferenceStorage:storage});
+  await assert.rejects(corrupted.readModel.getPortfolio({...accounts[0],networkId:'ethereum'}), {code:'READ_MODEL_PREFERENCES_UNAVAILABLE'});
+  assert.equal(corrupted.getRegisteredTokens().length,0);
+});
+
+test('network switch during persisted-token metadata validation rejects stale restoration',async()=>{
+  const delayed=fixture();
+  const delayedStorage=new PreferenceStorage();
+  const seed=createAppPortfolioRuntime(delayed.registry,delayed.createProvider,{walletId:'wallet-delayed',preferenceStorage:delayedStorage});
+  await seed.registerToken({networkId:'ethereum',contractAddress:contracts[0]});
+  delayed.setDelayedMetadata(true);
+  const reopened=createAppPortfolioRuntime(delayed.registry,delayed.createProvider,{walletId:'wallet-delayed',preferenceStorage:delayedStorage});
+  const pending=reopened.readModel.getPortfolio({...accounts[0],networkId:'ethereum'});
+  await delayed.pending;
+  delayed.registry.selectActiveNetwork('bnb-smart-chain');
+  delayed.release();
+  await assert.rejects(pending);
+  const otherNetwork=await reopened.readModel.getPortfolio({...accounts[0],networkId:'bnb-smart-chain'});
+  assert.equal(otherNetwork.assets.filter(asset=>asset.identity.assetType==='fungible_token').length,0);
+});
+
+test('production runtime reset retires delayed registration writes before clearing wallet partition',async()=>{
+  const f=fixture(); const storage=new PreferenceStorage();
+  const runtime=createAppPortfolioRuntime(f.registry,f.createProvider,{walletId:'wallet-runtime-reset',preferenceStorage:storage});
+  await runtime.ready(); storage.deferWrites=true;
+  const registration=runtime.registerToken({networkId:'ethereum',contractAddress:contracts[0]});
+  while(storage.pending.length===0) await Promise.resolve();
+  const reset=runtime.clear();
+  storage.completeNext();
+  await registration;
+  await reset;
+  assert.equal(storage.values.size,0);
+  const afterReset=createAppPortfolioRuntime(f.registry,f.createProvider,{walletId:'wallet-runtime-reset',preferenceStorage:storage});
+  assert.equal((await afterReset.readModel.getPortfolio({...accounts[0],networkId:'ethereum'})).assets.filter(asset=>asset.identity.assetType==='fungible_token').length,0);
+});
+
+test('Preview Test Mode never constructs or accesses the persistent wallet preference runtime',()=>{
+  const storage=new PreferenceStorage(); storage.failReads=true;
+  const runtime=createWalletPortfolioRuntime({previewMode:true,walletId:'preview-fixture',preferenceStorage:storage});
+  assert.equal(runtime,null);
+  assert.equal(storage.reads,0);
+  assert.equal(storage.writes,0);
 });

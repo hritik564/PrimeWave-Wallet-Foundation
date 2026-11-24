@@ -34,6 +34,7 @@ import type {
   TokenDiscoveryServiceOptions,
   TokenMetadataSnapshot,
   TokenPreferenceRecord,
+  TokenPreferencePersistenceState,
   TokenPreferenceRepository,
   TokenProvenance,
   TokenVisibility,
@@ -412,6 +413,47 @@ export class TokenDiscoveryService {
     this.candidates.set(getAssetIdentityKey(identity), candidate);
   }
 
+  restorePreference(record: TokenPreferenceRecord, token: ERC20Token): TokenCandidate {
+    const identity = token as TokenAssetIdentity;
+    if (
+      record.chainId !== token.chainId ||
+      getAssetIdentityKey(record.assetIdentity) !== getAssetIdentityKey(identity) ||
+      record.assetIdentity.contractAddress !== token.contractAddress ||
+      record.assetIdentity.networkId !== token.networkId
+    ) {
+      throw new AssetError('DISCOVERY_INVALID_TOKEN');
+    }
+    const provenance: FunctionalTokenProvenance = record.provenance.includes('user_added')
+      ? 'user_added'
+      : 'discovered';
+    const candidate = Object.freeze({
+      token,
+      assetIdentity: identity,
+      provenance,
+      provenanceObservations: Object.freeze([]),
+      discoveryState: record.visibility === 'hidden'
+        ? 'hidden'
+        : token.metadataStatus === 'unavailable'
+          ? 'unavailable'
+          : provenance === 'user_added' ? 'manually_added' : 'discovered',
+      verificationStatus: token.verificationStatus,
+      metadataSnapshot: metadataSnapshot(token, this.now()),
+      visibility: record.visibility,
+      createdAtMs: record.createdAtMs,
+      updatedAtMs: record.updatedAtMs,
+    } satisfies TokenCandidate);
+    this.restoreCandidate(candidate);
+    return candidate;
+  }
+
+  getPersistenceState(): TokenPreferencePersistenceState {
+    return this.repository.getPersistenceState?.() ?? 'ready';
+  }
+
+  subscribePersistenceState(listener: (state: TokenPreferencePersistenceState) => void): () => void {
+    return this.repository.subscribePersistenceState?.(listener) ?? (() => undefined);
+  }
+
   getCandidate(identity: TokenAssetIdentity): TokenCandidate | undefined {
     return this.candidates.get(getAssetIdentityKey(identity));
   }
@@ -534,6 +576,7 @@ export class TokenDiscoveryService {
     try {
       await this.repository.save({
         assetIdentity: identity,
+        chainId: input.token.chainId,
         visibility: candidate.visibility,
         provenance,
         metadataSnapshot: snapshot,
@@ -541,7 +584,8 @@ export class TokenDiscoveryService {
         updatedAtMs: candidate.updatedAtMs,
       });
     } catch {
-      this.candidates.delete(key);
+      if (existing) this.candidates.set(key, existing);
+      else this.candidates.delete(key);
       throw new AssetError('DISCOVERY_PERSISTENCE_FAILED');
     }
     return candidate;

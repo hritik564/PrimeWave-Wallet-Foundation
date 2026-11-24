@@ -23,7 +23,8 @@ import type {
 export type PortfolioReadModelErrorCode =
   | 'READ_MODEL_INVALID_REQUEST'
   | 'READ_MODEL_CONTEXT_MISMATCH'
-  | 'READ_MODEL_AGGREGATION_FAILED';
+  | 'READ_MODEL_AGGREGATION_FAILED'
+  | 'READ_MODEL_PREFERENCES_UNAVAILABLE';
 
 const SAFE_MESSAGES: Record<PortfolioReadModelErrorCode, string> = {
   READ_MODEL_INVALID_REQUEST: 'The portfolio read-model request is invalid.',
@@ -31,6 +32,8 @@ const SAFE_MESSAGES: Record<PortfolioReadModelErrorCode, string> = {
     'The portfolio result does not match the requested account or network.',
   READ_MODEL_AGGREGATION_FAILED:
     'The portfolio read-model could not be generated.',
+  READ_MODEL_PREFERENCES_UNAVAILABLE:
+    'Saved token preferences are unavailable. Existing token settings were preserved.',
 };
 
 export class PortfolioReadModelError extends Error {
@@ -254,7 +257,7 @@ export class PortfolioReadModelService {
         includeHidden: query.includeHidden,
       });
     } catch (error) {
-      if (error instanceof AssetError) throw error;
+      if (error instanceof AssetError || error instanceof PortfolioReadModelError) throw error;
       throw new PortfolioReadModelError('READ_MODEL_AGGREGATION_FAILED');
     }
 

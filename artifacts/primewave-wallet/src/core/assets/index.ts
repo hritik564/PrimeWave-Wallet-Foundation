@@ -29,6 +29,8 @@ export {
 export {
   InMemoryTokenPreferenceRepository,
 } from './token/discovery/repository';
+export { PersistentTokenPreferenceRepository } from './token/discovery/persistent-repository';
+export type { TokenPreferenceKeyValueStorage } from './token/discovery/persistent-repository';
 export type {
   AssetAvailability,
   AssetAvailabilityStatus,
@@ -63,6 +65,7 @@ export type {
   TokenMetadataSnapshot,
   TokenPreferenceRecord,
   TokenPreferenceRepository,
+  TokenPreferencePersistenceState,
   TokenProvenance,
   TokenVisibility,
   TransferDiscoveryRequest,

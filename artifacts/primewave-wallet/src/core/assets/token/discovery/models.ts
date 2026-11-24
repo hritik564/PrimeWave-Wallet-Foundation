@@ -104,6 +104,7 @@ export interface TokenDiscoveryServiceOptions {
 
 export interface TokenPreferenceRecord {
   readonly assetIdentity: TokenAssetIdentity;
+  readonly chainId: number;
   readonly visibility: TokenVisibility;
   readonly provenance: readonly TokenProvenance[];
   readonly metadataSnapshot: TokenMetadataSnapshot;
@@ -116,4 +117,10 @@ export interface TokenPreferenceRepository {
   list(): Promise<readonly TokenPreferenceRecord[]>;
   save(record: TokenPreferenceRecord): Promise<void>;
   delete(identity: TokenAssetIdentity): Promise<void>;
+  ready?(): Promise<void>;
+  clearDurable?(): Promise<void>;
+  getPersistenceState?(): TokenPreferencePersistenceState;
+  subscribePersistenceState?(listener: (state: TokenPreferencePersistenceState) => void): () => void;
 }
+
+export type TokenPreferencePersistenceState = 'loading' | 'ready' | 'write-failed' | 'unavailable' | 'cleared';

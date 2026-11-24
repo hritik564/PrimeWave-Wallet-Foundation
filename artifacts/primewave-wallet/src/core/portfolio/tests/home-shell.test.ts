@@ -160,6 +160,10 @@ test('sanitizes application errors before they reach the Home UI', () => {
     'The portfolio read-model could not be generated.',
   );
   assert.equal(
+    safePortfolioMessage(new PortfolioReadModelError('READ_MODEL_PREFERENCES_UNAVAILABLE')),
+    'Saved token preferences are unavailable. Existing token settings were preserved.',
+  );
+  assert.equal(
     safePortfolioDiagnostic(new PortfolioReadModelError('READ_MODEL_AGGREGATION_FAILED')),
     'READ_MODEL_AGGREGATION_FAILED: The portfolio read-model could not be generated.',
   );
