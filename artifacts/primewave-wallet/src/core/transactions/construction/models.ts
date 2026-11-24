@@ -108,6 +108,20 @@ export type TransactionPreview =
   | LegacyTransactionPreview
   | Eip1559TransactionPreview;
 
+export interface NativeTransferMaxQuote {
+  readonly accountId: string;
+  readonly address: string;
+  readonly networkId: string;
+  readonly chainId: bigint;
+  readonly recipient: string;
+  readonly rawBalance: bigint;
+  readonly gasLimit: bigint;
+  readonly feeModel: 'legacy' | 'eip1559';
+  readonly maxFeePerGas: bigint;
+  readonly feeReserve: bigint;
+  readonly maxAmount: bigint;
+}
+
 export interface TransactionConstructionEngineOptions {
   readonly now?: () => number;
   readonly gasFeeEngine?: GasFeeEngineDependency;
@@ -176,6 +190,12 @@ export interface GasFeeEngineDependency {
 }
 
 export interface AccountStateDependency {
+  getNativeBalance(address: string): Promise<{
+    readonly address: string;
+    readonly networkId: string;
+    readonly chainId: bigint;
+    readonly raw: bigint;
+  }>;
   getNonce(address: string): Promise<{
     readonly address: string;
     readonly networkId: string;

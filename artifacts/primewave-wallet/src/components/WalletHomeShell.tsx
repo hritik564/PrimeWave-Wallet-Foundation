@@ -1596,6 +1596,8 @@ function AccountHome({
                 ) ?? null
               }
               network={network}
+              networkRegistry={networkRegistry}
+              createConstructionEngine={createConstructionEngine}
               onComingSoon={onComingSoon}
               onNetworkPress={() => setNetworkSelectorVisible(true)}
               onReviewDraft={(draft) => {

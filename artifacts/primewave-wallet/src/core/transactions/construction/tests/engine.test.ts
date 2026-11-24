@@ -70,11 +70,12 @@ function rpcError(
   };
 }
 
-function createRegistry(includeBase = false): NetworkRegistry {
+function createRegistry(includeBase = false, includeBnb = false): NetworkRegistry {
   const networks = supportedNetworks.filter(
     (network) =>
       network.id === 'primewave' ||
       network.id === 'ethereum' ||
+      (includeBnb && network.id === 'bnb-smart-chain') ||
       (includeBase && network.id === 'base'),
   );
   const registry = new NetworkRegistry(networks);
@@ -85,16 +86,18 @@ function createRegistry(includeBase = false): NetworkRegistry {
 function standardHandler(options: {
   nonce?: string;
   gas?: string;
+  balance?: string;
   gasPrice?: string;
   baseFee?: string | null;
   priorityFee?: string;
   chainIds?: string[];
+  includeBnb?: boolean;
   onRequest?: (method: string, registry: NetworkRegistry) => void;
 } = {}): {
   handler: RpcHandler;
   registry: NetworkRegistry;
 } {
-  const registry = createRegistry(options.onRequest !== undefined);
+  const registry = createRegistry(options.onRequest !== undefined, options.includeBnb);
   const chainIds = [...(options.chainIds ?? ['0x1'])];
   return {
     registry,
@@ -104,6 +107,8 @@ function standardHandler(options: {
       switch (body.method) {
         case 'eth_chainId':
           return response(request, chainIds.length > 1 ? chainIds.shift() : chainIds[0]);
+        case 'eth_getBalance':
+          return response(request, options.balance ?? '0xde0b6b3a7640000');
         case 'eth_getTransactionCount':
           return response(request, options.nonce ?? '0x0');
         case 'eth_estimateGas':
@@ -130,10 +135,12 @@ async function createEngine(
   options: {
     nonce?: string;
     gas?: string;
+    balance?: string;
     gasPrice?: string;
     baseFee?: string | null;
     priorityFee?: string;
     chainIds?: string[];
+    includeBnb?: boolean;
     timeoutMs?: number;
     onRequest?: (method: string, registry: NetworkRegistry) => void;
   } = {},
@@ -726,6 +733,73 @@ test('supports concurrent construction without shared nonce or network state', a
   assert.equal(first.nonce, 3n);
   assert.equal(second.nonce, 3n);
   assert.notEqual(first.value, second.value);
+});
+
+test('native Max reserves an EIP-1559 worst-case fee and reaches exact review affordability', async () => {
+  const { engine } = await createEngine();
+  const quote = await engine.estimateNativeTransferMax({ accountId: 'account-0', from: FROM, to: TO });
+  assert.equal(quote.feeModel, 'eip1559');
+  assert.equal(quote.gasLimit, 21_000n);
+  assert.equal(quote.maxFeePerGas, 2_500_000_000n);
+  assert.equal(quote.feeReserve, 52_500_000_000_000n);
+  assert.equal(quote.maxAmount, quote.rawBalance - quote.feeReserve);
+  const preview = await engine.construct({ networkId: 'ethereum', from: FROM, to: TO, value: quote.maxAmount });
+  assert.equal(preview.totalMaximumNativeAmount, quote.rawBalance);
+});
+
+test('native Max uses legacy gas price and clamps insufficient or exact-fee balances to zero', async () => {
+  const legacy = await createEngine({ baseFee: null, gasPrice: '0x3b9aca00' });
+  const legacyQuote = await legacy.engine.estimateNativeTransferMax({ accountId: 'account-0', from: FROM, to: TO });
+  assert.equal(legacyQuote.feeModel, 'legacy');
+  assert.equal(legacyQuote.maxFeePerGas, 1_000_000_000n);
+  assert.equal(legacyQuote.feeReserve, 21_000_000_000_000n);
+
+  const exactFee = await createEngine({ balance: `0x${(21_000_000_000_000n).toString(16)}` });
+  const exactQuote = await exactFee.engine.estimateNativeTransferMax({ accountId: 'account-0', from: FROM, to: TO });
+  assert.equal(exactQuote.rawBalance, 21_000_000_000_000n);
+  assert.equal(exactQuote.maxAmount, 0n);
+  const zero = await createEngine({ balance: '0x0' });
+  assert.equal((await zero.engine.estimateNativeTransferMax({ accountId: 'account-0', from: FROM, to: TO })).maxAmount, 0n);
+  const insufficient = await createEngine({ balance: '0x1' });
+  assert.equal((await insufficient.engine.estimateNativeTransferMax({ accountId: 'account-0', from: FROM, to: TO })).maxAmount, 0n);
+});
+
+test('native Max rejects RPC chain mismatch and selection changes, including away-and-back', async () => {
+  let chainId = '0x1';
+  const mismatchConfig = standardHandler();
+  const mismatchTransport = new FakeTransport((request) => {
+    const body = JSON.parse(request.body) as { method: string };
+    return body.method === 'eth_chainId' ? response(request, chainId) : mismatchConfig.handler(request);
+  });
+  const mismatchProvider = await createEvmRpcProvider(mismatchConfig.registry, { transport: mismatchTransport });
+  const mismatchEngine = await createTransactionConstructionEngine(mismatchConfig.registry, mismatchProvider, [{ accountId: 'account-0', address: FROM }]);
+  chainId = '0x2';
+  await expectError(() => mismatchEngine.estimateNativeTransferMax({ accountId: 'account-0', from: FROM, to: TO }), 'CHAIN_ID_MISMATCH');
+
+  let changed = false;
+  const switching = await createEngine({
+    includeBnb: true,
+    onRequest: (method, registry) => {
+      if (method === 'eth_estimateGas' && !changed) {
+        changed = true;
+        registry.selectActiveNetwork('bnb-smart-chain');
+        registry.selectActiveNetwork('ethereum');
+      }
+    },
+  });
+  await expectError(() => switching.engine.estimateNativeTransferMax({ accountId: 'account-0', from: FROM, to: TO }), 'NETWORK_CHANGED');
+});
+
+test('native Max fails closed when gas estimation is unavailable', async () => {
+  const configured = standardHandler();
+  const transport = new FakeTransport((request) => {
+    const body = JSON.parse(request.body) as { method: string };
+    if (body.method === 'eth_estimateGas') return rpcError(request, -32000, 'estimation unavailable');
+    return configured.handler(request);
+  });
+  const provider = await createEvmRpcProvider(configured.registry, { transport });
+  const engine = await createTransactionConstructionEngine(configured.registry, provider, [{ accountId: 'account-0', address: FROM }]);
+  await expectError(() => engine.estimateNativeTransferMax({ accountId: 'account-0', from: FROM, to: TO }), 'GAS_ESTIMATION_FAILED');
 });
 
 test('maps RPC timeouts during nonce resolution safely', async () => {

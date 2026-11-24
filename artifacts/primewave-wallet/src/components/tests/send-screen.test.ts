@@ -2,10 +2,11 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import type { EvmNetwork } from '@/src/core/networks';
 import type { PortfolioAssetViewModel } from '@/src/core/portfolio';
+import { formatAssetAmount, parseAssetAmount } from '@/src/core/assets';
 import {
   assetIdentityKey,
   createPublicSendDraft,
-  formatMaxAmount,
+  NativeMaxRequestGuard,
   getSendableAssets,
   selectDefaultSendAsset,
   validateAmount,
@@ -93,10 +94,57 @@ test('amount validation uses exact decimals, rejects zero, and enforces balance'
   assert.equal(validateAmount('1.26', 2, 125n).message, 'Amount exceeds the available balance.');
 });
 
-test('Max reserves native fees and preserves exact token balances', () => {
-  assert.equal(formatMaxAmount(asset()), '');
-  assert.equal(formatMaxAmount(asset({ assetType: 'fungible_token' })), '1.25');
-  assert.equal(formatMaxAmount(asset({ rawBalance: null, formattedBalance: null })), '');
+test('ERC-20 assets remain excluded from the native Send path', () => {
+  assert.equal(getSendableAssets([asset(), asset({ assetType: 'fungible_token' })], network).length, 1);
+});
+
+test('native amount validation accepts only the fee-adjusted Max balance', () => {
+  const quoteMax = 1_249_000_000_000_000_000n;
+  assert.equal(validateSendForm({ network, asset: asset(), recipient: validRecipient, amount: '1.249', availableBalance: quoteMax }).canReview, true);
+  assert.equal(validateSendForm({ network, asset: asset(), recipient: validRecipient, amount: '1.25', availableBalance: quoteMax }).canReview, false);
+  assert.equal(validateSendForm({ network, asset: asset(), recipient: validRecipient, amount: '0', availableBalance: 0n }).canReview, false);
+});
+
+test('Max request guard invalidates account, recipient, lock and network-away-and-back results', async () => {
+  const guard = new NativeMaxRequestGuard();
+  let revision = 4;
+  let current = true;
+  const stale = guard.begin();
+  const pending = Promise.resolve('old quote');
+  guard.invalidate(); // recipient edit or lock/background
+  const result = await pending;
+  assert.equal(guard.isCurrent(stale, revision, () => revision, () => current), false);
+
+  const switched = guard.begin();
+  revision += 2; // Ethereum -> BNB -> Ethereum
+  assert.equal(guard.isCurrent(switched, 4, () => revision, () => true), false);
+
+  const accountChange = guard.begin();
+  current = false;
+  assert.equal(guard.isCurrent(accountChange, revision, () => revision, () => current), false);
+});
+
+test('out-of-order Max responses cannot replace the latest request', () => {
+  const guard = new NativeMaxRequestGuard();
+  const oldRequest = guard.begin();
+  const latestRequest = guard.begin();
+  assert.equal(guard.isCurrent(latestRequest, 8, () => 8, () => true), true);
+  assert.equal(guard.isCurrent(oldRequest, 8, () => 8, () => true), false);
+});
+
+test('recipient edits invalidate an in-flight Max result', () => {
+  const guard = new NativeMaxRequestGuard();
+  let recipient = validRecipient;
+  const generation = guard.begin();
+  recipient = '0x0000000000000000000000000000000000000002';
+  guard.invalidate();
+  assert.equal(guard.isCurrent(generation, 2, () => 2, () => recipient === validRecipient), false);
+});
+
+test('native Max amount formatting round-trips tiny Wei without floating-point rounding', () => {
+  const text = formatAssetAmount(1n, 18);
+  assert.equal(text, '0.000000000000000001');
+  assert.equal(parseAssetAmount(text, 18), 1n);
 });
 
 test('review is gated by network, asset, recipient, and amount', () => {

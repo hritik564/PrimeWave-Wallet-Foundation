@@ -1,5 +1,5 @@
 import { normalizePublicEvmAddress } from '@/src/core/blockchain/account-state';
-import { AssetError, formatAssetAmount, parseAssetAmount } from '@/src/core/assets';
+import { AssetError, parseAssetAmount } from '@/src/core/assets';
 import type { AssetIdentity } from '@/src/core/assets';
 import type { EvmNetwork } from '@/src/core/networks';
 import type { PortfolioAssetViewModel } from '@/src/core/portfolio';
@@ -23,6 +23,31 @@ export interface PublicSendDraft {
   readonly recipient: string;
   readonly amount: string;
   readonly tokenContractAddress?: string;
+}
+
+/** Monotonic guard for async Max requests. It stores no wallet secrets or transaction authority. */
+export class NativeMaxRequestGuard {
+  private generation = 0;
+
+  begin(): number {
+    this.generation += 1;
+    return this.generation;
+  }
+
+  invalidate(): void {
+    this.generation += 1;
+  }
+
+  isCurrent(
+    generation: number,
+    selectionRevision: number,
+    getSelectionRevision: () => number,
+    isContextCurrent: () => boolean,
+  ): boolean {
+    return generation === this.generation &&
+      selectionRevision === getSelectionRevision() &&
+      isContextCurrent();
+  }
 }
 
 export function assetIdentityKey(identity: AssetIdentity): string {
@@ -120,11 +145,13 @@ export function validateSendForm({
   asset,
   recipient,
   amount,
+  availableBalance,
 }: {
   readonly network: EvmNetwork;
   readonly asset: PortfolioAssetViewModel | null;
   readonly recipient: string;
   readonly amount: string;
+  readonly availableBalance?: bigint | null;
 }): {
   readonly recipient: RecipientValidation;
   readonly amount: AmountValidation;
@@ -145,7 +172,7 @@ export function validateSendForm({
   const amountResult = validateAmount(
     amount,
     asset?.decimals ?? null,
-    asset?.rawBalance ?? null,
+    availableBalance === undefined ? asset?.rawBalance ?? null : availableBalance,
   );
 
   let message: string | null = null;
@@ -199,12 +226,4 @@ export function createPublicSendDraft({
       : {}),
   };
   return Object.freeze(draft);
-}
-
-export function formatMaxAmount(asset: PortfolioAssetViewModel | null): string {
-  if (!asset || asset.assetType === 'native' || asset.availabilityState !== 'available' ||
-      asset.rawBalance === null || asset.rawBalance <= 0n || asset.decimals === null) {
-    return '';
-  }
-  return formatAssetAmount(asset.rawBalance, asset.decimals);
 }

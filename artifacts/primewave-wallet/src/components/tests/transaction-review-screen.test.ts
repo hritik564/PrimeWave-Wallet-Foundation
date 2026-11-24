@@ -202,6 +202,25 @@ function engine(options: {
 } = {}) {
   return {
     getNetwork: () => options.network ?? network,
+    getNativeBalance: async (_accountId: string, address: string) => ({
+      address,
+      networkId: network.id,
+      chainId: BigInt(network.chainId as number),
+      raw: 10_000_000_000_000_000_000n,
+    }),
+    estimateNativeTransferMax: async () => ({
+      accountId: 'account-1',
+      address: sender,
+      networkId: network.id,
+      chainId: BigInt(network.chainId as number),
+      recipient,
+      rawBalance: 10_000_000_000_000_000_000n,
+      gasLimit: 21_000n,
+      feeModel: options.feeModel ?? 'eip1559',
+      maxFeePerGas: 2n,
+      feeReserve: 42_000n,
+      maxAmount: 9_999_999_999_999_958_000n,
+    }),
     construct: async (intent: TransactionIntent) => {
       options.onConstruct?.(intent);
       return previewFor(intent, options.feeModel);
@@ -440,6 +459,8 @@ test('explorer links use only configured transaction URL templates', () => {
 test('construction and fee failures are sanitized', async () => {
   const failingEngine = {
     getNetwork: () => network,
+    getNativeBalance: async (_accountId: string, address: string) => ({ address, networkId: network.id, chainId: BigInt(network.chainId as number), raw: 10n ** 20n }),
+    estimateNativeTransferMax: async () => { throw new Error('not used'); },
     construct: async () => { throw new Error('https://secret-rpc.invalid/raw-stack'); },
   };
   await assert.rejects(

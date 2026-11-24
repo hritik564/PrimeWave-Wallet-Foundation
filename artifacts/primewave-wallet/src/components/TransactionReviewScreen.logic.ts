@@ -8,6 +8,7 @@ import type {
   TransactionIntent,
   TransactionPreview,
   UnsignedTransaction,
+  NativeTransferMaxQuote,
 } from '@/src/core/transactions/construction';
 import type {
   CreateTransactionSigningAuthorizationInput,
@@ -51,6 +52,17 @@ const ERC20_TRANSFER_ABI = [
 export interface TransactionConstructionDependency {
   readonly getNetwork: () => EvmNetwork;
   readonly construct: (intent: TransactionIntent) => Promise<TransactionPreview>;
+  readonly getNativeBalance: (accountId: string, address: string) => Promise<{
+    readonly address: string;
+    readonly networkId: string;
+    readonly chainId: bigint;
+    readonly raw: bigint;
+  }>;
+  readonly estimateNativeTransferMax: (input: {
+    readonly accountId: string;
+    readonly from: string;
+    readonly to: string;
+  }) => Promise<NativeTransferMaxQuote>;
 }
 
 export interface TransactionSigningDependency {
@@ -445,10 +457,28 @@ export async function prepareTransactionReview(
   }
   assertConstructedPreview(preview, intent, network);
 
+  let currentNativeBalance: Awaited<ReturnType<TransactionConstructionDependency['getNativeBalance']>>;
+  try {
+    currentNativeBalance = await constructionEngine.getNativeBalance(account.accountId, account.address);
+  } catch (error) {
+    const code = error instanceof Error && 'code' in error
+      ? String((error as Error & { readonly code?: unknown }).code)
+      : '';
+    if (code.includes('CHAIN')) return fail('CHAIN_ID_MISMATCH');
+    if (code.includes('NETWORK')) return fail('NETWORK_CHANGED');
+    return fail('BALANCE_UNAVAILABLE');
+  }
+  if (
+    currentNativeBalance.address.toLowerCase() !== account.address.toLowerCase() ||
+    currentNativeBalance.networkId !== network.id ||
+    currentNativeBalance.chainId !== BigInt(network.chainId) ||
+    currentNativeBalance.raw < 0n
+  ) return fail('CHAIN_ID_MISMATCH');
+
   if (
     asset.assetType === 'native'
-      ? preview.totalMaximumNativeAmount > nativeAsset.rawBalance
-      : preview.totalMaximumNativeAmount > nativeAsset.rawBalance
+      ? preview.totalMaximumNativeAmount > currentNativeBalance.raw
+      : preview.totalMaximumNativeAmount > currentNativeBalance.raw
   ) {
     return fail('INSUFFICIENT_NATIVE_BALANCE');
   }
@@ -465,7 +495,7 @@ export async function prepareTransactionReview(
     asset,
     preview,
     rawAmount,
-    nativeBalance: nativeAsset.rawBalance,
+    nativeBalance: currentNativeBalance.raw,
     tokenBalance: asset.assetType === 'fungible_token' ? asset.rawBalance : null,
     warnings: Object.freeze([...new Set(warnings)]),
     reviewContextKey: reviewContextKey(draft, account, network, asset),

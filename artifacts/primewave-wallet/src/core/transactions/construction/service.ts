@@ -30,6 +30,7 @@ import type {
   TransactionType,
   LegacyUnsignedTransaction,
   Eip1559UnsignedTransaction,
+  NativeTransferMaxQuote,
   UnsignedTransaction,
 } from './models';
 
@@ -385,6 +386,7 @@ export class TransactionConstructionEngine {
   private readonly gasFeeEngine: GasFeeEngineDependency;
   private readonly accountStateService: AccountStateDependency;
   private readonly accounts: ReadonlyMap<string, PublicWalletAccount>;
+  private readonly accountsById: ReadonlyMap<string, PublicWalletAccount>;
   private readonly now: () => number;
 
   constructor(
@@ -398,15 +400,12 @@ export class TransactionConstructionEngine {
       options.gasFeeEngine ?? new GasFeeEngine(registry, provider);
     this.accountStateService =
       options.accountStateService ?? new EvmAccountStateService(registry, provider);
-    this.accounts = new Map(
-      accounts.map((account) => {
-        const address = normalizeAddress(account.address, 'INVALID_FROM_ADDRESS');
-        return [
-          address.toLowerCase(),
-          { accountId: account.accountId, address },
-        ] as const;
-      }),
-    );
+    const normalizedAccounts = accounts.map((account) => ({
+      accountId: account.accountId,
+      address: normalizeAddress(account.address, 'INVALID_FROM_ADDRESS'),
+    }));
+    this.accounts = new Map(normalizedAccounts.map((account) => [account.address.toLowerCase(), account]));
+    this.accountsById = new Map(normalizedAccounts.map((account) => [account.accountId, account]));
     this.now = options.now ?? (() => Date.now());
     assertMatchingContext(registry, provider, this.network);
   }
@@ -415,9 +414,123 @@ export class TransactionConstructionEngine {
     return this.network;
   }
 
+  async getNativeBalance(accountId: string, address: string) {
+    const account = this.accountsById.get(accountId);
+    const normalized = normalizeAddress(address, 'INVALID_FROM_ADDRESS');
+    if (!account || account.address.toLowerCase() !== normalized.toLowerCase()) {
+      throw new TransactionConstructionError('UNKNOWN_ACCOUNT');
+    }
+    const revision = this.registry.getSelectionRevision();
+    assertMatchingContext(this.registry, this.provider, this.network);
+    try {
+      const result = await this.accountStateService.getNativeBalance(normalized);
+      this.assertCurrentRevision(revision);
+      if (
+        result.address.toLowerCase() !== normalized.toLowerCase() ||
+        result.networkId !== this.network.id ||
+        result.chainId !== BigInt(this.network.chainId as number) ||
+        result.raw < 0n
+      ) {
+        throw new TransactionConstructionError('CHAIN_ID_MISMATCH');
+      }
+      return result;
+    } catch (error) {
+      throw dependencyError(error);
+    }
+  }
+
+  async estimateNativeTransferMax(input: {
+    readonly accountId: string;
+    readonly from: string;
+    readonly to: string;
+  }): Promise<NativeTransferMaxQuote> {
+    const account = this.accountsById.get(input.accountId);
+    const from = normalizeAddress(input.from, 'INVALID_FROM_ADDRESS');
+    const to = normalizeAddress(input.to, 'INVALID_RECIPIENT');
+    if (!account || account.address.toLowerCase() !== from.toLowerCase()) {
+      throw new TransactionConstructionError('UNKNOWN_ACCOUNT');
+    }
+    const revision = this.registry.getSelectionRevision();
+    assertMatchingContext(this.registry, this.provider, this.network);
+
+    try {
+      const balance = await this.accountStateService.getNativeBalance(from);
+      this.assertCurrentRevision(revision);
+      const chainId = BigInt(this.network.chainId as number);
+      if (
+        balance.address.toLowerCase() !== from.toLowerCase() ||
+        balance.networkId !== this.network.id ||
+        balance.chainId !== chainId ||
+        balance.raw < 0n
+      ) {
+        throw new TransactionConstructionError('CHAIN_ID_MISMATCH');
+      }
+
+      let gasLimit = await this.estimateNativeGas(from, to, 0n, revision);
+      const feeData = await this.readFeeData('auto');
+      this.assertCurrentRevision(revision);
+      if (feeData.model === 'unavailable') {
+        throw new TransactionConstructionError('FEE_UNAVAILABLE');
+      }
+      if (feeData.networkId !== this.network.id || feeData.chainId !== chainId) {
+        throw new TransactionConstructionError('CHAIN_ID_MISMATCH');
+      }
+      const maxFeePerGas = feeData.model === 'legacy' ? feeData.gasPrice : feeData.maxFeePerGas;
+      if (maxFeePerGas < 0n) throw new TransactionConstructionError('FEE_UNAVAILABLE');
+
+      // Gas can depend on msg.value for contract recipients. Accept only a
+      // stable estimate for the candidate amount; otherwise fail closed.
+      for (let attempt = 0; attempt < 8; attempt += 1) {
+        const feeReserve = gasLimit * maxFeePerGas;
+        const maxAmount = balance.raw > feeReserve ? balance.raw - feeReserve : 0n;
+        const verifiedGasLimit = await this.estimateNativeGas(from, to, maxAmount, revision);
+        if (verifiedGasLimit === gasLimit) {
+          return Object.freeze({
+            accountId: account.accountId,
+            address: from,
+            networkId: this.network.id,
+            chainId,
+            recipient: to,
+            rawBalance: balance.raw,
+            gasLimit,
+            feeModel: feeData.model,
+            maxFeePerGas,
+            feeReserve,
+            maxAmount,
+          });
+        }
+        gasLimit = verifiedGasLimit;
+      }
+      throw new TransactionConstructionError('GAS_ESTIMATION_FAILED');
+    } catch (error) {
+      throw dependencyError(error);
+    }
+  }
+
+  private async estimateNativeGas(from: string, to: string, value: bigint, revision: number): Promise<bigint> {
+    const estimate = await this.gasFeeEngine.estimateGas({ from, to, value, data: '0x' });
+    this.assertCurrentRevision(revision);
+    if (estimate.gasLimit <= 0n) throw new TransactionConstructionError('GAS_ESTIMATION_FAILED');
+    if (
+      estimate.networkId !== this.network.id ||
+      estimate.chainId !== BigInt(this.network.chainId as number)
+    ) {
+      throw new TransactionConstructionError('CHAIN_ID_MISMATCH');
+    }
+    return estimate.gasLimit;
+  }
+
+  private assertCurrentRevision(revision: number): void {
+    assertMatchingContext(this.registry, this.provider, this.network);
+    if (this.registry.getSelectionRevision() !== revision) {
+      throw new TransactionConstructionError('NETWORK_CHANGED');
+    }
+  }
+
   async construct(intent: TransactionIntent): Promise<TransactionPreview> {
     try {
       const normalized = normalizeIntent(intent);
+      const selectionRevision = this.registry.getSelectionRevision();
       return await this.runLogged(async () => {
         assertMatchingContext(
           this.registry,
@@ -445,6 +558,7 @@ export class TransactionConstructionEngine {
           nonce = nonceState.value;
         }
         assertMatchingContext(this.registry, this.provider, this.network);
+        this.assertCurrentRevision(selectionRevision);
 
         let gasLimit = normalized.gasLimit;
         if (gasLimit === undefined) {
@@ -466,6 +580,7 @@ export class TransactionConstructionEngine {
           gasLimit = estimate.gasLimit;
         }
         assertMatchingContext(this.registry, this.provider, this.network);
+        this.assertCurrentRevision(selectionRevision);
 
         const feeData = await this.readFeeData(normalized.feePreference, normalized);
         if (feeData.model === 'unavailable') {
@@ -478,6 +593,7 @@ export class TransactionConstructionEngine {
           throw new TransactionConstructionError('CHAIN_ID_MISMATCH');
         }
         assertMatchingContext(this.registry, this.provider, this.network);
+        this.assertCurrentRevision(selectionRevision);
 
         const feePerGas =
           feeData.model === 'legacy'

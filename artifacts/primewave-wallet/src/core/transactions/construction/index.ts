@@ -13,6 +13,7 @@ export type {
   NormalizedTransactionIntent,
   PublicWalletAccount,
   TransactionConstructionEngineOptions,
+  NativeTransferMaxQuote,
   TransactionFeeConfiguration,
   TransactionFeePreference,
   TransactionIntent,
