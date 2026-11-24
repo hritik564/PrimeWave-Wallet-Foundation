@@ -11,6 +11,39 @@ out-tsc
 # dependencies
 node_modules
 
+# Local credentials and environment files must not enter EAS build archives.
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+*.mobileprovision
+credentials.json
+google-services.json
+GoogleService-Info.plist
+*mnemonic*
+*seed-phrase*
+*seed_phrase*
+*recovery-phrase*
+*recovery_phrase*
+*private-key*
+*private_key*
+*.log
+*.local
+
+# Generated native build output
+**/android/.gradle/
+**/android/build/
+**/android/app/build/
+**/ios/Pods/
+
 # IDEs and editors
 /.idea
 .project
